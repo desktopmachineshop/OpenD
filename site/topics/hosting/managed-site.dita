@@ -42,6 +42,8 @@
       <p>A push that fails validation never goes live; the previous version stays up. Run
         <cmdname>opend validate</cmdname> locally or in CI to catch problems first, and ask
         <ph keyref="help-contact"/> for the full list of a failed build's diagnostics.</p>
+      <p>If the operator also runs the web editor, ask them to add the authors who do not use Git. See
+        <xref href="../editor/editor.dita"/>.</p>
     </result>
   </taskbody>
 </task>

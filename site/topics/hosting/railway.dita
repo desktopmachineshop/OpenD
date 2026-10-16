@@ -83,6 +83,8 @@ NODE_ENV=production</codeblock>
     <result>
       <p>A public demo can set <codeph>NODE_ENV=development</codeph> and <codeph>OPEND_DEV_LOGIN=1</codeph> so
         visitors pick a sample reader. Never do this with real content.</p>
+      <p>To add the web editor, create a third service from the same Dockerfile with the start command
+        <codeph>node dist/bin.js editor serve</codeph> and its own domain. See <xref href="editor.dita"/>.</p>
       <p>Tagged releases are published as images to <codeph><keyword keyref="image-name"/></codeph>, so a
         service can deploy an image tag instead of building from the repository.</p>
     </result>

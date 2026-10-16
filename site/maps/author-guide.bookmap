@@ -30,6 +30,13 @@
     <topicref href="../topics/authoring/ci.dita"/>
   </chapter>
 
+  <chapter navtitle="Web editor" product="core hosted">
+    <topicref href="../topics/editor/editor.dita"/>
+    <topicref href="../topics/editor/editor-edit.dita"/>
+    <topicref href="../topics/editor/editor-publish.dita"/>
+    <topicref href="../topics/editor/editor-conflicts.dita"/>
+  </chapter>
+
   <chapter navtitle="Applicability">
     <topicref href="../topics/authoring/applicability.dita"/>
     <topicref href="../topics/authoring/release-ranges.dita"/>

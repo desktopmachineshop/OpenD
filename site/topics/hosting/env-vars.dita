@@ -15,6 +15,7 @@
           problem.</li>
         <li>An empty value counts as unset. So does an unresolved reference variable on Railway.</li>
         <li>Flags are on when set to <codeph>1</codeph> or <codeph>true</codeph>, and off otherwise.</li>
+        <li>The web editor has its own settings, listed in <xref href="editor.dita"/>.</li>
       </ul>
       <note conkeyref="reuse/restart"/>
     </section>

@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE task PUBLIC "-//OASIS//DTD DITA Task//EN" "task.dtd">
+<task id="editor-edit" product="core hosted" audience="author">
+  <title>Edit and save a topic</title>
+  <shortdesc>Change a topic's source, watch the preview update as you type, and save it to your working
+    branch.</shortdesc>
+  <prolog>
+    <resourceid appname="opend-console" appid="editor.save"/>
+  </prolog>
+  <taskbody>
+    <steps>
+      <step>
+        <cmd>On the <uicontrol>Files</uicontrol> page, choose the topic or map.</cmd>
+        <info><p>Files you changed on your branch are marked <uicontrol>changed</uicontrol>.</p></info>
+      </step>
+      <step>
+        <cmd>Edit the DITA source.</cmd>
+        <info>
+          <p>As you type, the preview next to the source rebuilds with your unsaved text. It is the staff
+            view: everything is shown and conditions are marked. <uicontrol>Problems</uicontrol> lists what
+            validation finds in the file, the same as <cmdname>opend validate</cmdname>; see
+            <xref keyref="diagnostics"/>.</p>
+        </info>
+      </step>
+      <step>
+        <cmd>Optional: check what a customer sees. Under the preview, choose an org and
+          <uicontrol>Open</uicontrol>.</cmd>
+        <info>
+          <p>The page opens with that org's products, features and version, as the docs site would show it.
+            It shows your last save, not unsaved text. The link expires after 30 minutes and is logged.</p>
+        </info>
+      </step>
+      <step>
+        <cmd>Optional: add a note about the change, then choose <uicontrol>Save</uicontrol>.</cmd>
+        <stepresult>
+          <p>The save is a commit to your working branch, and the page shows its short id. Your first save
+            creates the branch from the main branch. Nothing is published.</p>
+        </stepresult>
+      </step>
+    </steps>
+    <result>
+      <ul>
+        <li>A save is refused, and nothing is saved, when the file is not well-formed XML. Fix the problem it
+          names and save again.</li>
+        <li>Validation problems do not stop a save, but they stop you publishing.</li>
+        <li>If the file changed since you opened it, by another save or by a merge from the main branch, the
+          save is refused so it cannot overwrite that change. Copy your text, reload the page, and apply it
+          again.</li>
+        <li>After a save, the editor merges the latest main branch into yours. If that conflicts, it takes you
+          to <xref href="editor-conflicts.dita"/>.</li>
+      </ul>
+    </result>
+  </taskbody>
+
+  <task id="new-topic">
+    <title>Create a topic</title>
+    <shortdesc>Start a topic from a template and, optionally, add it to the navigation.</shortdesc>
+    <taskbody>
+      <steps>
+        <step>
+          <cmd>On the <uicontrol>Files</uicontrol> page, under <uicontrol>New topic</uicontrol>, fill in the
+            form.</cmd>
+          <choices>
+            <choice><uicontrol>Title</uicontrol>: the topic's title.</choice>
+            <choice><uicontrol>File name</uicontrol>: lowercase letters, digits and dashes.
+              <filepath>.dita</filepath> is added.</choice>
+            <choice><uicontrol>Folder</uicontrol>: where the file goes.</choice>
+            <choice><uicontrol>Type</uicontrol>: concept (explains what something is), task (step-by-step
+              instructions), reference (facts to look up) or a general topic.</choice>
+            <choice><uicontrol>Add to navigation</uicontrol>: a map to add it to, or <uicontrol>Not
+              yet</uicontrol>.</choice>
+          </choices>
+        </step>
+        <step>
+          <cmd>Choose <uicontrol>Create topic</uicontrol>.</cmd>
+          <stepresult>
+            <p>The new topic, and the map if you chose one, are saved to your working branch in one commit,
+              and the topic opens for editing.</p>
+          </stepresult>
+        </step>
+      </steps>
+    </taskbody>
+  </task>
+</task>

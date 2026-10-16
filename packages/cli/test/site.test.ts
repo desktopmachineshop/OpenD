@@ -125,6 +125,17 @@ describe('the OpenD documentation site', async () => {
       expect(sorted(documented)).toEqual(sorted(read));
     });
 
+    it('lists every environment variable the web editor reads', () => {
+      const config = readFileSync(join(ROOT, 'packages/editor/src/config.ts'), 'utf8');
+      const schema = config.slice(config.indexOf('const envSchema'), config.indexOf('.refine('));
+      const read = new Set([...schema.matchAll(/^ {4}([A-Z][A-Z0-9_]+):/gm)].map((m) => m[1]!));
+      const documented = find('topics/hosting/editor', (el) => el.name === 'property').map(
+        (p) => p.attrs.id!,
+      );
+      expect(read.size).toBeGreaterThan(15);
+      expect(sorted(documented)).toEqual(sorted(read));
+    });
+
     it('lists every admin API route', () => {
       const admin = readFileSync(join(ROOT, 'packages/server/src/admin.ts'), 'utf8');
       const routes = [...admin.matchAll(/scope\.(get|post|put|delete)\('([^']+)'/g)].map(
@@ -238,8 +249,12 @@ describe('the OpenD documentation site', async () => {
     expect(managed('topics/hosting/managed-site')).toBe(true);
     expect(managed('topics/hosting/docker-compose')).toBe(false);
     expect(managed('topics/start/install-cli')).toBe(true);
-    expect(visible('admin')('topics/next/editor')).toBe(true);
-    expect(visible('developer')('topics/next/editor')).toBe(false);
+    expect(visible('admin')('topics/next/console')).toBe(true);
+    expect(visible('developer')('topics/next/console')).toBe(false);
+    // The web editor: authors on either product, its hosting guide for self-hosters only.
+    expect(visible('author')('topics/editor/editor')).toBe(true);
+    expect(visible('author')('topics/hosting/editor')).toBe(false);
+    expect(visible('self-hoster')('topics/hosting/editor')).toBe(true);
   });
 
   it('drops the self-hosting chapter from a managed customer’s Administrator Guide', () => {

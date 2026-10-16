@@ -27,8 +27,9 @@
         reader without the topic simply gets the fallback, exactly as if the key pointed nowhere. The same
         holds when only part of a key's targets are hidden, which is how one key can open different topics
         for different releases.</p>
-      <p>In this site, the <codeph>opend-console</codeph> keys for the web editor point at an early-access
-        topic. Readers without the <codeph>early-access</codeph> feature fall back to the overview.</p>
+      <p>In this site, the <codeph>opend-console</codeph> keys for the operator console point at an
+        early-access topic. Readers without the <codeph>early-access</codeph> feature fall back to the
+        overview.</p>
     </section>
   </conbody>
 </concept>
