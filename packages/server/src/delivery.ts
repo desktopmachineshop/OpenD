@@ -34,7 +34,7 @@ const CONTENT_TYPES: Record<string, string> = {
 };
 
 /** Pages are personalised and never cached by browsers or proxies. No scripts run. */
-const PAGE_HEADERS = {
+export const PAGE_HEADERS = {
   'cache-control': 'private, no-store',
   'x-content-type-options': 'nosniff',
   'referrer-policy': 'same-origin',
@@ -43,13 +43,13 @@ const PAGE_HEADERS = {
 };
 
 /** Author-supplied files (SVG can carry script) are sandboxed when opened directly. */
-const ASSET_HEADERS = {
+export const ASSET_HEADERS = {
   'cache-control': 'private, max-age=300',
   'x-content-type-options': 'nosniff',
   'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'; sandbox",
 };
 
-interface ReaderRelease {
+export interface ReaderRelease {
   stored: StoredRelease;
   view: ReleaseView;
   key: string;
@@ -90,7 +90,7 @@ async function storedRelease(ctx: AppContext, id: number): Promise<StoredRelease
 }
 
 /** The live release for the reader's line, filtered for their entitlement set. */
-async function readerRelease(
+export async function readerRelease(
   ctx: AppContext,
   reader: ReaderContext,
 ): Promise<ReaderRelease | string> {

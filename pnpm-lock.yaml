@@ -119,6 +119,9 @@ importers:
       '@fastify/cookie':
         specifier: ^11.1.3
         version: 11.1.3
+      '@opend/embed':
+        specifier: workspace:*
+        version: link:../embed
       '@opend/filter':
         specifier: workspace:*
         version: link:../filter
@@ -140,6 +143,9 @@ importers:
       fastify:
         specifier: ^5.12.7
         version: 5.12.7
+      jose:
+        specifier: ^6.2.12
+        version: 6.2.12
       lru-cache:
         specifier: ^11.5.3
         version: 11.5.3
@@ -152,10 +158,6 @@ importers:
       zod:
         specifier: ^4.6.7
         version: 4.6.7
-    devDependencies:
-      jose:
-        specifier: ^6.2.12
-        version: 6.2.12
 
   packages/store:
     dependencies:

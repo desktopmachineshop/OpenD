@@ -153,3 +153,16 @@ export async function getReaderAccess(db: Db, readerId: number): Promise<ReaderA
       : null,
   };
 }
+
+/** A registered reader by email (case-insensitive), with their org's slug. */
+export async function findReaderByEmail(
+  db: Db,
+  email: string,
+): Promise<(Reader & { orgSlug: string }) | null> {
+  const { rows } = await db.query<Reader & { orgSlug: string }>(
+    `select ${READER_COLUMNS}, o.slug as "orgSlug" from readers r join orgs o on o.id = r.org_id
+     where lower(r.email) = lower($1)`,
+    [email.trim()],
+  );
+  return rows[0] ?? null;
+}
