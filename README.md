@@ -191,6 +191,7 @@ Customer and licence data can come from billing or a CRM, instead of per-org adm
 - `X-OpenD-Timestamp` carries the time in Unix seconds. It must be within 5 minutes of the server's clock.
 - `X-OpenD-Signature` is `sha256=` followed by the hex HMAC-SHA256 of `<timestamp>.<raw body>`.
 - `Idempotency-Key` is required. A repeated key returns `{"status":"duplicate"}` and changes nothing. A delivery that fails validation (422) does not record its key, so the CRM can fix the data and retry with the same key.
+- The key is not signed, so each signed request is also applied only once: resending the same timestamp, body and signature returns `{"status":"duplicate"}` whatever its key. To send an identical change again (for example, re-adding a reader you just removed), sign it with a new timestamp.
 
 **Webhook events:**
 

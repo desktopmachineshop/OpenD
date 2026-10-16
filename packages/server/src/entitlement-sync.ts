@@ -149,8 +149,9 @@ export function registerEntitlementSync(app: FastifyInstance, ctx: AppContext): 
       const body = request.body;
       if (!Buffer.isBuffer(body))
         return reply.code(415).send({ error: 'expected application/json' });
+      const signature = request.headers['x-opend-signature'] as string | undefined;
       const check = verifyEntitlementSignature(secret, body, {
-        signature: request.headers['x-opend-signature'] as string | undefined,
+        signature,
         timestamp: request.headers['x-opend-timestamp'] as string | undefined,
       });
       if (check === 'stale') return reply.code(401).send({ error: 'timestamp outside tolerance' });
@@ -169,10 +170,15 @@ export function registerEntitlementSync(app: FastifyInstance, ctx: AppContext): 
       if (!payload) return reply;
 
       try {
-        // The key is recorded with the change, so a failed attempt can be retried
-        // with the same key and a repeated one changes nothing.
+        // The key and the signature are recorded with the change, so a failed
+        // attempt can be retried and a repeated one changes nothing. The key is
+        // not signed, so the signature (over the timestamp and body) is what
+        // stops a captured request being replayed under a fresh key within the
+        // timestamp window.
         const result = await withTransaction(ctx.pool, async (db) => {
-          // Namespaced so a CRM key can never collide with a GitHub delivery id.
+          // Namespaced so neither can collide with a GitHub delivery id.
+          if (!(await recordDelivery(db, `entitlements-signature:${signature}`, 'entitlements')))
+            return null;
           if (!(await recordDelivery(db, `entitlements:${key}`, 'entitlements'))) return null;
           return syncEntitlementsInTransaction(
             db,
