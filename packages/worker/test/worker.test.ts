@@ -1,5 +1,5 @@
 import { generateKeyPairSync } from 'node:crypto';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { importSPKI, jwtVerify } from 'jose';
@@ -117,6 +117,21 @@ describe('fetchSource', () => {
     await expect(fetchSource(repo.dir, 'deadbeef'.repeat(5), 'secret-token')).rejects.not.toThrow(
       /secret-token/,
     );
+  });
+});
+
+describe('fetchSource option injection', () => {
+  it('never treats a source URL as a git option', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'opend-inject-'));
+    const marker = join(dir, 'pwned');
+    try {
+      await expect(
+        fetchSource(`--upload-pack=touch ${marker};`, 'deadbeef'.repeat(5)),
+      ).rejects.toThrow(/^fetching \w+ failed/);
+      expect(existsSync(marker)).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 
