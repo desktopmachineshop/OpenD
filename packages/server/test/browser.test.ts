@@ -176,6 +176,12 @@ describe.skipIf(!url || !hasBrowser)('embedded help widget in a browser', () => 
     await expect.poll(() => frameText(page)).toContain('Hold the Gadget pairing button');
 
     // Escape inside the frame closes the panel and returns focus to the host page.
+    // The topic's text can render before the frame script runs; wait until it has.
+    await (
+      await helpFrame(page)
+    ).waitForSelector('html[data-opend-embedded]', {
+      state: 'attached',
+    });
     await (await helpFrame(page)).press('body', 'Escape');
     await expect
       .poll(() =>
