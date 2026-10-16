@@ -16,6 +16,7 @@
   ],
   "dependencies": {
     "@opend/build": "workspace:*",
+    "@opend/filter": "workspace:*",
     "@opend/model": "workspace:*",
     "@opend/store": "workspace:*",
     "@opend/validate": "workspace:*",

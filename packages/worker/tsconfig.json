@@ -4,12 +4,13 @@
     "rootDir": "src",
     "outDir": "dist"
   },
-  "include": [
-    "src"
-  ],
+  "include": ["src"],
   "references": [
     {
       "path": "../model"
+    },
+    {
+      "path": "../filter"
     },
     {
       "path": "../build"

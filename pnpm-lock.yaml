@@ -181,6 +181,9 @@ importers:
       '@opend/build':
         specifier: workspace:*
         version: link:../build
+      '@opend/filter':
+        specifier: workspace:*
+        version: link:../filter
       '@opend/model':
         specifier: workspace:*
         version: link:../model

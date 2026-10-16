@@ -41,7 +41,11 @@ export class FsBlobStore implements BlobStore {
   }
 }
 
-/** Blob key for a release asset. */
-export function assetKey(releaseId: number, path: string): string {
-  return `releases/${releaseId}/${path}`;
+/**
+ * Blob key for a file of the docs tree at a commit. Keyed by commit rather than
+ * release so the worker can upload before the release row exists, and a
+ * rebuild of the same commit overwrites identical bytes.
+ */
+export function assetKey(repoId: number, sha: string, path: string): string {
+  return `repos/${repoId}/${sha}/${path}`;
 }
