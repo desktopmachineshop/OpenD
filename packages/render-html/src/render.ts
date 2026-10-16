@@ -309,9 +309,26 @@ function linkTarget(
     return href === null ? null : { href, defaultText: asset.split('/').pop() ?? asset };
   }
   const href = node.attrs.href;
-  if (href !== undefined && node.attrs.scope === 'external') return { href, defaultText: href };
-  if (href !== undefined && /^[a-z][a-z0-9+.-]*:/i.test(href)) return { href, defaultText: href };
+  const external = href !== undefined && (node.attrs.scope === 'external' || urlScheme(href));
+  if (external) return safeUrl(href, LINK_SCHEMES) ? { href, defaultText: href } : null;
   return undefined; // unresolved (already reported by the build)
+}
+
+/** Schemes an authored link may use. Anything else (`javascript:`, `data:`) is dropped. */
+const LINK_SCHEMES = new Set(['http', 'https', 'mailto', 'tel', 'ftp']);
+const IMAGE_SCHEMES = new Set(['http', 'https']);
+
+/** The lower-case scheme of a URL as a browser reads it (ignoring whitespace and controls). */
+function urlScheme(url: string): string | null {
+  // eslint-disable-next-line no-control-regex
+  const m = /^([a-z][a-z0-9+.-]*):/i.exec(url.replace(/[\u0000-\u0020\u007f]/g, ''));
+  return m ? m[1]!.toLowerCase() : null;
+}
+
+/** Relative URLs, and absolute ones with an allowed scheme. */
+function safeUrl(url: string, schemes: ReadonlySet<string>): boolean {
+  const scheme = urlScheme(url);
+  return scheme === null || schemes.has(scheme);
 }
 
 function renderXref(node: ElementNode, ctx: Ctx): string {
@@ -351,7 +368,13 @@ function renderRelatedLinks(node: ElementNode, ctx: Ctx): string {
 
 function renderImage(node: ElementNode, ctx: Ctx): string {
   const asset = node.attrs[ASSET_ATTR];
-  const src = asset !== undefined ? ctx.assetSrc(asset, 'image') : node.attrs.href;
+  const href = node.attrs.href;
+  const src =
+    asset !== undefined
+      ? ctx.assetSrc(asset, 'image')
+      : href !== undefined && safeUrl(href, IMAGE_SCHEMES)
+        ? href
+        : null;
   const altEl = childElements(node, 'alt')[0];
   const alt = altEl ? textContent(altEl) : (node.attrs.alt ?? '');
   if (!src) return alt ? tag('span', { class: 'image-unavailable' }, escapeHtml(alt)) : '';

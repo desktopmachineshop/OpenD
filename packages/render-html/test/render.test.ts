@@ -132,6 +132,28 @@ describe('renderTopic', () => {
     expect(html).not.toContain('/c.html');
   });
 
+  it('never emits script URLs from authored links and images', () => {
+    const t = topic(
+      'a',
+      '<topic id="a"><title>A</title><body>' +
+        '<p><xref href="javascript:alert(1)" scope="external">x1</xref></p>' +
+        '<p><xref href=" JaVa&#9;Script:alert(2)" scope="external">x2</xref></p>' +
+        '<p><xref href="data:text/html,&lt;script&gt;alert(3)&lt;/script&gt;">x3</xref></p>' +
+        '<p><xref href="vbscript:msgbox(4)">x4</xref></p>' +
+        '<p><image href="javascript:alert(5)" scope="external"><alt>pic</alt></image></p>' +
+        '<related-links><link href="javascript:alert(6)" scope="external"><linktext>x6</linktext></link></related-links>' +
+        '<p><xref href="https://example.com/ok" scope="external">ok</xref></p>' +
+        '<p><xref href="mailto:help@example.com">mail</xref></p>' +
+        '</body></topic>',
+    );
+    const html = renderTopic(viewRelease(release([t]), []), t);
+    expect(html).not.toMatch(/script:|data:text/i);
+    expect(html).toContain('<span class="xref xref-unavailable">x1</span>');
+    expect(html).toContain('<span class="image-unavailable">pic</span>');
+    expect(html).toContain('href="https://example.com/ok"');
+    expect(html).toContain('href="mailto:help@example.com"');
+  });
+
   it('marks conditions and shows every alternative only in the staff view', () => {
     const t = topic(
       'a',
@@ -192,6 +214,26 @@ describe('renderNav and renderPage', () => {
   it('omits hidden entries, empty headings and invisible topics', () => {
     const nav = renderNav(viewRelease(rel, [widgetV1]), 'a');
     expect(nav).toBe('<ul><li><a href="/a.html" aria-current="page">Alpha</a></li></ul>');
+  });
+
+  it('never shows the navtitle of a hidden topic, even when it has visible children', () => {
+    const nested: CompiledRelease = {
+      ...release([a, g]),
+      nav: [
+        {
+          title: 'Gadget navtitle',
+          topicId: 'g',
+          condition: {},
+          kind: 'topicref',
+          children: [{ title: '', topicId: 'a', condition: {}, kind: 'topicref', children: [] }],
+        },
+      ],
+    };
+    const nav = renderNav(viewRelease(nested, [widgetV1]), 'a');
+    expect(nav).not.toContain('Gadget navtitle');
+    expect(nav).toBe('<ul><li><a href="/a.html" aria-current="page">Alpha</a></li></ul>');
+    // The staff view still shows it, with its child underneath.
+    expect(renderNav(viewRelease(nested, []), 'a')).toContain('Gadget navtitle');
   });
 
   it('returns null for pages the reader cannot see and escapes the site title', () => {

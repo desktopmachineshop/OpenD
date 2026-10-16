@@ -33,7 +33,8 @@ export async function fetchSource(
     });
   try {
     await git('init', '-q');
-    await git('fetch', '-q', '--depth', '1', '--no-tags', sourceUrl, sha);
+    // `--` so a source URL such as `--upload-pack=...` can never be read as an option.
+    await git('fetch', '-q', '--depth', '1', '--no-tags', '--', sourceUrl, sha);
     await git('checkout', '-q', '--detach', 'FETCH_HEAD');
     return { dir, cleanup };
   } catch (err) {
@@ -80,7 +81,7 @@ export async function listRemoteRefs(sourceUrl: string, token?: string): Promise
   try {
     ({ stdout } = await run(
       'git',
-      [...gitAuthArgs(token), 'ls-remote', '--heads', '--tags', sourceUrl],
+      [...gitAuthArgs(token), 'ls-remote', '--heads', '--tags', '--', sourceUrl],
       { env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }, maxBuffer: 64 * 1024 * 1024 },
     ));
   } catch (err) {

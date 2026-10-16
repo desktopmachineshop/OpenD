@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -90,6 +90,17 @@ describe('listRemoteRefs', () => {
       { ref: 'v1', sha: head, kind: 'branch' },
       { ref: 'v2.1', sha: parent, kind: 'tag' },
     ]);
+  });
+
+  it('never treats a source URL as a git option', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'opend-inject-'));
+    const marker = join(dir, 'pwned');
+    try {
+      await listRemoteRefs(`--upload-pack=touch ${marker};`).catch(() => []);
+      expect(existsSync(marker)).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it('reports failures without leaking the token', async () => {

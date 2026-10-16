@@ -17,6 +17,10 @@
         <li>Links to other local files, such as a sample YAML file, are served like images, only to readers
           who can see the linking topic.</li>
         <li>A link to a missing file, topic or element is an error, <codeph>broken-link</codeph>.</li>
+        <li>External links may use <codeph>http</codeph>, <codeph>https</codeph>, <codeph>mailto</codeph>,
+          <codeph>tel</codeph> or <codeph>ftp</codeph>, and external images <codeph>http</codeph> or
+          <codeph>https</codeph>. Any other scheme, such as <codeph>javascript:</codeph> or
+          <codeph>data:</codeph>, renders as plain text.</li>
         <li><codeph>related-links</codeph> with <codeph>link</codeph> elements render as a "Related
           information" list. Links whose target is hidden are left out of it.</li>
       </ul>
