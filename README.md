@@ -83,7 +83,7 @@ See [docs/adr/0003-applicability.md](docs/adr/0003-applicability.md) for the det
 
 ## Hosting
 
-One image runs every role (`serve`, `worker`, `migrate`, `seed`, `reconcile`, and the optional `editor`), configured only by environment variables. The smallest install is the app, the worker and Postgres. `node deploy/setup.mjs` does all of this for you (see [Self-hosting setup](#self-hosting-setup)). To do it by hand:
+One image runs every role (`serve`, `worker`, `migrate`, `seed`, `reconcile`, `reindex`, and the optional `editor`), configured only by environment variables. The smallest install is the app, the worker and Postgres. `node deploy/setup.mjs` does all of this for you (see [Self-hosting setup](#self-hosting-setup)). To do it by hand:
 
 ```sh
 cp deploy/.env.example deploy/.env                 # set SESSION_SECRET, webhook secret, OIDC, admin token
@@ -112,6 +112,8 @@ To try it without an identity provider, set `NODE_ENV=development` and `OPEND_DE
 | `GET /admin/api/audit`                                                                               | Audit log                                           |
 
 See [ADR 0004](docs/adr/0004-hosted-architecture.md) for how it fits together.
+
+**Search.** The worker indexes each release for Postgres full-text search when it publishes it. The help panel and `GET /api/v1/help/search` match, rank and quote only what the signed-in reader can see, with stemming, `"quoted phrases"`, `or`, `-word` and prefix matching on the last word. Releases published before the upgrade that added search are searched in memory until you run `opend-server reindex` (all releases) or `opend-server reindex --release <id>`. See [ADR 0008](docs/adr/0008-search.md).
 
 To run on Railway (web, worker, Postgres and a bucket), see [docs/railway.md](docs/railway.md).
 
@@ -342,6 +344,7 @@ The store, worker, server and editor integration tests need Postgres. Set `TEST_
 - [0005 Embedded, context-aware help](docs/adr/0005-embedded-help.md)
 - [0006 PDF publications printed by headless Chromium](docs/adr/0006-pdf-rendering.md)
 - [0007 Web editor: save to a branch, publish through a pull request](docs/adr/0007-web-editor.md)
+- [0008 Search: Postgres full-text search that cannot leak](docs/adr/0008-search.md)
 
 ## Licence
 

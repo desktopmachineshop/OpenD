@@ -25,11 +25,11 @@
         <dlentry>
           <dt>worker (<codeph>opend-server worker</codeph>)</dt>
           <dd>Claims build jobs, fetches the exact pushed commit, builds and validates it, uploads images and
-            the theme, and publishes. Several workers can share the queue.</dd>
+            the theme, indexes it for search, and publishes. Several workers can share the queue.</dd>
         </dlentry>
         <dlentry>
           <dt>Postgres</dt>
-          <dd>The job queue, release snapshots, which release is live for each release line, organizations,
+          <dd>The job queue, release snapshots and their search indexes, which release is live for each release line, organizations,
             entitlements, readers, webhook deliveries and the audit log.</dd>
         </dlentry>
         <dlentry>
@@ -39,7 +39,8 @@
         </dlentry>
       </dl>
       <p product="core">One image runs every role: <codeph>serve</codeph>, <codeph>worker</codeph>,
-        <codeph>migrate</codeph> and <codeph>seed</codeph>. It is configured only with environment variables;
+        <codeph>migrate</codeph>, <codeph>seed</codeph>, <codeph>reconcile</codeph> and
+        <codeph>reindex</codeph>. It is configured only with environment variables;
         see <xref keyref="env-vars">the environment variable reference</xref>.</p>
     </section>
 

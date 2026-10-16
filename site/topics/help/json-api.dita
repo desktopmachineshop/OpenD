@@ -59,11 +59,15 @@
 
     <section id="search">
       <title>GET /api/v1/help/search?q=</title>
-      <p>Searches only the topics this reader can see. Every word of two or more letters must appear; title
-        matches weigh most, then the short description, then the body. Up to ten hits.</p>
+      <p>Searches only the topics this reader can see, and only the parts of them this reader can see.
+        Every word must appear, in any form (<codeph>installing</codeph> finds
+        <codeph>install</codeph>). Quote a phrase (<codeph>"setup wizard"</codeph>), use <codeph>or</codeph>
+        between alternatives, and put <codeph>-</codeph> before a word to exclude it. The last word also
+        matches as a prefix, for search as you type. Title matches weigh most, then the short description,
+        then the body. Up to ten hits, best first; <parmname>score</parmname> is a relative rank.</p>
       <codeblock>{ "query": "token", "hits": [
   { "topicId": "topics/help/tokens", "title": "Sign embed tokens in your backend",
-    "snippet": "…prove that with a short-lived token signed…", "score": 42 } ] }</codeblock>
+    "snippet": "…prove that with a short-lived token signed…", "score": 0.6079 } ] }</codeblock>
     </section>
 
     <section id="errors">

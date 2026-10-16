@@ -196,7 +196,14 @@ docker compose -f deploy/docker-compose.yml up -d --build
 docker compose -f deploy/docker-compose.yml logs migrate   # lists the migrations applied
 ```
 
-3. If something is wrong, start the previous image again:
+3. If the release notes say so, rebuild the search index. Releases published before the upgrade are searched in memory (no stemming, no prefix matching) until then; readers are served throughout:
+
+```sh
+docker compose -f deploy/docker-compose.yml run --rm migrate reindex            # every release
+docker compose -f deploy/docker-compose.yml run --rm migrate reindex --release 42
+```
+
+4. If something is wrong, start the previous image again:
 
 ```sh
 docker tag opend:rollback opend:local

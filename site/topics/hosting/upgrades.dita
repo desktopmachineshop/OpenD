@@ -38,6 +38,17 @@
         <cmd>Replace the web service and the worker.</cmd>
       </step>
       <step>
+        <cmd>If the release notes say so, rebuild the search index with
+          <codeph>opend-server reindex</codeph>.</cmd>
+        <info>
+          <p>The worker indexes every release it publishes. Releases published before an upgrade that
+            changes the index (or before search indexing existed) are searched in memory, without stemming or
+            prefix matching, until they are reindexed. <codeph>opend-server reindex --release &lt;id&gt;</codeph>
+            rebuilds one release; the ids are in <filepath>/admin/api/repos/:id/releases</filepath>. Readers
+            are served throughout.</p>
+        </info>
+      </step>
+      <step>
         <cmd>Check <filepath>/healthz</filepath> and the start-up log line of each service.</cmd>
       </step>
     </steps>
