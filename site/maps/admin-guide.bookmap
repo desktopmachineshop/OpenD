@@ -26,6 +26,7 @@
   <chapter navtitle="Readers and administration" product="core">
     <topicref href="../topics/hosting/readers-orgs.dita"/>
     <topicref href="../topics/hosting/admin-api.dita"/>
+    <topicref href="../topics/hosting/analytics.dita"/>
   </chapter>
 
   <chapter navtitle="Embedded help" product="embed">

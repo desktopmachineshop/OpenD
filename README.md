@@ -110,6 +110,7 @@ To try it without an identity provider, set `NODE_ENV=development` and `OPEND_DE
 | `GET/POST /admin/api/orgs`, `PUT /admin/api/orgs/:slug/entitlements`, `DELETE /admin/api/orgs/:slug` | Orgs and entitlements                               |
 | `GET/POST /admin/api/readers`, `DELETE /admin/api/readers/:id`                                       | Readers, matched to OIDC sign-ins by verified email |
 | `GET /admin/api/audit`                                                                               | Audit log                                           |
+| `GET /admin/api/analytics/summary`, `GET /admin/api/analytics/feedback[.csv]`                        | Docs analytics and reader feedback                  |
 
 See [ADR 0004](docs/adr/0004-hosted-architecture.md) for how it fits together.
 
@@ -146,6 +147,17 @@ With polling on, the `opend-server worker` process runs `git ls-remote` against 
 - On the first poll, tags are queued before branches. A moving branch such as `main` then gets the newest job, so it wins its release line over an older tag.
 
 When `PUBLIC_URL` is a private address, setup turns polling on (every 60 seconds) and creates the GitHub App with its webhook inactive.
+
+## Docs analytics and feedback
+
+The server counts page views (docs site, help panel and JSON API) and help searches, and every topic page ends with a "Was this page helpful? Yes / No" form with an optional comment. Rows record the org slug, release line, topic or normalised query, and time: never a reader's email, id or IP address. Recording is one unawaited insert per request, so it never slows or breaks a page.
+
+- `DNT: 1` or `Sec-GPC: 1` skips views and searches. `OPEND_ANALYTICS=0` turns everything off and hides the form.
+- The form works without JavaScript, needs a signed-in reader and a CSRF token bound to their session, and only accepts topics the reader can see (anything else is the same 404).
+- `GET /admin/api/analytics/summary?days=30` gives top pages, top and zero-result searches and helpfulness per page; `GET /admin/api/analytics/feedback?topic=&days=` lists answers and comments, newest first (`.csv` for a spreadsheet).
+- The worker deletes rows older than `OPEND_ANALYTICS_RETENTION_DAYS` (default 180); `opend-server purge-analytics` does it on demand.
+
+See [ADR 0009](docs/adr/0009-analytics.md).
 
 ## Entitlement sync
 
@@ -342,6 +354,7 @@ The store, worker, server and editor integration tests need Postgres. Set `TEST_
 - [0005 Embedded, context-aware help](docs/adr/0005-embedded-help.md)
 - [0006 PDF publications printed by headless Chromium](docs/adr/0006-pdf-rendering.md)
 - [0007 Web editor: save to a branch, publish through a pull request](docs/adr/0007-web-editor.md)
+- [0009 Docs analytics and reader feedback, without tracking readers](docs/adr/0009-analytics.md)
 
 ## Licence
 
