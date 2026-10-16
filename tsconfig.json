@@ -1,0 +1,12 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/model" },
+    { "path": "packages/filter" },
+    { "path": "packages/dita" },
+    { "path": "packages/build" },
+    { "path": "packages/validate" },
+    { "path": "packages/render-html" },
+    { "path": "packages/cli" }
+  ]
+}

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE task PUBLIC "-//OASIS//DTD DITA Task//EN" "task.dtd">
+<task id="gadget-pairing" product="gadget">
+  <title>Pair a Gadget</title>
+  <shortdesc>Connect a Gadget companion device to the hub.</shortdesc>
+  <taskbody>
+    <steps>
+      <step><cmd>Hold the Gadget pairing button for five seconds.</cmd></step>
+      <step><cmd>In the dashboard, choose <uicontrol>Add device</uicontrol>.</cmd></step>
+    </steps>
+  </taskbody>
+</task>

@@ -1,0 +1,20 @@
+{
+  "name": "@opend/model",
+  "version": "0.1.0",
+  "description": "Shared types and schemas for OpenD: document nodes, applicability, reader context and the compiled release snapshot",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "zod": "^4.6.7"
+  }
+}

@@ -1,0 +1,24 @@
+# OpenD project configuration. See README.md.
+title: Widget Platform Docs
+
+# The release this branch documents. Keep one branch or tag per release (v1, v2, ...).
+release: '2.1'
+
+# Root map for the website navigation.
+map: maps/user-guide.ditamap
+
+# Curated publications (PDF) defined as bookmaps.
+publications:
+  - maps/admin-guide.bookmap
+
+# Allowed values for each filtering attribute. Any other value is a validation error.
+# `release` is not listed: it takes version ranges such as 1.4, 2.0.. or 1.2..1.9.
+attributes:
+  product: [widget, gadget]
+  feature: [sso, audit-log]
+  audience: [admin, internal]
+
+# Applied to every reader at build time.
+buildFilter: filters/publish.ditaval
+
+theme: theme/site.css

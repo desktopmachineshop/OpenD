@@ -1,0 +1,22 @@
+{
+  "name": "@opend/render-html",
+  "version": "0.1.0",
+  "description": "Renders a filtered CompiledRelease to HTML",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@opend/dita": "workspace:*",
+    "@opend/filter": "workspace:*",
+    "@opend/model": "workspace:*"
+  }
+}

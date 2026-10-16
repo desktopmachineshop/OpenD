@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE reference PUBLIC "-//OASIS//DTD DITA Reference//EN" "reference.dtd">
+<reference id="audit-log" feature="audit-log" release="2.0..">
+  <title>Audit log events</title>
+  <shortdesc>Events recorded in the audit log.</shortdesc>
+  <refbody>
+    <simpletable>
+      <sthead><stentry>Event</stentry><stentry>Recorded when</stentry></sthead>
+      <strow><stentry><codeph>user.login</codeph></stentry><stentry>A user signs in.</stentry></strow>
+      <strow feature="sso"><stentry><codeph>sso.assertion</codeph></stentry><stentry>The identity provider sends an assertion.</stentry></strow>
+      <strow><stentry><codeph>hub.config</codeph></stentry><stentry>Hub settings change.</stentry></strow>
+    </simpletable>
+  </refbody>
+</reference>

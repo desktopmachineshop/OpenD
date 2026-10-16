@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE topic PUBLIC "-//OASIS//DTD DITA Topic//EN" "topic.dtd">
+<topic id="release-notes-2" release="2">
+  <title>Release notes for 2.x</title>
+  <body>
+    <ul>
+      <li>2.1: Audit log export.</li>
+      <li>2.0: New setup wizard replaces the shell installer.</li>
+    </ul>
+  </body>
+</topic>

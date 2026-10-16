@@ -1,0 +1,16 @@
+# Sample readers for `opend preview --as <name>`. Each one is what the
+# entitlement service would produce for a signed-in reader.
+contexts:
+  v1-basic:
+    org: acme
+    products: [widget]
+    version: '1.4'
+  v2-basic:
+    org: initech
+    products: [widget]
+    version: '2.1'
+  v2-pro:
+    org: globex
+    products: [widget, gadget]
+    features: [sso, audit-log]
+    version: '2.1'

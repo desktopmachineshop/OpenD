@@ -1,0 +1,23 @@
+{
+  "name": "@opend/validate",
+  "version": "0.1.0",
+  "description": "Validation checks shared by CI, the previewer and the hosted build",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@opend/build": "workspace:*",
+    "@opend/dita": "workspace:*",
+    "@opend/filter": "workspace:*",
+    "@opend/model": "workspace:*"
+  }
+}

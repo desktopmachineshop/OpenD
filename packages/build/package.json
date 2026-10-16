@@ -1,0 +1,23 @@
+{
+  "name": "@opend/build",
+  "version": "0.1.0",
+  "description": "Compiles a DITA source tree into a CompiledRelease snapshot",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@opend/model": "workspace:*",
+    "@opend/filter": "workspace:*",
+    "@opend/dita": "workspace:*",
+    "yaml": "^2.9.1"
+  }
+}

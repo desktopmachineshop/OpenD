@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE topic PUBLIC "-//OASIS//DTD DITA Topic//EN" "topic.dtd">
+<!-- Staff-only. Excluded at build time by filters/publish.ditaval. -->
+<topic id="escalation" audience="internal">
+  <title>Escalation procedure</title>
+  <body>
+    <p>Page the on-call engineer through the staff paging tool.</p>
+  </body>
+</topic>

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE task PUBLIC "-//OASIS//DTD DITA Task//EN" "task.dtd">
+<task id="configure-sso" feature="sso">
+  <title>Configure single sign-on</title>
+  <shortdesc>Let your users sign in with your identity provider.</shortdesc>
+  <taskbody>
+    <steps>
+      <step><cmd>Open <menucascade><uicontrol>Settings</uicontrol><uicontrol>Sign-in</uicontrol></menucascade>.</cmd></step>
+      <step><cmd>Paste your identity provider's SAML metadata URL.</cmd></step>
+      <step release="2.0.."><cmd>Optionally turn on <uicontrol>Just-in-time provisioning</uicontrol>.</cmd></step>
+    </steps>
+  </taskbody>
+</task>

@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE map PUBLIC "-//OASIS//DTD DITA Map//EN" "map.dtd">
+<map>
+  <title>Widget Platform Docs</title>
+
+  <!-- Variables. The first definition a reader's filter keeps wins. -->
+  <keydef keys="product-name">
+    <topicmeta><keywords><keyword>Widget Platform</keyword></keywords></topicmeta>
+  </keydef>
+  <keydef keys="edition" feature="sso">
+    <topicmeta><keywords><keyword>Enterprise Edition</keyword></keywords></topicmeta>
+  </keydef>
+  <keydef keys="edition">
+    <topicmeta><keywords><keyword>Standard Edition</keyword></keywords></topicmeta>
+  </keydef>
+  <keydef keys="support-site" href="https://support.example.com" scope="external">
+    <topicmeta><linktext>the support site</linktext></topicmeta>
+  </keydef>
+
+  <!-- Reusable chunks live in reuse/ and are pulled in with conref or conkeyref. -->
+  <keydef keys="common" href="../reuse/common.dita"/>
+
+  <topicref href="../topics/overview.dita"/>
+
+  <topichead navtitle="Getting started">
+    <topicref href="../topics/install.dita"/>
+    <topicref href="../topics/configure.dita"/>
+  </topichead>
+
+  <topichead navtitle="Gadget" product="gadget">
+    <topicref href="../topics/gadget-pairing.dita"/>
+  </topichead>
+
+  <topichead navtitle="Security">
+    <topicref href="../topics/configure-sso.dita" feature="sso"/>
+    <topicref href="../topics/audit-log.dita" feature="audit-log" release="2.0.."/>
+  </topichead>
+
+  <topichead navtitle="Release notes">
+    <topicref href="../topics/release-notes-1.dita" release="1"/>
+    <topicref href="../topics/release-notes-2.dita" release="2"/>
+  </topichead>
+
+  <topicref href="../internal/escalation.dita" audience="internal"/>
+</map>
