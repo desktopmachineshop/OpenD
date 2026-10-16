@@ -5,6 +5,7 @@ import {
   type CompiledTopic,
   type Condition,
   type NavEntry,
+  type Publication,
 } from '@opend/model';
 import { filterTree, isIncluded, type FilterPolicy, type FilterTreeOptions } from './policy.js';
 
@@ -53,7 +54,40 @@ export function viewRelease(
   policies: readonly FilterPolicy[],
   options: FilterTreeOptions = {},
 ): ReleaseView {
-  const filtered = filterNav(release.nav, policies);
+  return viewNav(release, release.nav, policies, options);
+}
+
+/**
+ * A reader's view of one curated publication (a bookmap): the same as a
+ * release view, but navigation and the set of published topics come from the
+ * publication's map instead of the site map. Chapter conditions and each topic
+ * root's conditions are applied with the same policies, so a topic only the
+ * bookmap references is visible exactly when the reader may see it there.
+ */
+export interface PublicationView extends ReleaseView {
+  readonly publication: Publication;
+}
+
+/** `null` when the release has no publication built from `file`. */
+export function viewPublication(
+  release: CompiledRelease,
+  file: string,
+  policies: readonly FilterPolicy[],
+  options: FilterTreeOptions = {},
+): PublicationView | null {
+  const publication = release.publications.find((p) => p.file === file);
+  if (!publication) return null;
+  return { ...viewNav(release, publication.nav, policies, options), publication };
+}
+
+/** A view whose published topics are exactly those reachable from `nav` after filtering. */
+function viewNav(
+  release: CompiledRelease,
+  nav: readonly NavEntry[],
+  policies: readonly FilterPolicy[],
+  options: FilterTreeOptions,
+): ReleaseView {
+  const filtered = filterNav(nav, policies);
   const cache = new Map<string, CompiledTopic | null>();
 
   const ordered: string[] = [];

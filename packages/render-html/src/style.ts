@@ -34,6 +34,7 @@ a { color: var(--opend-accent); }
 .site-header { display: flex; gap: 12px; align-items: baseline; padding: 12px 16px; border-bottom: 1px solid var(--opend-border); }
 .site-title { font-weight: 600; text-decoration: none; color: inherit; }
 .site-release { color: var(--opend-muted); font-size: 14px; }
+.site-pdfs { margin-left: auto; display: flex; gap: 12px; font-size: 14px; }
 .layout { display: grid; grid-template-columns: minmax(200px, 260px) minmax(0, 1fr); max-width: 1200px; margin: 0 auto; }
 .toc { padding: 16px; border-right: 1px solid var(--opend-border); font-size: 15px; }
 .toc ul { list-style: none; margin: 0; padding: 0; }

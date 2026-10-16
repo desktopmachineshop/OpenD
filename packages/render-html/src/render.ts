@@ -27,15 +27,41 @@ export interface RenderOptions {
    * embedded help panel keeps links inside the panel instead.
    */
   topicHref?: (topicId: string) => string;
+  /**
+   * Resolves a link to a topic, replacing both the visibility check and the
+   * URL: return `null` to render the link as unavailable text. Print output
+   * uses this to point at in-document anchors or the docs site.
+   */
+  topicLink?: (topicId: string, fragment: string | undefined) => TopicLink | null;
+  /**
+   * URL of a file the content references (images, linked files), or `null`
+   * when it is unavailable. Default: the site's `_assets/` route.
+   */
+  assetSrc?: (path: string, use: 'image' | 'link') => string | null;
+  /** Prefix for every `id` the topic emits, so several topics can share one document. */
+  idPrefix?: string;
+  /** Nesting depth of the topic, for heading levels: 0 renders the title as `h1`. */
+  depth?: number;
+}
+
+export interface TopicLink {
+  href: string;
+  /** Link text when the author gave none. */
+  title: string;
 }
 
 interface Ctx {
   view: ReleaseView;
   base: string;
   topicHref: (topicId: string) => string;
+  topicLink: ((topicId: string, fragment: string | undefined) => TopicLink | null) | undefined;
+  assetSrc: (path: string, use: 'image' | 'link') => string | null;
+  idPrefix: string;
   showConditions: boolean;
   /** Nesting depth of topics, for heading levels. */
   depth: number;
+  /** Depth of the topic being rendered, whose root is an `article`. */
+  rootDepth: number;
   inThead: boolean;
   colnames: string[];
   /** Name of the element being rendered when its children render, e.g. for titles. */
@@ -69,8 +95,12 @@ export function renderTopic(
     view,
     base: options.base ?? '/',
     topicHref: options.topicHref ?? ((id) => pageHref(id, options.base ?? '/')),
+    topicLink: options.topicLink,
+    assetSrc: options.assetSrc ?? ((path) => assetHref(path, options.base ?? '/')),
+    idPrefix: options.idPrefix ?? '',
     showConditions: options.showConditions ?? false,
-    depth: 0,
+    depth: options.depth ?? 0,
+    rootDepth: options.depth ?? 0,
     inThead: false,
     colnames: [],
     parent: '',
@@ -105,7 +135,8 @@ function commonAttrs(
   extraClass = '',
 ): Record<string, string | undefined> {
   const classes = [node.name, extraClass, node.attrs.outputclass].filter(Boolean).join(' ');
-  const out: Record<string, string | undefined> = { id: node.attrs.id, class: classes };
+  const id = node.attrs.id ? ctx.idPrefix + node.attrs.id : undefined;
+  const out: Record<string, string | undefined> = { id, class: classes };
   if (ctx.showConditions) {
     const label = conditionLabel(node.attrs);
     if (label) {
@@ -143,7 +174,11 @@ function renderNode(node: DocNode, ctx: Ctx): string {
 
   if (TOPIC_TYPES.has(name)) {
     const inner = renderChildren(node, { ...ctx, depth: ctx.depth + 1 });
-    return tag(ctx.depth === 0 ? 'article' : 'section', commonAttrs(node, ctx, 'topic'), inner);
+    return tag(
+      ctx.depth === ctx.rootDepth ? 'article' : 'section',
+      commonAttrs(node, ctx, 'topic'),
+      inner,
+    );
   }
 
   switch (name) {
@@ -257,6 +292,10 @@ function linkTarget(
   const target = node.attrs[TARGET_ATTR];
   if (target !== undefined) {
     const [id = '', fragment] = target.split('#');
+    if (ctx.topicLink) {
+      const link = ctx.topicLink(id, fragment || undefined);
+      return link && { href: link.href, defaultText: link.title };
+    }
     const topic = ctx.view.topic(id);
     if (!topic) return null;
     return {
@@ -265,8 +304,10 @@ function linkTarget(
     };
   }
   const asset = node.attrs[ASSET_ATTR];
-  if (asset !== undefined)
-    return { href: assetHref(asset, ctx.base), defaultText: asset.split('/').pop() ?? asset };
+  if (asset !== undefined) {
+    const href = ctx.assetSrc(asset, 'link');
+    return href === null ? null : { href, defaultText: asset.split('/').pop() ?? asset };
+  }
   const href = node.attrs.href;
   if (href !== undefined && node.attrs.scope === 'external') return { href, defaultText: href };
   if (href !== undefined && /^[a-z][a-z0-9+.-]*:/i.test(href)) return { href, defaultText: href };
@@ -310,10 +351,10 @@ function renderRelatedLinks(node: ElementNode, ctx: Ctx): string {
 
 function renderImage(node: ElementNode, ctx: Ctx): string {
   const asset = node.attrs[ASSET_ATTR];
-  const src = asset !== undefined ? assetHref(asset, ctx.base) : node.attrs.href;
-  if (!src) return '';
+  const src = asset !== undefined ? ctx.assetSrc(asset, 'image') : node.attrs.href;
   const altEl = childElements(node, 'alt')[0];
   const alt = altEl ? textContent(altEl) : (node.attrs.alt ?? '');
+  if (!src) return alt ? tag('span', { class: 'image-unavailable' }, escapeHtml(alt)) : '';
   const img = `<img${attrString({ ...commonAttrs(node, ctx), src, alt, width: node.attrs.width, height: node.attrs.height })}>`;
   return node.attrs.placement === 'break' ? tag('div', { class: 'image-break' }, img) : img;
 }

@@ -1,9 +1,25 @@
 import { posix } from 'node:path';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { ASSET_ATTR, entitlementKey, walk, type ReaderContext } from '@opend/model';
-import { readerPolicy, releaseLine, viewRelease, type ReleaseView } from '@opend/filter';
+import {
+  ASSET_ATTR,
+  entitlementKey,
+  publicationSlug,
+  walk,
+  type Publication,
+  type ReaderContext,
+} from '@opend/model';
+import {
+  readerPolicy,
+  releaseLine,
+  viewPublication,
+  viewRelease,
+  type PublicationView,
+  type ReleaseView,
+} from '@opend/filter';
 import {
   pageHref,
+  publicationHasContent,
+  publicationHref,
   renderIndex,
   renderNotFound,
   renderPage,
@@ -52,7 +68,9 @@ export const ASSET_HEADERS = {
 export interface ReaderRelease {
   stored: StoredRelease;
   view: ReleaseView;
+  /** `releaseId|entitlementKey`: everything rendered from this view is cached under it. */
   key: string;
+  reader: ReaderContext;
 }
 
 async function siteRepo(ctx: AppContext): Promise<Repo | null> {
@@ -108,7 +126,68 @@ export async function readerRelease(
     view = viewRelease(stored.snapshot, [readerPolicy(reader)]);
     ctx.caches.views.set(key, view);
   }
-  return { stored, view, key };
+  return { stored, view, key, reader };
+}
+
+/** The reader's view of one publication, or `null` when the release has none from `file`. */
+export function publicationView(
+  ctx: AppContext,
+  release: ReaderRelease,
+  file: string,
+): PublicationView | null {
+  const key = `${release.key}|${file}`;
+  let cached = ctx.caches.publications.get(key);
+  if (!cached) {
+    cached = {
+      view: viewPublication(release.stored.snapshot, file, [readerPolicy(release.reader)]),
+    };
+    ctx.caches.publications.set(key, cached);
+  }
+  return cached.view;
+}
+
+/** Publications with at least one topic this reader can see. */
+export function readerPublications(ctx: AppContext, release: ReaderRelease): Publication[] {
+  return release.stored.snapshot.publications.filter((p) => {
+    const view = publicationView(ctx, release, p.file);
+    return view !== null && publicationHasContent(view);
+  });
+}
+
+/**
+ * Resolves the signed-in reader and their release, or answers the request
+ * itself: sign-in redirect, no entitlements, or nothing published.
+ */
+export async function resolveReader(
+  ctx: AppContext,
+  request: FastifyRequest,
+  reply: FastifyReply,
+): Promise<{ email: string; release: ReaderRelease } | null> {
+  const access = await currentAccess(request, ctx);
+  if (!access) {
+    await redirectToLogin(request, reply);
+    return null;
+  }
+  if (!access.context) {
+    await reply
+      .code(403)
+      .headers(PAGE_HEADERS)
+      .type('text/html')
+      .send(
+        messagePage('No access yet', 'Your organization has no documentation entitlements yet.'),
+      );
+    return null;
+  }
+  const release = await readerRelease(ctx, access.context);
+  if (typeof release === 'string') {
+    await reply
+      .code(404)
+      .headers(PAGE_HEADERS)
+      .type('text/html')
+      .send(messagePage('Not published', release));
+    return null;
+  }
+  return { email: access.reader.email, release };
 }
 
 const visibleAssetsCache = new WeakMap<ReleaseView, Set<string>>();
@@ -130,43 +209,19 @@ function visibleAssets(view: ReleaseView): Set<string> {
 }
 
 export function registerDelivery(app: FastifyInstance, ctx: AppContext): void {
-  const pageOptions = (view: ReleaseView): PageOptions => {
-    const options: PageOptions = { banner: USER_BAR_MARKER };
-    if (view.release.theme) options.themeHref = '/_theme.css';
+  const pageOptions = (release: ReaderRelease): PageOptions => {
+    const options: PageOptions = {
+      banner: USER_BAR_MARKER,
+      publications: readerPublications(ctx, release).map((p) => ({
+        title: p.title || publicationSlug(p.file),
+        href: publicationHref(p),
+      })),
+    };
+    if (release.view.release.theme) options.themeHref = '/_theme.css';
     return options;
   };
-
-  /** Resolves the signed-in reader and their release, or answers the request itself. */
-  const resolve = async (
-    request: FastifyRequest,
-    reply: FastifyReply,
-  ): Promise<{ email: string; release: ReaderRelease } | null> => {
-    const access = await currentAccess(request, ctx);
-    if (!access) {
-      await redirectToLogin(request, reply);
-      return null;
-    }
-    if (!access.context) {
-      await reply
-        .code(403)
-        .headers(PAGE_HEADERS)
-        .type('text/html')
-        .send(
-          messagePage('No access yet', 'Your organization has no documentation entitlements yet.'),
-        );
-      return null;
-    }
-    const release = await readerRelease(ctx, access.context);
-    if (typeof release === 'string') {
-      await reply
-        .code(404)
-        .headers(PAGE_HEADERS)
-        .type('text/html')
-        .send(messagePage('Not published', release));
-      return null;
-    }
-    return { email: access.reader.email, release };
-  };
+  const resolve = (request: FastifyRequest, reply: FastifyReply) =>
+    resolveReader(ctx, request, reply);
 
   const sendPage = (reply: FastifyReply, status: number, html: string, email: string) =>
     reply
@@ -180,7 +235,7 @@ export function registerDelivery(app: FastifyInstance, ctx: AppContext): void {
     if (!r) return reply;
     const first = r.release.view.topicIds()[0];
     if (first) return reply.headers(PAGE_HEADERS).redirect(pageHref(first));
-    return sendPage(reply, 200, renderIndex(r.release.view, pageOptions(r.release.view)), r.email);
+    return sendPage(reply, 200, renderIndex(r.release.view, pageOptions(r.release)), r.email);
   });
 
   app.get('/_theme.css', async (request, reply) => {
@@ -219,12 +274,12 @@ export function registerDelivery(app: FastifyInstance, ctx: AppContext): void {
       const cacheKey = `${key}|${topicId}`;
       let html = ctx.caches.pages.get(cacheKey);
       if (html === undefined) {
-        html = renderPage(view, topicId, pageOptions(view)) ?? '';
+        html = renderPage(view, topicId, pageOptions(r.release)) ?? '';
         ctx.caches.pages.set(cacheKey, html);
       }
       if (html) return sendPage(reply, 200, html, r.email);
     }
     // Missing and hidden pages look the same.
-    return sendPage(reply, 404, renderNotFound(view, pageOptions(view)), r.email);
+    return sendPage(reply, 404, renderNotFound(view, pageOptions(r.release)), r.email);
   });
 }
