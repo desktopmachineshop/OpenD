@@ -7,6 +7,7 @@ import { GitHubApp, jsonLog, startPoller, startWorker } from '@opend/worker';
 import { createApp } from './app.js';
 import { loadConfig } from './config.js';
 import { runReconcileCommand, type ReconcileCommandOptions } from './reconcile-command.js';
+import { runReindexCommand, type ReindexCommandOptions } from './reindex-command.js';
 import { applySeed } from './seed.js';
 
 const program = new Command('opend-server').description(
@@ -106,6 +107,14 @@ program
   .option('--allow-empty', 'apply a replace even when the export lists no orgs')
   .action(async (options: ReconcileCommandOptions) => {
     await runReconcileCommand(loadConfig(), options);
+  });
+
+program
+  .command('reindex')
+  .description('rebuild the search index of every stored release, or of one')
+  .option('--release <id>', 'only this release id')
+  .action(async (options: ReindexCommandOptions) => {
+    await runReindexCommand(loadConfig(), options);
   });
 
 // The web editor runs as its own service on its own host; see ADR 0007.

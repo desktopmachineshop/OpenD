@@ -286,6 +286,11 @@ describe.skipIf(!url)('embedded help (hosted)', () => {
         hits: unknown[];
       };
       expect(hits.hits).toEqual([]);
+      // Postgres search: the last word completes as a prefix.
+      const found = (await get('/api/v1/help/search?q=setup%20wiza', await auth('v2-pro'))).json();
+      expect(found.query).toBe('setup wiza');
+      expect(found.hits[0]).toMatchObject({ topicId: 'topics/install', score: expect.any(Number) });
+      expect(found.hits[0].snippet).toContain('setup wizard');
     });
 
     it('requires a valid token and an allowed origin', async () => {
