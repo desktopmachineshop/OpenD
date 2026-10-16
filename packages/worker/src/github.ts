@@ -27,6 +27,12 @@ export const nullReporter: StatusReporter = { report: async () => {} };
 export class GitHubApp implements StatusReporter {
   private readonly key: KeyObject;
   private readonly apiUrl: string;
+  /**
+   * Hosts that git may send this app's installation tokens to: `github.com`
+   * for the public API, or the Enterprise host the API URL names
+   * (`ghe.example/api/v3` → `ghe.example`, `api.acme.ghe.com` → `acme.ghe.com`).
+   */
+  readonly gitHosts: readonly string[];
   private readonly tokens = new Map<number, { token: string; expiresAt: number }>();
 
   constructor(
@@ -35,6 +41,7 @@ export class GitHubApp implements StatusReporter {
   ) {
     this.key = createPrivateKey(config.privateKey.replace(/\\n/g, '\n'));
     this.apiUrl = (config.apiUrl ?? 'https://api.github.com').replace(/\/$/, '');
+    this.gitHosts = [new URL(this.apiUrl).host.replace(/^api\./, '')];
   }
 
   private async appJwt(): Promise<string> {

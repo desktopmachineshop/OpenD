@@ -97,6 +97,12 @@ describe.skipIf(!url)('push to publish', () => {
     expect((await h.app.inject({ method: 'GET', url: '/admin/api/repos' })).statusCode).toBe(401);
     const bad = await admin(h.app, 'POST', '/repos', { fullName: 'no-slash', sourceUrl: docs.dir });
     expect(bad.statusCode).toBe(400);
+    const insecure = await admin(h.app, 'POST', '/repos', {
+      fullName: 'acme/docs',
+      sourceUrl: 'http://example.com/acme/docs.git',
+    });
+    expect(insecure.statusCode).toBe(400);
+    expect(insecure.json().issues).toEqual([expect.stringMatching(/^sourceUrl: /)]);
     const res = await admin(h.app, 'POST', '/repos', {
       fullName: 'acme/docs',
       sourceUrl: docs.dir,
@@ -144,6 +150,27 @@ describe.skipIf(!url)('push to publish', () => {
       ['1', '1.4'],
       ['2', '2.1'],
     ]);
+  });
+
+  it('never rolls a release line back when an old signed push is replayed', async () => {
+    // GitHub signs the body, not X-GitHub-Delivery, so a captured push can be
+    // resent under a fresh delivery id.
+    const newer = docs.commit({ 'notes.txt': 'a newer commit on main' });
+    expect(
+      (await webhook(h.app, pushPayload('acme/docs', 'refs/heads/main', newer))).json(),
+    ).toMatchObject({ status: 'queued' });
+    expect(await worker()).toBe('published');
+
+    const replay = await webhook(h.app, pushPayload('acme/docs', 'refs/heads/main', mainSha), {
+      delivery: 'replayed-delivery',
+    });
+    expect(replay.json()).toEqual({ status: 'duplicate' });
+    expect(await worker()).toBeNull();
+    const live = (await admin(h.app, 'GET', '/repos/1/releases')).json() as {
+      releaseLine: string;
+      sha: string;
+    }[];
+    expect(live.find((r) => r.releaseLine === '2')?.sha).toBe(newer);
   });
 
   it('sends signed-out readers to sign in, and rejects tampered sessions', async () => {
