@@ -16,6 +16,7 @@ import {
   type Pool,
   type Repo,
 } from '@opend/store';
+import { searchIndexInput } from './search.js';
 import { fetchSource } from './source.js';
 import { nullReporter, type GitHubApp, type StatusReporter } from './github.js';
 
@@ -182,6 +183,7 @@ async function buildAndPublish(deps: WorkerDeps, repo: Repo, job: BuildJob): Pro
       releaseLine: line,
       snapshot: release,
       diagnostics,
+      searchIndex: searchIndexInput(release),
     });
     return { kind: 'published', release: release.release, live: published.live };
   } finally {
