@@ -96,3 +96,18 @@ export async function getReleaseSnapshot(
   );
   return rows[0]?.snapshot ?? null;
 }
+
+export interface StoredRelease {
+  id: number;
+  repoId: number;
+  sha: string;
+  snapshot: CompiledRelease;
+}
+
+export async function getRelease(db: Db, releaseId: number): Promise<StoredRelease | null> {
+  const { rows } = await db.query<StoredRelease>(
+    'select id, repo_id as "repoId", sha, snapshot from releases where id = $1',
+    [releaseId],
+  );
+  return rows[0] ?? null;
+}
