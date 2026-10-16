@@ -8,6 +8,7 @@ import {
   type Publication,
 } from '@opend/model';
 import { filterTree, isIncluded, type FilterPolicy, type FilterTreeOptions } from './policy.js';
+import { gatesPass, type SearchGate } from './search-index.js';
 
 /**
  * One reader's view of a release. Navigation, pages and (later) search and PDF
@@ -29,6 +30,8 @@ export interface ReleaseView {
   topicIds(): string[];
   /** Whether every condition passes for this reader (for content outside topics, such as context targets). */
   includes(conditions: readonly Condition[]): boolean;
+  /** Whether this reader sees text behind these gates (see `searchSegments`). */
+  passes(gates: readonly SearchGate[]): boolean;
 }
 
 export function filterNav(
@@ -132,5 +135,6 @@ function viewNav(
     topic,
     topicIds: () => ordered.filter((id) => topic(id) !== null),
     includes: (conditions) => conditions.every((c) => isIncluded(c, policies)),
+    passes: (gates) => gatesPass(gates, policies, options),
   };
 }

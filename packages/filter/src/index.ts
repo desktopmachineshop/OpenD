@@ -3,3 +3,4 @@ export * from './policy.js';
 export * from './view.js';
 export * from './context.js';
 export * from './search.js';
+export * from './search-index.js';
