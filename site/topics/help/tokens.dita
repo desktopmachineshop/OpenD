@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE task PUBLIC "-//OASIS//DTD DITA Task//EN" "task.dtd">
+<task id="tokens" product="embed" audience="developer">
+  <title>Sign embed tokens in your backend</title>
+  <shortdesc>Your app already knows who is signed in. Its backend proves that to
+    <keyword keyref="product-name"/> with a short-lived token signed with a shared secret.</shortdesc>
+  <taskbody>
+    <prereq>
+      <p>You need the deployment's embed secret, <codeph>OPEND_EMBED_SECRET</codeph>, in your backend's
+        configuration. Treat it like a password: anyone holding it can sign in as any registered reader. Never
+        send it to the browser.</p>
+    </prereq>
+    <context>
+      <p>The token only says who the user is. What they may read still comes from
+        <keyword keyref="product-name"/>: their organization's entitlements. A host app therefore cannot grant
+        more than <keyword keyref="product-name"/> allows.</p>
+    </context>
+    <steps>
+      <step>
+        <cmd>Add an endpoint that returns a token for the signed-in user.</cmd>
+        <stepxmp>
+          <p>With the <codeph>jose</codeph> library:</p>
+          <codeblock>import { SignJWT } from 'jose';
+
+const secret = new TextEncoder().encode(process.env.OPEND_EMBED_SECRET);
+const DOCS_URL = 'https://docs.example.com'; // the docs site's PUBLIC_URL, no trailing slash
+
+export function opendToken(user) {
+  return new SignJWT({ email: user.email, org: user.opendOrg })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setAudience(DOCS_URL)
+    .setIssuedAt()
+    .setExpirationTime('5m')
+    .sign(secret);
+}
+
+// Express, for example. Only for signed-in users, and never cached.
+app.get('/api/opend-token', requireSignIn, async (req, res) => {
+  res.set('cache-control', 'no-store').type('text/plain').send(await opendToken(req.user));
+});</codeblock>
+          <p>Or with nothing but Node's <codeph>crypto</codeph> module:</p>
+          <codeblock>import { createHmac } from 'node:crypto';
+
+export function opendToken({ email, org }) {
+  const b64 = (value) => Buffer.from(JSON.stringify(value)).toString('base64url');
+  const now = Math.floor(Date.now() / 1000);
+  const body = `${b64({ alg: 'HS256', typ: 'JWT' })}.${b64({ email, org, aud: DOCS_URL, iat: now, exp: now + 300 })}`;
+  const signature = createHmac('sha256', process.env.OPEND_EMBED_SECRET).update(body).digest('base64url');
+  return `${body}.${signature}`;
+}</codeblock>
+        </stepxmp>
+      </step>
+      <step>
+        <cmd>Return it from the widget's <parmname>getToken</parmname>.</cmd>
+        <stepxmp>
+          <codeblock>getToken: () => fetch('/api/opend-token').then((r) => r.text()),</codeblock>
+        </stepxmp>
+      </step>
+    </steps>
+    <result>
+      <p id="rules">The server checks each token:</p>
+        <simpletable relcolwidth="2* 5*">
+          <sthead><stentry>Part</stentry><stentry>Rule</stentry></sthead>
+          <strow><stentry>Algorithm</stentry><stentry><codeph>HS256</codeph> with <codeph>OPEND_EMBED_SECRET</codeph>. Other algorithms are refused.</stentry></strow>
+          <strow><stentry><codeph>aud</codeph></stentry><stentry>The docs site's <codeph>PUBLIC_URL</codeph>, exactly, without a trailing slash.</stentry></strow>
+          <strow><stentry><codeph>iat</codeph>, <codeph>exp</codeph></stentry><stentry>Both required. The lifetime, <codeph>exp</codeph> minus <codeph>iat</codeph>, must be at most 600 seconds. 30 seconds of clock skew are tolerated.</stentry></strow>
+          <strow><stentry><codeph>email</codeph></stentry><stentry>The reader's email as registered in <keyword keyref="product-name"/>. A <codeph>sub</codeph> holding an email is accepted instead.</stentry></strow>
+          <strow><stentry><codeph>org</codeph></stentry><stentry>The slug of the reader's organization. It must match the organization registered for that email.</stentry></strow>
+        </simpletable>
+        <p>An invalid or expired token gets 401. A valid token for an email that is not registered, or for the
+          wrong organization, gets 403. A good token is exchanged for an <codeph>opend_embed</codeph> session
+          cookie that lasts 60 minutes, after which the panel asks for a new token.</p>
+    </result>
+  </taskbody>
+</task>

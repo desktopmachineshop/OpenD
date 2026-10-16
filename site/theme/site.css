@@ -1,0 +1,93 @@
+/*
+ * OpenD brand theme. It loads after the built-in styles, so it only needs to
+ * override the --opend-* variables and add a few brand touches. The same file
+ * styles the site, the help panel and the PDF publications.
+ */
+:root {
+  --opend-accent: #1f5fbf;
+  --opend-text: #14213d;
+  --opend-muted: #52607a;
+  --opend-surface: #ffffff;
+  --opend-surface-alt: #f2f5fa;
+  --opend-border: #d9e0ea;
+  --opend-warn: #b45309;
+  --opend-cond: #7c3aed;
+  --opend-font:
+    'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --opend-mono: ui-monospace, 'SFMono-Regular', 'JetBrains Mono', Menlo, Consolas, monospace;
+  --opend-brand: #13795b;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --opend-accent: #7fb0ff;
+    --opend-text: #e6ebf2;
+    --opend-muted: #a3afc2;
+    --opend-surface: #10151d;
+    --opend-surface-alt: #18202b;
+    --opend-border: #2a3442;
+    --opend-warn: #f59e0b;
+    --opend-cond: #b49cff;
+    --opend-brand: #4fd1a5;
+  }
+}
+
+/* Header: a brand bar with the site name in the brand colour. */
+.site-header {
+  border-bottom: 3px solid var(--opend-brand);
+}
+.site-title {
+  color: var(--opend-brand);
+  letter-spacing: 0.01em;
+}
+
+/* Navigation and reading width. */
+.toc a {
+  color: var(--opend-text);
+}
+.toc a:hover,
+.toc a[aria-current='page'] {
+  color: var(--opend-accent);
+}
+article {
+  max-width: 780px;
+}
+h1,
+h2,
+h3 {
+  letter-spacing: -0.01em;
+}
+
+/* Code and tables. */
+pre {
+  border: 1px solid var(--opend-border);
+}
+:not(pre) > code {
+  padding: 0.05em 0.3em;
+  border-radius: 4px;
+  background: var(--opend-surface-alt);
+}
+th {
+  font-weight: 600;
+}
+
+/* Notes: the important ones stand out in the brand colour. */
+.note-important,
+.note-tip {
+  border-left-color: var(--opend-brand);
+}
+
+/* Diagrams have their own white background; give them a frame. */
+img[src$='.svg'] {
+  border: 1px solid var(--opend-border);
+  border-radius: 12px;
+}
+
+/* PDF publications: brand-coloured cover and chapter titles. */
+.publication .pub-cover h1 {
+  color: var(--opend-brand);
+}
+.publication .pub-chapter h1 {
+  border-bottom: 2px solid var(--opend-brand);
+  padding-bottom: 4pt;
+}

@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="applicability" audience="author">
+  <title>Applicability attributes</title>
+  <shortdesc>Standard DITA filtering attributes on any map entry, topic or element decide which readers
+    see it. One rule covers both the reader's release and what their organization is entitled to.</shortdesc>
+  <conbody>
+    <section id="attributes">
+      <title>The attributes</title>
+      <simpletable relcolwidth="2* 3* 4*">
+        <sthead><stentry>Attribute</stentry><stentry>Values</stentry><stentry>A reader sees the content when</stentry></sthead>
+        <strow><stentry><codeph>product</codeph></stentry><stentry>tokens declared in <filepath>opend.config.yaml</filepath></stentry><stentry>their organization holds at least one listed product</stentry></strow>
+        <strow><stentry><codeph>feature</codeph></stentry><stentry>tokens declared in <filepath>opend.config.yaml</filepath></stentry><stentry>their organization holds at least one listed feature</stentry></strow>
+        <strow><stentry><codeph>release</codeph></stentry><stentry>versions and ranges such as <codeph>0.1</codeph>, <codeph>2</codeph>, <codeph>2.0..</codeph>, <codeph>..1.9</codeph>, <codeph>1.2..1.9</codeph></stentry><stentry>their version matches at least one listed range</stentry></strow>
+        <strow><stentry><codeph>audience</codeph>, <codeph>platform</codeph>, <codeph>otherprops</codeph>, <codeph>props</codeph>, <codeph>deliveryTarget</codeph></stentry><stentry>tokens declared in <filepath>opend.config.yaml</filepath></stentry><stentry>the build-time DITAVAL does not exclude them</stentry></strow>
+      </simpletable>
+      <p>For example, this site declares <codeph>product: [core, hosted, embed]</codeph>. The self-hosting
+        guides carry <codeph>product="core"</codeph>, the embedded-help section carries
+        <codeph>product="embed"</codeph>, and the architecture overview carries
+        <codeph>product="core hosted"</codeph> because it matters to anyone with either.</p>
+    </section>
+
+    <section id="combining">
+      <title>How conditions combine</title>
+      <p>These are DITAVAL semantics:</p>
+      <ul>
+        <li>Values within one attribute are alternatives: <codeph>product="core hosted"</codeph> shows to a
+          reader holding either.</li>
+        <li>Separate attributes must all pass: <codeph>product="embed" release="0.2.."</codeph> needs the
+          embed product and release 0.2 or later.</li>
+        <li>A condition on an ancestor applies to everything inside it: an element, a topic, a
+          <codeph>topicref</codeph> or a <codeph>topichead</codeph>.</li>
+        <li>A topic is published to a reader only when a navigation entry they can see points at it and the
+          topic's own root passes.</li>
+      </ul>
+      <codeblock><![CDATA[<topichead navtitle="Embedded help" product="embed">   <!-- whole section -->
+  <topicref href="../topics/help/tokens.dita"/>
+</topichead>
+<p product="core">Set OPEND_EMBED_SECRET on the server.</p>   <!-- one paragraph -->
+<step release="..0.1">...</step>                             <!-- up to 0.1.x -->]]></codeblock>
+    </section>
+
+    <section id="reader-or-build">
+      <title>Reader attributes and build attributes</title>
+      <p><codeph>product</codeph>, <codeph>feature</codeph> and <codeph>release</codeph> are reader
+        attributes: they are kept in the release snapshot and decided for each reader at request time. The
+        other attributes are build attributes: the build-time DITAVAL decides them once for everyone, and
+        readers are never gated by them. So <codeph>audience="admin"</codeph> labels content, but does not
+        hide it from anyone unless the DITAVAL excludes that value. Use <codeph>product</codeph> or
+        <codeph>feature</codeph> to gate readers.</p>
+    </section>
+
+    <section id="no-leaks">
+      <title>What readers never see</title>
+      <ul>
+        <li>Content their filter excludes, in pages, navigation, search, the help panel or PDFs.</li>
+        <li>The title of a hidden topic: a link to it renders as its authored text only. See
+          <xref href="links.dita"/>.</li>
+        <li>Filtering attributes themselves: they are stripped from the HTML.</li>
+      </ul>
+      <p conkeyref="reuse/same-404"/>
+      <note conkeyref="reuse/fail-closed"/>
+    </section>
+
+    <section id="more">
+      <title>More</title>
+      <ul>
+        <li><xref href="release-ranges.dita"/>, and its <xref href="release-ranges.dita#release-ranges/grammar">grammar</xref></li>
+        <li><xref href="fail-closed.dita"/></li>
+        <li><xref href="conditional-keys.dita"/></li>
+        <li><xref href="build-filter.dita"/></li>
+      </ul>
+    </section>
+  </conbody>
+</concept>

@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE task PUBLIC "-//OASIS//DTD DITA Task//EN" "task.dtd">
+<task id="release-branches" audience="author admin">
+  <title>Document several releases with release branches</title>
+  <shortdesc>Keep one branch or tag per major release, and use <codeph>release</codeph> ranges for the
+    differences between minor releases inside it.</shortdesc>
+  <taskbody>
+    <context>
+      <p>Both tools work together. A branch per major release keeps old docs stable while new work lands on
+        <codeph>main</codeph>. Ranges within a branch avoid copying a topic for every minor release: a step
+        marked <codeph>release="2.1.."</codeph> appears for 2.1 readers and later, and is hidden from 2.0
+        readers.</p>
+    </context>
+    <steps>
+      <step>
+        <cmd>Create a branch for the release you are freezing, such as <codeph>v1</codeph>, and set
+          <parmname>release</parmname> in its <filepath>opend.config.yaml</filepath>, for example to
+          <codeph>'1.4'</codeph>.</cmd>
+      </step>
+      <step>
+        <cmd>On <codeph>main</codeph>, set <parmname>release</parmname> to the next major version, such as
+          <codeph>'2.0'</codeph>.</cmd>
+      </step>
+      <step>
+        <cmd>Preview or validate any branch without checking it out.</cmd>
+        <stepxmp>
+          <codeblock>pnpm opend preview path/to/docs --ref v1 --version 1.4
+pnpm opend validate path/to/docs --ref v1</codeblock>
+        </stepxmp>
+      </step>
+      <step product="core hosted">
+        <cmd>Make sure the docs repository's release refs include every branch that publishes.</cmd>
+        <info>
+          <p>A repository registered with <codeph>"releaseRefs": ["main", "v*"]</codeph> publishes pushes to
+            <codeph>main</codeph> and to any branch or tag starting with <codeph>v</codeph>; <codeph>*</codeph>
+            matches any run of characters. The default is <codeph>["main"]</codeph>.</p>
+        </info>
+      </step>
+    </steps>
+    <result>
+      <p product="core hosted">Each successful build goes live for its release line, the major number of
+        its <parmname>release</parmname>. Readers get the line matching their own version, so 1.x and 2.x
+        docs are live side by side. A build replaces the live release of its line only if it comes from a
+        newer push, so a slow build of an old commit cannot overwrite a newer one.</p>
+      <p>For the exact range syntax, see <xref keyref="release-ranges"/>.</p>
+    </result>
+  </taskbody>
+</task>

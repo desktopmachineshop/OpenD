@@ -41,6 +41,8 @@ jobs:
       - run: pnpm test
       - name: Validate the starter template
         run: pnpm opend validate templates/docs-starter --format github
+      - name: Validate the documentation site
+        run: pnpm opend validate site --strict --format github
 
   image:
     runs-on: ubuntu-latest

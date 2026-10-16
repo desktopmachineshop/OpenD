@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE reference PUBLIC "-//OASIS//DTD DITA Reference//EN" "reference.dtd">
+<reference id="admin-api" product="core" audience="admin">
+  <title>Admin API reference</title>
+  <shortdesc>Every route of the admin API: docs repositories, builds, organizations, readers and the audit
+    log.</shortdesc>
+  <refbody>
+    <section id="basics">
+      <title>Basics</title>
+      <ul>
+        <li>Base path <filepath>/admin/api</filepath>, JSON in and out.</li>
+        <li>Every request needs <codeph>Authorization: Bearer $OPEND_ADMIN_TOKEN</codeph>. A missing or wrong
+          token gets 401 <codeph>{"error":"unauthorized"}</codeph>. The token is compared in constant
+          time.</li>
+        <li>Without <codeph>OPEND_ADMIN_TOKEN</codeph>, none of these routes exist.</li>
+        <li>An invalid body gets 400 <codeph>{"error":"invalid request","issues":[...]}</codeph>, one issue per
+          problem.</li>
+        <li>Every change is written to the audit log with the actor <codeph>admin-token</codeph>.</li>
+      </ul>
+      <p>The admin API will be joined by staff sign-in and an operator console; see
+        <xref href="../next/console.dita">the operator console plans</xref>.</p>
+    </section>
+  </refbody>
+
+  <reference id="repos">
+    <title>Repositories</title>
+    <prolog><resourceid appname="opend-console" appid="repos"/></prolog>
+    <refbody>
+      <simpletable relcolwidth="3* 5*">
+        <sthead><stentry>Route</stentry><stentry>What it does</stentry></sthead>
+        <strow><stentry><codeph>GET /admin/api/repos</codeph></stentry><stentry>Lists registered repositories: <codeph>id</codeph>, <codeph>fullName</codeph>, <codeph>sourceUrl</codeph>, <codeph>installationId</codeph>, <codeph>releaseRefs</codeph>, <codeph>docsPath</codeph>.</stentry></strow>
+        <strow><stentry><codeph>POST /admin/api/repos</codeph></stentry><stentry>Registers a repository, or replaces the settings of the one with the same <codeph>fullName</codeph>. 201 with the repository.</stentry></strow>
+        <strow><stentry><codeph>GET /admin/api/repos/:id/releases</codeph></stentry><stentry>The live release for each release line: <codeph>releaseId</codeph>, <codeph>releaseLine</codeph>, <codeph>release</codeph>, <codeph>sha</codeph>.</stentry></strow>
+      </simpletable>
+      <properties relcolwidth="2* 2* 5*">
+        <prophead><proptypehd>Body field</proptypehd><propvaluehd>Default</propvaluehd><propdeschd>Rules</propdeschd></prophead>
+        <property><proptype><parmname>fullName</parmname></proptype><propvalue>required</propvalue><propdesc><codeph>owner/name</codeph>, as GitHub sends it in webhooks. Matched without regard to case.</propdesc></property>
+        <property><proptype><parmname>sourceUrl</parmname></proptype><propvalue>required</propvalue><propdesc>The URL the worker fetches from, such as <codeph>https://github.com/acme/docs.git</codeph>.</propdesc></property>
+        <property><proptype><parmname>installationId</parmname></proptype><propvalue><codeph>null</codeph></propvalue><propdesc>The GitHub App installation id: a positive integer, or <codeph>null</codeph>.</propdesc></property>
+        <property><proptype><parmname>releaseRefs</parmname></proptype><propvalue><codeph>["main"]</codeph></propvalue><propdesc>Branch and tag names that publish. Not empty. <codeph>*</codeph> matches any run of characters.</propdesc></property>
+        <property><proptype><parmname>docsPath</parmname></proptype><propvalue><codeph>.</codeph></propvalue><propdesc>The folder holding <filepath>opend.config.yaml</filepath>, inside the repository: no leading <codeph>/</codeph> and no <codeph>..</codeph>.</propdesc></property>
+      </properties>
+      <p>Omitted fields are reset to their defaults when a repository is registered again.</p>
+    </refbody>
+  </reference>
+
+  <reference id="builds">
+    <title>Builds</title>
+    <prolog><resourceid appname="opend-console" appid="builds"/></prolog>
+    <refbody>
+      <simpletable relcolwidth="3* 5*">
+        <sthead><stentry>Route</stentry><stentry>What it does</stentry></sthead>
+        <strow><stentry><codeph>POST /admin/api/repos/:id/builds</codeph></stentry><stentry>Queues a build of one commit. Body <codeph>{"ref": "main", "sha": "&lt;40 hex characters&gt;"}</codeph>. 202 with the job; 404 <codeph>{"error":"no such repo"}</codeph>.</stentry></strow>
+        <strow><stentry><codeph>GET /admin/api/builds</codeph></stentry><stentry>Recent builds, newest first. Query <parmname>repoId</parmname> to filter, and <parmname>limit</parmname> (default 50, at most 200).</stentry></strow>
+        <strow><stentry><codeph>GET /admin/api/builds/:id</codeph></stentry><stentry>One build, with its diagnostics. 404 <codeph>{"error":"no such build"}</codeph>.</stentry></strow>
+      </simpletable>
+      <p>A build has <codeph>id</codeph>, <codeph>repoId</codeph>, <codeph>ref</codeph>, <codeph>sha</codeph>,
+        <codeph>status</codeph> (<codeph>queued</codeph>, <codeph>running</codeph>, <codeph>succeeded</codeph>
+        or <codeph>failed</codeph>), <codeph>attempts</codeph>, <codeph>error</codeph>,
+        <codeph>diagnostics</codeph>, <codeph>releaseId</codeph>, <codeph>createdAt</codeph> and
+        <codeph>finishedAt</codeph>. Each diagnostic has the <codeph>severity</codeph>, <codeph>code</codeph>,
+        <codeph>message</codeph>, <codeph>file</codeph>, <codeph>line</codeph> and <codeph>column</codeph>
+        described in <xref keyref="diagnostics"/>.</p>
+    </refbody>
+  </reference>
+
+  <reference id="orgs">
+    <title>Organizations and entitlements</title>
+    <prolog><resourceid appname="opend-console" appid="orgs"/></prolog>
+    <refbody>
+      <simpletable relcolwidth="3* 5*">
+        <sthead><stentry>Route</stentry><stentry>What it does</stentry></sthead>
+        <strow><stentry><codeph>GET /admin/api/orgs</codeph></stentry><stentry>Lists organizations with their <codeph>products</codeph>, <codeph>features</codeph> and <codeph>version</codeph> (<codeph>null</codeph> without entitlements).</stentry></strow>
+        <strow><stentry><codeph>POST /admin/api/orgs</codeph></stentry><stentry>Creates or renames an organization. Body <codeph>{"slug", "name", "entitlements"?}</codeph>. 201 <codeph>{"slug"}</codeph>.</stentry></strow>
+        <strow><stentry><codeph>PUT /admin/api/orgs/:slug/entitlements</codeph></stentry><stentry>Replaces the entitlements. Body <codeph>{"products": [], "features": [], "version": "0.1"}</codeph>. 200 with the result; 404 <codeph>{"error":"no such org"}</codeph>.</stentry></strow>
+        <strow><stentry><codeph>DELETE /admin/api/orgs/:slug</codeph></stentry><stentry>Deletes the organization, its entitlements and its readers. 204; 404 if there is no such organization.</stentry></strow>
+      </simpletable>
+      <p>A slug is 1 to 63 lowercase letters, digits and dashes, starting with a letter or digit.
+        <parmname>products</parmname> and <parmname>features</parmname> default to empty lists and hold tokens;
+        <parmname>version</parmname> is required and looks like <codeph>0.1</codeph>, with an optional leading
+        <codeph>v</codeph>.</p>
+    </refbody>
+  </reference>
+
+  <reference id="readers">
+    <title>Readers</title>
+    <prolog><resourceid appname="opend-console" appid="readers"/></prolog>
+    <refbody>
+      <simpletable relcolwidth="3* 5*">
+        <sthead><stentry>Route</stentry><stentry>What it does</stentry></sthead>
+        <strow><stentry><codeph>GET /admin/api/readers</codeph></stentry><stentry>Lists readers: <codeph>id</codeph>, <codeph>orgId</codeph>, <codeph>orgSlug</codeph>, <codeph>email</codeph>, <codeph>name</codeph>, and the linked <codeph>oidcIssuer</codeph> and <codeph>oidcSubject</codeph>.</stentry></strow>
+        <strow><stentry><codeph>POST /admin/api/readers</codeph></stentry><stentry>Adds a reader, or moves an existing email to another organization. Body <codeph>{"orgSlug", "email", "name"?}</codeph>. 201 with the reader; 404 <codeph>{"error":"no such org"}</codeph>.</stentry></strow>
+        <strow><stentry><codeph>DELETE /admin/api/readers/:id</codeph></stentry><stentry>Removes a reader. 204; 404 <codeph>{"error":"no such reader"}</codeph>.</stentry></strow>
+      </simpletable>
+      <p>Emails are unique without regard to case.</p>
+    </refbody>
+  </reference>
+
+  <reference id="audit">
+    <title>Audit log</title>
+    <prolog><resourceid appname="opend-console" appid="audit"/></prolog>
+    <refbody>
+      <simpletable relcolwidth="3* 5*">
+        <sthead><stentry>Route</stentry><stentry>What it does</stentry></sthead>
+        <strow><stentry><codeph>GET /admin/api/audit</codeph></stentry><stentry>The latest 100 entries, newest first: <codeph>at</codeph>, <codeph>actor</codeph>, <codeph>action</codeph> and <codeph>detail</codeph>.</stentry></strow>
+      </simpletable>
+      <p>Actions are <codeph>repo.upsert</codeph>, <codeph>build.request</codeph>, <codeph>org.upsert</codeph>,
+        <codeph>entitlements.set</codeph>, <codeph>org.delete</codeph>, <codeph>reader.upsert</codeph>,
+        <codeph>reader.delete</codeph> and, from the <codeph>seed</codeph> command, <codeph>seed.apply</codeph>.</p>
+    </refbody>
+  </reference>
+</reference>

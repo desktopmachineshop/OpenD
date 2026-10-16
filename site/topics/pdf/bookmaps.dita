@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE task PUBLIC "-//OASIS//DTD DITA Task//EN" "task.dtd">
+<task id="bookmaps" audience="author">
+  <title>Define a publication with a bookmap</title>
+  <shortdesc>List chapters in a bookmap, name it under <parmname>publications</parmname>, and preview the
+    PDF as each reader.</shortdesc>
+  <taskbody>
+    <steps>
+      <step>
+        <cmd>Write the bookmap.</cmd>
+        <stepxmp>
+          <codeblock><![CDATA[<bookmap>
+  <booktitle>
+    <mainbooktitle>OpenD Administrator Guide</mainbooktitle>
+  </booktitle>
+  <mapref href="keys.ditamap"/>
+  <chapter href="../topics/hosting/architecture.dita"/>
+  <chapter navtitle="Self-hosting" product="core">
+    <topicref href="../topics/hosting/docker-compose.dita"/>
+    <topicref href="../topics/hosting/railway.dita"/>
+  </chapter>
+  <chapter href="../topics/hosting/admin-api.dita"/>
+</bookmap>]]></codeblock>
+        </stepxmp>
+        <info>
+          <ul>
+            <li>A <codeph>chapter</codeph> with an <codeph>href</codeph> is a topic; nested
+              <codeph>topicref</codeph>s follow it. A <codeph>chapter</codeph> with only a
+              <codeph>navtitle</codeph> becomes a heading for what is under it. <codeph>part</codeph> and
+              <codeph>appendix</codeph> work the same way.</li>
+            <li>The bookmap resolves keys in its own keyspace. Pull in the same key map as the site map, or
+              topics only the bookmap uses will report <codeph>unresolved-key</codeph>.</li>
+            <li>A topic the bookmap includes does not have to be in the site map. If it is not, links to it
+              from the site are plain text and validation warns.</li>
+          </ul>
+        </info>
+      </step>
+      <step>
+        <cmd>Add it to <filepath>opend.config.yaml</filepath>.</cmd>
+        <stepxmp>
+          <codeblock>publications:
+  - maps/admin-guide.bookmap</codeblock>
+        </stepxmp>
+        <info>
+          <p>The file name is the URL: <filepath>admin-guide.bookmap</filepath> is served at
+            <filepath>/pdf/admin-guide.pdf</filepath>. File names must be unique across publications
+            (<codeph>duplicate-publication</codeph>).</p>
+        </info>
+      </step>
+      <step>
+        <cmd>Preview it. Start the previewer, choose a reader, and open
+          <filepath>/_opend/publications</filepath>.</cmd>
+        <info>
+          <p>Each publication shows a <uicontrol>PDF</uicontrol> link and a <uicontrol>print HTML</uicontrol>
+            link, or "nothing visible to this reader". The print HTML, at
+            <filepath>/pdf/admin-guide.html</filepath>, shows the layout without starting a browser; the PDF
+            needs Chromium (see <xref href="pdf-limits.dita"/>).</p>
+        </info>
+      </step>
+    </steps>
+    <result>
+      <p>On the next published build, readers who can see at least one topic of the publication get a link to
+        it in the page header.</p>
+    </result>
+  </taskbody>
+</task>

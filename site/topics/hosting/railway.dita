@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE task PUBLIC "-//OASIS//DTD DITA Task//EN" "task.dtd">
+<task id="railway" product="core" audience="admin">
+  <title>Run OpenD on Railway</title>
+  <shortdesc>One Railway project runs one OpenD instance: a web service, a worker, Postgres and a bucket.</shortdesc>
+  <taskbody>
+    <context>
+      <p>On Railway the web service and the worker are separate services that cannot share a disk, so blobs go
+        to a Railway Bucket. Railway has deprecated <filepath>railway.json</filepath>, so apply the settings
+        below per service, in the dashboard or through the Railway API. See
+        <xref keyref="railway-docs"/> for the platform itself.</p>
+    </context>
+    <steps>
+      <step>
+        <cmd>Create a project and add Postgres and a Bucket.</cmd>
+      </step>
+      <step>
+        <cmd>Add two services from this repository, <codeph>web</codeph> and <codeph>worker</codeph>, both
+          building <filepath>deploy/Dockerfile</filepath>, and configure them.</cmd>
+        <info>
+          <simpletable relcolwidth="2* 4* 3*">
+            <sthead><stentry>Setting</stentry><stentry>web</stentry><stentry>worker</stentry></sthead>
+            <strow><stentry>Source</stentry><stentry>this repository, branch <codeph>main</codeph></stentry><stentry>same</stentry></strow>
+            <strow><stentry>Dockerfile path</stentry><stentry><filepath>deploy/Dockerfile</filepath></stentry><stentry>same</stentry></strow>
+            <strow><stentry>Start command</stentry><stentry><codeph>node dist/bin.js serve</codeph></stentry><stentry><codeph>node dist/bin.js worker</codeph></stentry></strow>
+            <strow><stentry>Pre-deploy</stentry><stentry><codeph>node dist/bin.js migrate</codeph></stentry><stentry>none</stentry></strow>
+            <strow><stentry>Healthcheck</stentry><stentry><filepath>/healthz</filepath>, timeout 120 s</stentry><stentry>none</stentry></strow>
+            <strow><stentry>Restart policy</stentry><stentry>on failure, 5 retries</stentry><stentry>always</stentry></strow>
+            <strow><stentry>Watch paths</stentry><stentry><filepath>packages/**</filepath>, <filepath>deploy/Dockerfile</filepath>, <filepath>package.json</filepath>, <filepath>pnpm-lock.yaml</filepath></stentry><stentry>same</stentry></strow>
+            <strow><stentry>Public domain</stentry><stentry>yes, port 3000</stentry><stentry>no</stentry></strow>
+          </simpletable>
+          <p>A start command replaces the image's entry point, so always give the full
+            <codeph>node dist/bin.js &lt;command&gt;</codeph>. Watch paths keep docs-only commits from
+            redeploying the app: docs reach readers through the worker, not through a redeploy.</p>
+        </info>
+      </step>
+      <step>
+        <cmd>Set the variables on both services, using reference variables for Postgres and the bucket.</cmd>
+        <stepxmp>
+          <codeblock>DATABASE_URL=${{Postgres.DATABASE_URL}}
+S3_BUCKET=${{Bucket.BUCKET}}
+S3_ENDPOINT=${{Bucket.ENDPOINT}}
+S3_ACCESS_KEY_ID=${{Bucket.ACCESS_KEY_ID}}
+S3_SECRET_ACCESS_KEY=${{Bucket.SECRET_ACCESS_KEY}}
+S3_REGION=${{Bucket.REGION}}
+PUBLIC_URL=https://&lt;web domain&gt;
+SESSION_SECRET=&lt;openssl rand -hex 32&gt;
+OPEND_ADMIN_TOKEN=&lt;openssl rand -hex 32&gt;
+GITHUB_WEBHOOK_SECRET=&lt;openssl rand -hex 32&gt;
+NODE_ENV=production</codeblock>
+        </stepxmp>
+        <info>
+          <p>Replace <codeph>Bucket</codeph> with your bucket service's name. Railway buckets use
+            virtual-hosted addressing, so leave <codeph>S3_FORCE_PATH_STYLE</codeph> unset. Add the
+            <codeph>OIDC_*</codeph> variables for reader sign-in, and <codeph>OPEND_EMBED_SECRET</codeph> and
+            <codeph>OPEND_EMBED_ORIGINS</codeph> to embed help in your apps.</p>
+        </info>
+      </step>
+      <step>
+        <cmd>Deploy, and wait for <codeph>web</codeph> to report healthy.</cmd>
+        <info>
+          <p>Its pre-deploy step creates the schema. The worker retries until the schema exists.</p>
+        </info>
+      </step>
+      <step>
+        <cmd>Register the docs repository, and add organizations and readers, through the admin API.</cmd>
+        <stepxmp>
+          <codeblock>curl -X POST "$PUBLIC_URL/admin/api/repos" -H "authorization: Bearer $OPEND_ADMIN_TOKEN" \
+  -H 'content-type: application/json' \
+  -d '{"fullName":"acme/docs","sourceUrl":"https://github.com/acme/docs.git","releaseRefs":["main","v*"]}'</codeblock>
+        </stepxmp>
+        <info><p>See <xref href="readers-orgs.dita"/>.</p></info>
+      </step>
+      <step>
+        <cmd>Publish: point a GitHub webhook at <filepath>$PUBLIC_URL/webhooks/github</filepath>, or trigger a
+          build directly.</cmd>
+        <stepxmp>
+          <codeblock>curl -X POST "$PUBLIC_URL/admin/api/repos/1/builds" -H "authorization: Bearer $OPEND_ADMIN_TOKEN" \
+  -H 'content-type: application/json' -d '{"ref":"main","sha":"&lt;full commit sha&gt;"}'</codeblock>
+        </stepxmp>
+      </step>
+    </steps>
+    <result>
+      <p>A public demo can set <codeph>NODE_ENV=development</codeph> and <codeph>OPEND_DEV_LOGIN=1</codeph> so
+        visitors pick a sample reader. Never do this with real content.</p>
+      <p>Tagged releases are published as images to <codeph><keyword keyref="image-name"/></codeph>, so a
+        service can deploy an image tag instead of building from the repository.</p>
+    </result>
+  </taskbody>
+</task>

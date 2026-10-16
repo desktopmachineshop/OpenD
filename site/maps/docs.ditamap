@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE map PUBLIC "-//OASIS//DTD DITA Map//EN" "map.dtd">
+<map>
+  <title>OpenD Documentation</title>
+
+  <!-- Product names, URLs, conditional keys and the reusable-chunks key. -->
+  <mapref href="keys.ditamap"/>
+
+  <topicref href="../topics/overview.dita"/>
+
+  <topichead navtitle="Get started">
+    <topicref href="../topics/start/install-cli.dita"/>
+    <topicref href="../topics/start/validate.dita"/>
+    <topicref href="../topics/start/preview.dita"/>
+    <topicref href="../topics/start/help-lab.dita" product="embed"/>
+    <topicref href="../topics/start/cli-reference.dita"/>
+    <topicref href="../topics/start/these-docs.dita"/>
+  </topichead>
+
+  <topichead navtitle="Authoring">
+    <topicref href="../topics/authoring/project-layout.dita"/>
+    <topicref href="../topics/authoring/config-reference.dita"/>
+    <topicref href="../topics/authoring/topics-and-maps.dita"/>
+    <topicref href="../topics/authoring/dita-subset.dita"/>
+    <topicref href="../topics/authoring/keys.dita"/>
+    <topicref href="../topics/authoring/reuse.dita"/>
+    <topicref href="../topics/authoring/images.dita"/>
+    <topicref href="../topics/authoring/links.dita"/>
+    <topicref href="../topics/authoring/release-branches.dita"/>
+    <topicref href="../topics/authoring/preview-contexts.dita"/>
+    <topicref href="../topics/authoring/ci.dita"/>
+    <topicref href="../topics/authoring/diagnostics.dita"/>
+  </topichead>
+
+  <topichead navtitle="Applicability">
+    <topicref href="../topics/authoring/applicability.dita"/>
+    <topicref href="../topics/authoring/release-ranges.dita"/>
+    <topicref href="../topics/authoring/fail-closed.dita"/>
+    <topicref href="../topics/authoring/conditional-keys.dita"/>
+    <topicref href="../topics/authoring/build-filter.dita"/>
+  </topichead>
+
+  <!-- The whole section is for readers with the embed product. -->
+  <topichead navtitle="Context-sensitive help" product="embed">
+    <topicref href="../topics/help/help-overview.dita"/>
+    <topicref href="../topics/help/resourceid.dita"/>
+    <topicref href="../topics/help/help-contexts.dita"/>
+    <topicref href="../topics/help/fallback.dita"/>
+    <topicref href="../topics/help/widget.dita"/>
+    <topicref href="../topics/help/widget-api.dita"/>
+    <topicref href="../topics/help/tokens.dita"/>
+    <topicref href="../topics/help/json-api.dita"/>
+    <topicref href="../topics/help/security.dita"/>
+    <topicref href="../topics/help/troubleshooting.dita"/>
+  </topichead>
+
+  <topichead navtitle="PDF publications">
+    <topicref href="../topics/pdf/pdf-overview.dita"/>
+    <topicref href="../topics/pdf/bookmaps.dita"/>
+    <topicref href="../topics/pdf/pdf-filtering.dita"/>
+    <topicref href="../topics/pdf/pdf-theming.dita"/>
+    <topicref href="../topics/pdf/pdf-limits.dita"/>
+  </topichead>
+
+  <!-- Self-hosting guides are for core; publishing to a managed site is for hosted. -->
+  <topichead navtitle="Hosting" product="core hosted">
+    <topicref href="../topics/hosting/architecture.dita"/>
+    <topicref href="../topics/hosting/managed-site.dita" product="hosted"/>
+    <topicref href="../topics/hosting/docker-compose.dita" product="core"/>
+    <topicref href="../topics/hosting/railway.dita" product="core"/>
+    <topicref href="../topics/hosting/env-vars.dita" product="core"/>
+    <topicref href="../topics/hosting/blob-storage.dita" product="core"/>
+    <topicref href="../topics/hosting/github.dita" product="core"/>
+    <topicref href="../topics/hosting/oidc.dita" product="core"/>
+    <topicref href="../topics/hosting/readers-orgs.dita" product="core">
+      <!-- A context key on the map entry: map entries are checked before topics. -->
+      <topicmeta><resourceid appname="opend-console" appid="orgs.entitlements"/></topicmeta>
+    </topicref>
+    <topicref href="../topics/hosting/admin-api.dita" product="core"/>
+    <topicref href="../topics/hosting/backups.dita" product="core"/>
+    <topicref href="../topics/hosting/upgrades.dita" product="core"/>
+  </topichead>
+
+  <topichead navtitle="Coming soon" feature="early-access">
+    <topicref href="../topics/next/editor.dita"/>
+    <topicref href="../topics/next/console.dita"/>
+  </topichead>
+
+  <topichead navtitle="Release notes">
+    <topicref href="../topics/notes/release-0.1.dita"/>
+  </topichead>
+
+  <!-- Removed for every reader by filters/publish.ditaval. -->
+  <topicref href="../internal/maintainers.dita" audience="internal"/>
+</map>

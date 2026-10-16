@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE task PUBLIC "-//OASIS//DTD DITA Task//EN" "task.dtd">
+<task id="build-filter" audience="author">
+  <title>Filter at build time with DITAVAL</title>
+  <shortdesc>Remove content for every reader before it reaches the content store, for example staff-only
+    notes, with a DITAVAL file named in <filepath>opend.config.yaml</filepath>.</shortdesc>
+  <taskbody>
+    <steps>
+      <step>
+        <cmd>Write the DITAVAL file.</cmd>
+        <stepxmp>
+          <codeblock><![CDATA[<val>
+  <prop att="audience" val="internal" action="exclude"/>
+</val>]]></codeblock>
+        </stepxmp>
+      </step>
+      <step>
+        <cmd>Name it in <filepath>opend.config.yaml</filepath>.</cmd>
+        <stepxmp>
+          <codeblock>buildFilter: filters/publish.ditaval</codeblock>
+        </stepxmp>
+      </step>
+      <step>
+        <cmd>Mark the content.</cmd>
+        <stepxmp>
+          <codeblock><![CDATA[<topicref href="../internal/maintainers.dita" audience="internal"/>
+<p audience="internal">Ask in the team channel before changing this.</p>]]></codeblock>
+        </stepxmp>
+      </step>
+    </steps>
+    <result>
+      <p>Excluded content is gone from the release snapshot, so no reader, preview or PDF can ever show it.
+        This site keeps maintainer notes in <filepath>internal/</filepath> this way.</p>
+    </result>
+    <postreq>
+      <p id="rules">Supported rules:</p>
+        <ul>
+          <li><codeph>prop</codeph> with an <codeph>action</codeph> of <codeph>include</codeph>,
+            <codeph>exclude</codeph>, <codeph>flag</codeph> or <codeph>passthrough</codeph>. Only
+            <codeph>exclude</codeph> removes content; the others keep it.</li>
+          <li>The most specific rule wins: attribute and value, then attribute only (no
+            <codeph>val</codeph>), then a global default (no <codeph>att</codeph>), then include.</li>
+          <li>Flagging styles and <codeph>revprop</codeph> are ignored.</li>
+          <li>The root must be <codeph>&lt;val&gt;</codeph>, and an unknown action is an error
+            (<codeph>invalid-ditaval</codeph>).</li>
+        </ul>
+        <p>Any filtering attribute can be filtered at build time, but excluding a <codeph>product</codeph>,
+          <codeph>feature</codeph> or <codeph>release</codeph> value here removes it for <i>every</i> reader.
+          To gate readers, rely on their entitlements instead.</p>
+    </postreq>
+  </taskbody>
+</task>

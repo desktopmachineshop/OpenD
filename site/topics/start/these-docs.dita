@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE task PUBLIC "-//OASIS//DTD DITA Task//EN" "task.dtd">
+<task id="these-docs" audience="author">
+  <title>Preview this documentation</title>
+  <shortdesc>This site is itself an <keyword keyref="product-name"/> docs project, in the
+    <filepath>site/</filepath> folder of the repository. Preview it to see the platform at work.</shortdesc>
+  <taskbody>
+    <context>
+      <p>The project uses most of what it documents: conditional keys, reusable chunks, product-gated
+        sections, a build-time DITAVAL, two PDF publications, a brand theme and context-sensitive help
+        keys. Read its sources next to the rendered pages.</p>
+    </context>
+    <steps>
+      <step conkeyref="reuse/step-build"/>
+      <step conkeyref="reuse/step-validate"/>
+      <step>
+        <cmd>Preview it: <codeph>pnpm opend preview site</codeph>.</cmd>
+      </step>
+      <step>
+        <cmd>Switch <uicontrol>Preview as</uicontrol> between the readers in
+          <filepath>site/preview-contexts.yaml</filepath>.</cmd>
+        <stepresult>
+          <p>The navigation changes with the reader. For example, <option>self-hoster</option> sees the
+            self-hosting guides and no embedded-help section, while <option>managed-customer</option> sees
+            the embedded-help section and no Docker or Railway runbooks.</p>
+        </stepresult>
+      </step>
+    </steps>
+    <result>
+      <p>A test in <filepath>packages/cli/test/site.test.ts</filepath> builds this project, requires zero
+        problems, and renders every page and both publications for every preview reader, so the docs cannot
+        silently break.</p>
+    </result>
+  </taskbody>
+</task>

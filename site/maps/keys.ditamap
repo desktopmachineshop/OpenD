@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE map PUBLIC "-//OASIS//DTD DITA Map//EN" "map.dtd">
+<!-- Shared key definitions. Every map and bookmap pulls these in with a mapref,
+     so a topic resolves the same keys wherever it is published. -->
+<map>
+  <title>Keys</title>
+
+  <!-- Product and command names. -->
+  <keydef keys="product-name">
+    <topicmeta><keywords><keyword>OpenD</keyword></keywords></topicmeta>
+  </keydef>
+  <keydef keys="cli">
+    <topicmeta><keywords><keyword>opend</keyword></keywords></topicmeta>
+  </keydef>
+  <keydef keys="server-cli">
+    <topicmeta><keywords><keyword>opend-server</keyword></keywords></topicmeta>
+  </keydef>
+  <keydef keys="current-release">
+    <topicmeta><keywords><keyword>0.1</keyword></keywords></topicmeta>
+  </keydef>
+  <keydef keys="node-version">
+    <topicmeta><keywords><keyword>Node 22.12 or later</keyword></keywords></topicmeta>
+  </keydef>
+  <keydef keys="pnpm-version">
+    <topicmeta><keywords><keyword>pnpm 10</keyword></keywords></topicmeta>
+  </keydef>
+  <keydef keys="image-name">
+    <topicmeta><keywords><keyword>ghcr.io/desktopmachineshop/opend</keyword></keywords></topicmeta>
+  </keydef>
+
+  <!-- Conditional keys: the first definition a reader's filter keeps wins. -->
+  <keydef keys="help-contact" product="hosted">
+    <topicmeta><keywords><keyword>the operator of your docs site</keyword></keywords></topicmeta>
+  </keydef>
+  <keydef keys="help-contact">
+    <topicmeta><keywords><keyword>the OpenD maintainers on GitHub</keyword></keywords></topicmeta>
+  </keydef>
+  <keydef keys="your-server" product="core">
+    <topicmeta><keywords><keyword>your OpenD server</keyword></keywords></topicmeta>
+  </keydef>
+  <keydef keys="your-server">
+    <topicmeta><keywords><keyword>your docs site</keyword></keywords></topicmeta>
+  </keydef>
+
+  <!-- External links. -->
+  <keydef keys="repo" href="https://github.com/desktopmachineshop/opend" scope="external" format="html">
+    <topicmeta><linktext>the OpenD repository</linktext></topicmeta>
+  </keydef>
+  <keydef keys="issues" href="https://github.com/desktopmachineshop/opend/issues" scope="external" format="html">
+    <topicmeta><linktext>the issue tracker</linktext></topicmeta>
+  </keydef>
+  <keydef keys="dita-spec" href="https://docs.oasis-open.org/dita/dita/v1.3/dita-v1.3-part3-all-inclusive.html" scope="external" format="html">
+    <topicmeta><linktext>the DITA 1.3 specification</linktext></topicmeta>
+  </keydef>
+  <keydef keys="railway-docs" href="https://docs.railway.com" scope="external" format="html">
+    <topicmeta><linktext>Railway's documentation</linktext></topicmeta>
+  </keydef>
+
+  <!-- Topics that many pages link to, so a move only changes this map. -->
+  <keydef keys="env-vars" href="../topics/hosting/env-vars.dita"/>
+  <keydef keys="diagnostics" href="../topics/authoring/diagnostics.dita"/>
+  <keydef keys="applicability" href="../topics/authoring/applicability.dita"/>
+  <keydef keys="release-ranges" href="../topics/authoring/release-ranges.dita"/>
+  <keydef keys="admin-api" href="../topics/hosting/admin-api.dita"/>
+
+  <!-- Reusable chunks, pulled in with conkeyref="reuse/<id>". -->
+  <keydef keys="reuse" href="../reuse/common.dita"/>
+</map>

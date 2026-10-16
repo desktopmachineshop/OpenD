@@ -301,6 +301,39 @@ describe.skipIf(!url)('embedded help (hosted)', () => {
       ).toBe(403);
     });
   });
+
+  // Last: it publishes a new 2.x release with a key that points at a nested topic.
+  it('opens a context that points at a section of a page at its anchor', async () => {
+    const config = readFileSync(join(STARTER, 'opend.config.yaml'), 'utf8');
+    const map = readFileSync(join(STARTER, 'maps/user-guide.ditamap'), 'utf8');
+    const sha = docs.commit({
+      'opend.config.yaml': config,
+      'maps/user-guide.ditamap': map.replace(
+        '<topicref href="../topics/overview.dita"/>',
+        '<topicref href="../topics/overview.dita"/>\n  <topicref href="../topics/limits.dita"/>',
+      ),
+      'topics/limits.dita': `<reference id="limits"><title>Limits</title><refbody><p>Intro</p></refbody>
+  <reference id="quotas"><title>Quotas</title>
+    <prolog><resourceid appname="console" appid="settings.quotas"/></prolog>
+    <refbody><p>Quota details</p></refbody>
+  </reference>
+</reference>`,
+    });
+    const repo = (await h.db.pool.query<{ id: number }>('select id from repos')).rows[0]!;
+    await enqueueJob(h.db.pool, { repoId: repo.id, ref: 'main', sha });
+    const deps = { pool: h.db.pool, blobs: new FsBlobStore(h.blobDir), log: () => {} };
+    expect(await processNext(deps)).toBe('published');
+    h.ctx.caches.releaseChanged();
+    const res = await get(
+      `/embed/context?app=console&key=settings.quotas&host=${encodeURIComponent(HOST)}`,
+      { cookie: sessions['v2-pro']! },
+    );
+    expect(res.statusCode).toBe(303);
+    expect(res.headers.location).toBe(
+      `/embed/topics/topics/limits.html?host=${encodeURIComponent(HOST)}&app=console#quotas`,
+    );
+    expect(res.headers['content-security-policy']).toContain(`frame-ancestors ${HOST}`);
+  });
 });
 
 describe.skipIf(!url)('embedded help when not configured', () => {

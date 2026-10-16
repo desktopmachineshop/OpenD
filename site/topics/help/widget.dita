@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE task PUBLIC "-//OASIS//DTD DITA Task//EN" "task.dtd">
+<task id="widget" product="embed" audience="developer">
+  <title>Embed the help widget</title>
+  <shortdesc>Add one script and a help button to your app, tell the widget where the user is, and the
+    panel opens on the right help.</shortdesc>
+  <taskbody>
+    <prereq>
+      <ul>
+        <li>Embedding is turned on for your app's origin, for example
+          <codeph>https://console.example.com</codeph>. <ph product="core">Set
+          <codeph>OPEND_EMBED_ORIGINS</codeph> and <codeph>OPEND_EMBED_SECRET</codeph> on
+          <ph keyref="your-server"/>.</ph> <ph product="hosted">Ask the operator of your docs site.</ph></li>
+        <li>Your backend has an endpoint that returns an embed token for the signed-in user. See
+          <xref href="tokens.dita"/>.</li>
+        <li>Your app's users are registered as readers in <keyword keyref="product-name"/>, by email, in the
+          right organization.</li>
+      </ul>
+    </prereq>
+    <steps>
+      <step>
+        <cmd>Load the widget script from the docs site.</cmd>
+        <stepxmp>
+          <codeblock><![CDATA[<script src="https://docs.example.com/embed/opend-help.js"></script>]]></codeblock>
+        </stepxmp>
+      </step>
+      <step>
+        <cmd>Initialise it once, with the docs URL, your app's name and a function that fetches a token.</cmd>
+        <stepxmp>
+          <codeblock><![CDATA[<script>
+  OpenDHelp.init({
+    docsUrl: 'https://docs.example.com',
+    app: 'opend-console',
+    getToken: () => fetch('/api/opend-token').then((r) => r.text()),
+  });
+</script>]]></codeblock>
+        </stepxmp>
+        <info>
+          <p><parmname>app</parmname> must match the <codeph>appname</codeph> authors use and the app's entry
+            in <filepath>help-contexts.yaml</filepath>.</p>
+        </info>
+      </step>
+      <step>
+        <cmd>Tell the widget the current route, on every route change.</cmd>
+        <stepxmp>
+          <codeblock>// In a single-page app, call this from your router.
+OpenDHelp.setContext({ path: location.pathname });
+// Or name the context directly:
+OpenDHelp.setContext({ key: 'tenants.detail' });</codeblock>
+        </stepxmp>
+        <info>
+          <p>If the panel is open, it follows the new context straight away.</p>
+        </info>
+      </step>
+      <step>
+        <cmd>Add a help button where it fits your layout.</cmd>
+        <stepxmp>
+          <codeblock><![CDATA[<opend-help-button></opend-help-button>
+<!-- Or open a specific context: -->
+<opend-help-button key="billing" label="Help with billing"></opend-help-button>]]></codeblock>
+        </stepxmp>
+        <info>
+          <p>The button toggles the panel. You can also call <codeph>OpenDHelp.open()</codeph>,
+            <codeph>close()</codeph> and <codeph>toggle()</codeph> from your own controls.</p>
+        </info>
+      </step>
+    </steps>
+    <result>
+      <p>The panel slides in from the side, 380 pixels wide (full width on small screens), and shows the help
+        for the current context. It does not block the page. Escape or its close button closes it and
+        returns focus to where it was.</p>
+      <p>The first time it opens, the panel asks your <parmname>getToken</parmname> for a token and exchanges
+        it for its own short session. For every option and message, see
+        <xref href="widget-api.dita"/>. <xref keyref="repo"/> includes a runnable host app in
+        <filepath>examples/embed-host</filepath>.</p>
+    </result>
+  </taskbody>
+</task>

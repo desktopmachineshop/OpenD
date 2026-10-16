@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="overview" audience="author admin developer">
+  <title><keyword keyref="product-name"/> overview</title>
+  <shortdesc>A docs platform where "which release applies" and "who may see this" are one rule,
+    written once in the content and applied everywhere it is shown.</shortdesc>
+  <prolog>
+    <resourceid appname="opend-console" appid="overview"/>
+  </prolog>
+  <conbody>
+    <p>Authors write DITA in a Git repository. The build compiles it into a release snapshot that keeps
+      every element's applicability, and each reader is served only what their release and entitlements
+      allow: on the docs site, in the help panel inside your apps, in search, and in PDF manuals.</p>
+
+    <section id="one-rule">
+      <title>One rule for release and entitlement</title>
+      <p>Most documentation tools filter by release when they build, then handle access in a separate
+        layer, if at all. In <keyword keyref="product-name"/>, any map entry, topic or element can carry
+        standard DITA filtering attributes, and one filter decides both questions:</p>
+      <ul>
+        <li><codeph>product</codeph> and <codeph>feature</codeph> are matched against what the reader's
+          organization is entitled to.</li>
+        <li><codeph>release</codeph> takes version ranges, such as <codeph>0.1..</codeph>, and is matched
+          against the release the reader runs.</li>
+        <li><codeph>audience</codeph>, <codeph>platform</codeph> and the other DITA attributes are
+          filtered once, at build time, with a DITAVAL file.</li>
+      </ul>
+      <fig id="fig-one-rule">
+        <title>Every output goes through the same filtered view</title>
+        <image href="../images/one-rule.svg" placement="break">
+          <alt>Diagram: DITA source with product, release and audience attributes goes through the
+            build-time DITAVAL into a release snapshot that keeps its conditions. The reader filter turns
+            the snapshot into one view that feeds navigation, pages, search, the help panel and PDF
+            publications.</alt>
+        </image>
+      </fig>
+      <p>The filter is fail-closed and never leaks through links, titles or search: a link to a page the
+        reader cannot see renders as plain text, and a hidden page answers with the same 404 as a missing
+        one. See <xref keyref="applicability"/>.</p>
+    </section>
+
+    <section id="architecture">
+      <title>Architecture</title>
+      <p>The same packages run on an author's laptop and on the server, so what an author previews is what
+        readers get.</p>
+      <ul>
+        <li><b>Locally</b>, the <cmdname><keyword keyref="cli"/></cmdname> command validates a docs project,
+          previews it as any reader, and prints PDF publications.</li>
+        <li product="core hosted"><b>Hosted</b>, a push to the docs repository fires a GitHub webhook. A worker
+          builds and validates the commit, and the web service serves signed-in readers their filtered
+          pages. A push that fails validation never goes live.</li>
+        <li product="embed"><b>In your apps</b>, a small widget opens a help panel on the topic for the
+          current screen, filtered for the signed-in user.</li>
+      </ul>
+      <fig id="fig-architecture">
+        <title>The hosted platform: web, worker, Postgres and a blob store</title>
+        <image href="../images/architecture.svg" placement="break">
+          <alt>Diagram: the docs repository sends a push webhook to the web service, which queues a job in
+            Postgres. The worker fetches the commit, builds and validates it, stores assets in the blob store
+            and publishes the release to Postgres. Readers and host apps are served by the web service
+            through the reader filter.</alt>
+        </image>
+      </fig>
+    </section>
+
+    <section id="what-is-in-0-1">
+      <title>What release <keyword keyref="current-release"/> includes</title>
+      <ul>
+        <li>The build and filter core, the <cmdname>opend</cmdname> CLI and a local previewer.</li>
+        <li>The hosted path: push to publish, OIDC reader sign-in, filtered delivery and an admin API.</li>
+        <li>Context-sensitive help embedded in your own web apps.</li>
+        <li>PDF publications from bookmaps, filtered per reader.</li>
+      </ul>
+      <p>The web editor, site-wide search on the docs site and multi-tenancy come later and reuse the
+        same packages. See <xref href="notes/release-0.1.dita"/>.</p>
+    </section>
+
+    <section id="where-next">
+      <title>Where to go next</title>
+      <ul>
+        <li><xref href="start/install-cli.dita"/></li>
+        <li><xref href="authoring/applicability.dita"/></li>
+        <li product="embed"><xref href="help/help-overview.dita"/></li>
+        <li product="core hosted"><xref href="hosting/architecture.dita"/></li>
+      </ul>
+      <p>Questions? Ask <ph keyref="help-contact"/>.</p>
+    </section>
+  </conbody>
+</concept>

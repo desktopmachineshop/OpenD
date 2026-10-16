@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="conditional-keys" audience="author">
+  <title>Conditional keys</title>
+  <shortdesc>Give a key several definitions with different conditions, and each reader gets the first
+    definition their filter keeps, which is DITA's rule applied per reader.</shortdesc>
+  <conbody>
+    <p>These docs define who to ask for help twice:</p>
+    <codeblock><![CDATA[<keydef keys="help-contact" product="hosted">
+  <topicmeta><keywords><keyword>the operator of your docs site</keyword></keywords></topicmeta>
+</keydef>
+<keydef keys="help-contact">
+  <topicmeta><keywords><keyword>the OpenD maintainers on GitHub</keyword></keywords></topicmeta>
+</keydef>]]></codeblock>
+    <p>A topic writes <codeph>&lt;ph keyref="help-contact"/&gt;</codeph>. For you, right now, that reads:
+      ask <ph keyref="help-contact"/>.</p>
+
+    <section id="how-it-works">
+      <title>How it works</title>
+      <p>A static DITA build picks one definition per output. <keyword keyref="product-name"/> builds once
+        for every reader, so it keeps all the definitions, in precedence order, as alternatives in the release
+        snapshot. When a page is served, the reader's filter removes the alternatives they don't qualify for
+        and keeps the first that remains.</p>
+      <ul>
+        <li>Put the most specific definition first and an unconditional one last, as a default. Definitions
+          after an unconditional one can never win.</li>
+        <li>If no definition survives for a reader, the element's own content is used, as for an undefined
+          key.</li>
+        <li>Conditions on the map entries around a <codeph>keydef</codeph> count as its conditions.</li>
+        <li>The build-time DITAVAL does not choose between alternatives, because it runs for every reader at
+          once. It only removes definitions it excludes.</li>
+        <li>In the previewer's staff view, every alternative is shown, separated by a bar and marked with its
+          conditions.</li>
+      </ul>
+      <p>Conditional keys work for variable text, links and images, and for <codeph>conkeyref</codeph>, so a
+        reader can get a different reusable chunk.</p>
+    </section>
+  </conbody>
+</concept>

@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="security" product="embed" audience="developer admin">
+  <title>Framing, CSP and cookies</title>
+  <shortdesc>What protects the help panel inside other sites, and what your app's own Content Security
+    Policy must allow.</shortdesc>
+  <conbody>
+    <section id="off-by-default">
+      <title>Off by default</title>
+      <p>Nothing under <filepath>/embed</filepath> or <filepath>/api/v1/help</filepath> exists unless both
+        <codeph>OPEND_EMBED_SECRET</codeph> (at least 32 characters) and <codeph>OPEND_EMBED_ORIGINS</codeph>
+        are set. Each origin is a scheme, host and optional port, such as
+        <codeph>https://console.example.com</codeph>, with no path or trailing slash.</p>
+    </section>
+
+    <section id="framing">
+      <title>Who may frame what</title>
+      <ul>
+        <li>Panel pages send <codeph>frame-ancestors</codeph> listing only the allowed origins, so no other
+          site can frame them.</li>
+        <li>The docs site itself sends <codeph>frame-ancestors 'none'</codeph>: it cannot be framed at
+          all.</li>
+        <li>The panel runs no inline script. Its policy is <codeph>default-src 'none'; script-src 'self';
+          img-src 'self' https: data:; style-src 'self' 'unsafe-inline'; connect-src 'self'; form-action
+          'self'; base-uri 'none'</codeph>, plus the <codeph>frame-ancestors</codeph> list.</li>
+        <li>Docs pages run no scripts at all.</li>
+      </ul>
+    </section>
+
+    <section id="host-csp">
+      <title>Your app's Content Security Policy</title>
+      <p>If your app sends a CSP, allow the docs origin for the script and the frame:</p>
+      <codeblock>script-src 'self' https://docs.example.com;
+frame-src https://docs.example.com;</codeblock>
+      <p>Apps that call the JSON API from the browser also need
+        <codeph>connect-src https://docs.example.com</codeph>.</p>
+    </section>
+
+    <section id="cookies">
+      <title>The panel's session</title>
+      <p>Inside your app, the panel is a third-party frame. Its session cookie, <codeph>opend_embed</codeph>,
+        is <codeph>HttpOnly</codeph>, <codeph>Secure</codeph>, <codeph>SameSite=None</codeph> and
+        <codeph>Partitioned</codeph> (CHIPS): it exists only under your app's site, never as a general
+        session for the docs site, and expires after 60 minutes. The docs site's own session cookie is
+        separate.</p>
+      <p>Because the cookie must be <codeph>Secure</codeph>, the docs site has to be served over HTTPS for
+        the panel to keep a session. Browsers that block all third-party cookies, even partitioned ones,
+        cannot keep a panel session; use the JSON API there.</p>
+    </section>
+
+    <section id="trust">
+      <title>What a host app can and cannot do</title>
+      <ul>
+        <li>A host app vouches for <i>who</i> the user is. Entitlements still come from
+          <keyword keyref="product-name"/>, so it cannot show a user more than their organization may see.</li>
+        <li>A token naming an email from another organization is refused.</li>
+        <li>Anyone with the embed secret can sign in as any registered reader. Keep it in your backend only,
+          and rotate it by changing it on both sides.</li>
+        <li>There is one embed secret per deployment for now.</li>
+      </ul>
+    </section>
+  </conbody>
+</concept>

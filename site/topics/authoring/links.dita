@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="links" audience="author">
+  <title>Links, and links to hidden topics</title>
+  <shortdesc>Link with <codeph>xref</codeph> or <codeph>related-links</codeph>. A link to a topic the reader
+    cannot see turns into plain text, so it never gives away what is behind it.</shortdesc>
+  <conbody>
+    <section id="writing-links">
+      <title>Writing links</title>
+      <codeblock><![CDATA[<xref href="install-cli.dita"/>                       <!-- another topic; text is its title -->
+<xref href="preview.dita#preview/staff">the staff view</xref>   <!-- an element in a topic -->
+<xref href="#links/hidden"/>                            <!-- an element in this topic -->
+<xref keyref="env-vars">environment variables</xref>    <!-- through a key -->
+<xref href="https://example.com" scope="external" format="html">Example</xref>]]></codeblock>
+      <ul>
+        <li>An empty link shows the target topic's title as the reader sees it.</li>
+        <li>Links to other local files, such as a sample YAML file, are served like images, only to readers
+          who can see the linking topic.</li>
+        <li>A link to a missing file, topic or element is an error, <codeph>broken-link</codeph>.</li>
+        <li><codeph>related-links</codeph> with <codeph>link</codeph> elements render as a "Related
+          information" list. Links whose target is hidden are left out of it.</li>
+      </ul>
+    </section>
+
+    <section id="hidden">
+      <title>Links to hidden topics</title>
+      <p>Pages are shared by many readers, so a page often links to a topic some of its readers cannot see.
+        For those readers, the link renders as its authored text, without the target's title and without a
+        URL. A link with no authored text disappears.</p>
+      <p>So when a link's target may be hidden, give it link text that makes sense on its own, as the
+        <xref href="#links/writing-links">examples above</xref> do:</p>
+      <codeblock><![CDATA[<!-- Good: reads well as plain text -->
+<p>Operators set this in the <xref keyref="env-vars">server environment</xref>.</p>
+<!-- Risky: an empty link vanishes for readers who can't see the target -->
+<p>See <xref keyref="env-vars"/>.</p>]]></codeblock>
+      <p>Or put the condition on the sentence that holds the link, so it disappears as a whole. For example,
+        this sentence is only shown to readers with the embed product:</p>
+      <p product="embed">To open help in your own app, see <xref href="../help/widget.dita"/>.</p>
+    </section>
+
+    <section id="unpublished">
+      <title>Links to topics outside the navigation</title>
+      <p>A topic that is in no navigation entry is never published, so links to it are plain text for
+        everyone. Validation warns about them as <codeph>link-to-unpublished</codeph>. Add the topic to the
+        site map, with <codeph>toc="no"</codeph> if it should not be listed.</p>
+      <p>In PDF publications, links to topics in the same publication jump within the PDF; links to other
+        topics point at the docs site when the reader can see them there.</p>
+    </section>
+  </conbody>
+</concept>

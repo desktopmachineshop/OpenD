@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE task PUBLIC "-//OASIS//DTD DITA Task//EN" "task.dtd">
+<task id="github" product="core" audience="admin">
+  <title>Connect GitHub: webhooks and the GitHub App</title>
+  <shortdesc>A push webhook tells <ph keyref="your-server"/> to build. A GitHub App adds private
+    repositories and commit statuses.</shortdesc>
+  <taskbody>
+    <context>
+      <p>A public repository needs only the webhook. Add the GitHub App when a docs repository is private, or
+        when you want each commit to show whether it published.</p>
+    </context>
+    <steps>
+      <step>
+        <cmd>Set <codeph>GITHUB_WEBHOOK_SECRET</codeph> on the web service to a random string.</cmd>
+        <info><note conkeyref="reuse/secret"/></info>
+      </step>
+      <step>
+        <cmd>Add a webhook to the docs repository: payload URL <filepath>$PUBLIC_URL/webhooks/github</filepath>,
+          content type <uicontrol>application/json</uicontrol>, the same secret, and <uicontrol>Just the push
+          event</uicontrol>.</cmd>
+        <stepresult>
+          <p>GitHub's ping delivery gets <systemoutput>{"status":"pong"}</systemoutput>.</p>
+        </stepresult>
+      </step>
+      <step>
+        <cmd>Register the repository, with the branches and tags that publish.</cmd>
+        <stepxmp>
+          <codeblock>curl -X POST "$PUBLIC_URL/admin/api/repos" -H "authorization: Bearer $OPEND_ADMIN_TOKEN" \
+  -H 'content-type: application/json' \
+  -d '{"fullName":"acme/docs","sourceUrl":"https://github.com/acme/docs.git","releaseRefs":["main","v*"],"docsPath":"."}'</codeblock>
+        </stepxmp>
+        <info>
+          <p><parmname>fullName</parmname> must match the repository name GitHub sends. Pushes to other refs,
+            branch deletions and other events are acknowledged and ignored.</p>
+        </info>
+      </step>
+      <step>
+        <cmd>Optional: create a GitHub App for private repositories and commit statuses.</cmd>
+        <substeps>
+          <substep><cmd>Create the App with repository permissions <uicontrol>Contents: Read-only</uicontrol>
+            and <uicontrol>Commit statuses: Read and write</uicontrol>. You can use the App's own webhook,
+            subscribed to push events, instead of per-repository webhooks.</cmd></substep>
+          <substep><cmd>Generate a private key, and set <codeph>GITHUB_APP_ID</codeph> and
+            <codeph>GITHUB_APP_PRIVATE_KEY</codeph> on the worker (and the web service, which shares its
+            configuration).</cmd></substep>
+          <substep><cmd>Install the App on the docs repository and note the installation id from the
+            installation's URL.</cmd></substep>
+          <substep><cmd>Register the repository again with <codeph>"installationId": 12345678</codeph>.</cmd>
+            <info><p>Send every field again: registering replaces the repository's settings, and omitted ones
+              go back to their defaults.</p></info></substep>
+        </substeps>
+      </step>
+    </steps>
+    <result>
+      <ul>
+        <li>The webhook checks the <codeph>X-Hub-Signature-256</codeph> signature in constant time and answers
+          401 to a bad one. Each delivery id is recorded, so a redelivered webhook does nothing.</li>
+        <li>For a private repository, the worker fetches with an installation token sent as an HTTP header,
+          never in the URL, so it cannot leak into logs.</li>
+        <li>With the App installed, every build sets an <codeph>opend/build</codeph> commit status: pending,
+          then success (<systemoutput>Published 0.1</systemoutput>), failure with the first errors, or
+          error when the build could not run.</li>
+        <li>For GitHub Enterprise Server, set <codeph>GITHUB_API_URL</codeph>.</li>
+      </ul>
+    </result>
+  </taskbody>
+</task>

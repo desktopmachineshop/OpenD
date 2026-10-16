@@ -60,6 +60,33 @@ describe('embedded help pages', async () => {
     expect(get(pro, '/embed/context', 'app=nope&key=x').status).toBe(404);
   });
 
+  it('opens a context that points at a section of a page at its anchor', () => {
+    const texts = new Map([
+      ['opend.config.yaml', 'release: "1.0"\nmap: m.ditamap\n'],
+      ['m.ditamap', '<map><topicref href="api.dita"/></map>'],
+      [
+        'api.dita',
+        `<reference id="api"><title>API</title><refbody><p>Intro</p></refbody>
+          <reference id="builds"><title>Builds</title>
+            <prolog><resourceid appname="console" appid="builds"/></prolog>
+            <refbody><p>Build routes</p></refbody>
+          </reference>
+        </reference>`,
+      ],
+    ]);
+    const built = buildRelease({ files: new Set(texts.keys()), texts }).release!;
+    const res = handleEmbedRequest(
+      viewRelease(built, []),
+      '/embed/context',
+      new URLSearchParams('app=console&key=builds'),
+      o,
+    );
+    expect(res.status).toBe(303);
+    expect(res.location).toBe(
+      '/embed/topics/api.html?host=https%3A%2F%2Fapp.example&app=console#builds',
+    );
+  });
+
   it('serves topics by id and hides ones the reader cannot see', () => {
     expect(get(pro, '/embed/topics/topics/gadget-pairing.html', '').status).toBe(200);
     const hidden = get(v1, '/embed/topics/topics/gadget-pairing.html', '');

@@ -66,6 +66,31 @@ describe('loadConfig', () => {
     expect(config.oidc).toBeUndefined();
   });
 
+  it('treats empty variables as unset, as deploy/.env.example leaves them', () => {
+    const config = loadConfig({
+      ...base,
+      PUBLIC_URL: '',
+      PORT: '',
+      GITHUB_WEBHOOK_SECRET: '',
+      GITHUB_APP_ID: '',
+      OIDC_ISSUER: '',
+      OPEND_ADMIN_TOKEN: '',
+      OPEND_SITE_REPO: '',
+      OPEND_EMBED_SECRET: '',
+      OPEND_EMBED_ORIGINS: '',
+      OPEND_DEV_LOGIN: '',
+    });
+    expect(config).toMatchObject({
+      publicUrl: 'http://localhost:3000',
+      port: 3000,
+      devLogin: false,
+    });
+    expect(config.webhookSecret).toBeUndefined();
+    expect(config.adminToken).toBeUndefined();
+    expect(config.embed).toBeUndefined();
+    expect(() => loadConfig({ ...base, DATABASE_URL: '' })).toThrow(/DATABASE_URL/);
+  });
+
   it('refuses development sign-in in production', () => {
     expect(() => loadConfig({ ...base, NODE_ENV: 'production', OPEND_DEV_LOGIN: 'true' })).toThrow(
       /OPEND_DEV_LOGIN must not be enabled when NODE_ENV=production/,

@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE task PUBLIC "-//OASIS//DTD DITA Task//EN" "task.dtd">
+<task id="keys" audience="author">
+  <title>Use keys for names, links and images</title>
+  <shortdesc>Define a value once in a map, with <codeph>keydef</codeph>, and refer to it everywhere with
+    <codeph>keyref</codeph>. Changing the map changes every page.</shortdesc>
+  <taskbody>
+    <context>
+      <p>Keys suit product names, version numbers, external URLs, and topics that many pages link to.
+        These docs keep theirs in <filepath>maps/keys.ditamap</filepath> and pull it into every map with a
+        <codeph>mapref</codeph>.</p>
+    </context>
+    <steps>
+      <step>
+        <cmd>Define the key in a map.</cmd>
+        <stepxmp>
+          <codeblock><![CDATA[<!-- Variable text -->
+<keydef keys="product-name">
+  <topicmeta><keywords><keyword>OpenD</keyword></keywords></topicmeta>
+</keydef>
+<!-- An external link with default link text -->
+<keydef keys="repo" href="https://github.com/desktopmachineshop/opend" scope="external" format="html">
+  <topicmeta><linktext>the OpenD repository</linktext></topicmeta>
+</keydef>
+<!-- A topic -->
+<keydef keys="env-vars" href="../topics/hosting/env-vars.dita"/>]]></codeblock>
+        </stepxmp>
+      </step>
+      <step>
+        <cmd>Refer to it from a topic.</cmd>
+        <stepxmp>
+          <codeblock><![CDATA[<title><keyword keyref="product-name"/> overview</title>
+<p>Clone <xref keyref="repo"/>.</p>
+<p>See <xref keyref="env-vars"/>.</p>
+<image keyref="logo"><alt>Logo</alt></image>]]></codeblock>
+        </stepxmp>
+        <info>
+          <p>An empty element takes the key's text: the <codeph>keyword</codeph> or
+            <codeph>linktext</codeph> in its <codeph>topicmeta</codeph>, or else the target topic's title,
+            or else the URL. An element with its own content keeps that content and only takes the key's
+            target.</p>
+        </info>
+      </step>
+      <step>
+        <cmd>Validate.</cmd>
+        <info>
+          <p>An undefined key in <codeph>keyref</codeph> is a warning, <codeph>unresolved-key</codeph>, and
+            the element's own content is used as a fallback. An undefined key in <codeph>conkeyref</codeph>
+            is an error.</p>
+        </info>
+      </step>
+    </steps>
+    <result>
+      <p id="precedence">When a key is defined more than once, this definition wins:</p>
+        <ul>
+          <li>Within one map, the first definition in document order.</li>
+          <li>A map's own definitions win over those of the submaps it references.</li>
+          <li>Each map and bookmap has its own keyspace. A topic used by both the site map and a bookmap is
+            compiled once, with the site map's keys.</li>
+          <li>A key may have several definitions with different conditions. Each reader gets the first one
+            their filter keeps: see <xref href="conditional-keys.dita"/>.</li>
+        </ul>
+        <p>Key scopes are not supported yet.</p>
+    </result>
+  </taskbody>
+</task>

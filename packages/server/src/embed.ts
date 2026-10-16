@@ -155,6 +155,8 @@ export function registerEmbed(app: FastifyInstance, ctx: AppContext): void {
       params,
       embedOptions(request, release.view),
     );
+    if (result.location)
+      return reply.headers(frameHeaders).redirect(result.location, result.status);
     return send(result.status, result.html);
   };
   app.get('/embed/context', panel);

@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE bookmap PUBLIC "-//OASIS//DTD DITA BookMap//EN" "bookmap.dtd">
+<!-- Served as /pdf/author-guide.pdf. -->
+<bookmap>
+  <booktitle>
+    <mainbooktitle>OpenD Author Guide</mainbooktitle>
+  </booktitle>
+
+  <mapref href="keys.ditamap"/>
+
+  <chapter href="../topics/overview.dita"/>
+
+  <chapter navtitle="Get started">
+    <topicref href="../topics/start/install-cli.dita"/>
+    <topicref href="../topics/start/validate.dita"/>
+    <topicref href="../topics/start/preview.dita"/>
+    <topicref href="../topics/start/cli-reference.dita"/>
+  </chapter>
+
+  <chapter navtitle="Writing docs">
+    <topicref href="../topics/authoring/project-layout.dita"/>
+    <topicref href="../topics/authoring/config-reference.dita"/>
+    <topicref href="../topics/authoring/topics-and-maps.dita"/>
+    <topicref href="../topics/authoring/keys.dita"/>
+    <topicref href="../topics/authoring/reuse.dita"/>
+    <topicref href="../topics/authoring/images.dita"/>
+    <topicref href="../topics/authoring/links.dita"/>
+    <topicref href="../topics/authoring/release-branches.dita"/>
+    <topicref href="../topics/authoring/preview-contexts.dita"/>
+    <topicref href="../topics/authoring/ci.dita"/>
+  </chapter>
+
+  <chapter navtitle="Applicability">
+    <topicref href="../topics/authoring/applicability.dita"/>
+    <topicref href="../topics/authoring/release-ranges.dita"/>
+    <topicref href="../topics/authoring/fail-closed.dita"/>
+    <topicref href="../topics/authoring/conditional-keys.dita"/>
+    <topicref href="../topics/authoring/build-filter.dita"/>
+  </chapter>
+
+  <chapter navtitle="Context-sensitive help" product="embed">
+    <topicref href="../topics/start/help-lab.dita"/>
+    <topicref href="../topics/help/resourceid.dita"/>
+    <topicref href="../topics/help/help-contexts.dita"/>
+    <topicref href="../topics/help/fallback.dita"/>
+  </chapter>
+
+  <chapter navtitle="PDF publications">
+    <topicref href="../topics/pdf/pdf-overview.dita"/>
+    <topicref href="../topics/pdf/bookmaps.dita"/>
+    <topicref href="../topics/pdf/pdf-filtering.dita"/>
+    <topicref href="../topics/pdf/pdf-theming.dita"/>
+  </chapter>
+
+  <appendix href="../topics/authoring/dita-subset.dita"/>
+  <appendix href="../topics/authoring/diagnostics.dita"/>
+</bookmap>

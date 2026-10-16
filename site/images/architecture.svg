@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 410" width="780" height="410" role="img" aria-labelledby="arch-title arch-desc" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="13">
+  <title id="arch-title">OpenD architecture</title>
+  <desc id="arch-desc">A push to the docs repository on GitHub sends a webhook to the web service, which queues a build job in Postgres. The worker fetches the commit, builds and validates it, stores images and themes in the blob store, and publishes the release snapshot to Postgres. Readers, the help widget in host apps, and PDF downloads are all served by the web service, which reads releases from Postgres and assets from the blob store, and filters every response through the same applicability rule for the signed-in reader.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3d4a5c"/>
+    </marker>
+  </defs>
+  <rect x="0" y="0" width="780" height="410" rx="12" fill="#ffffff"/>
+
+  <!-- Sources and clients -->
+  <rect x="24" y="40" width="170" height="64" rx="8" fill="#eef3ff" stroke="#2f5bd3" stroke-width="1.5"/>
+  <text x="109" y="66" text-anchor="middle" font-weight="600" fill="#14213d">Docs repository</text>
+  <text x="109" y="86" text-anchor="middle" fill="#3d4a5c">DITA on GitHub</text>
+
+  <rect x="24" y="178" width="170" height="64" rx="8" fill="#f3f4f6" stroke="#6b7280" stroke-width="1.5"/>
+  <text x="109" y="204" text-anchor="middle" font-weight="600" fill="#14213d">Readers</text>
+  <text x="109" y="224" text-anchor="middle" fill="#3d4a5c">signed in with OIDC</text>
+
+  <rect x="24" y="316" width="170" height="64" rx="8" fill="#f3f4f6" stroke="#6b7280" stroke-width="1.5"/>
+  <text x="109" y="342" text-anchor="middle" font-weight="600" fill="#14213d">Host apps</text>
+  <text x="109" y="362" text-anchor="middle" fill="#3d4a5c">help widget</text>
+
+  <!-- Services -->
+  <rect x="292" y="24" width="190" height="80" rx="10" fill="#e8f7ef" stroke="#13795b" stroke-width="2"/>
+  <text x="387" y="52" text-anchor="middle" font-weight="700" fill="#14213d">worker</text>
+  <text x="387" y="72" text-anchor="middle" fill="#3d4a5c">opend-server worker</text>
+  <text x="387" y="90" text-anchor="middle" fill="#3d4a5c">fetch · build · validate</text>
+
+  <rect x="292" y="150" width="190" height="120" rx="10" fill="#e8f7ef" stroke="#13795b" stroke-width="2"/>
+  <text x="387" y="178" text-anchor="middle" font-weight="700" fill="#14213d">web</text>
+  <text x="387" y="198" text-anchor="middle" fill="#3d4a5c">opend-server serve</text>
+  <text x="387" y="222" text-anchor="middle" fill="#3d4a5c">webhook · sign-in · pages</text>
+  <text x="387" y="240" text-anchor="middle" fill="#3d4a5c">help panel · PDF · admin API</text>
+  <text x="387" y="258" text-anchor="middle" fill="#13795b" font-weight="600">reader filter</text>
+
+  <!-- State -->
+  <rect x="570" y="160" width="166" height="80" rx="10" fill="#fff6e5" stroke="#b45309" stroke-width="1.5"/>
+  <text x="653" y="188" text-anchor="middle" font-weight="700" fill="#14213d">Postgres</text>
+  <text x="653" y="208" text-anchor="middle" fill="#3d4a5c">jobs · releases</text>
+  <text x="653" y="226" text-anchor="middle" fill="#3d4a5c">orgs · readers · audit</text>
+
+  <rect x="570" y="300" width="166" height="80" rx="10" fill="#fff6e5" stroke="#b45309" stroke-width="1.5"/>
+  <text x="653" y="328" text-anchor="middle" font-weight="700" fill="#14213d">Blob store</text>
+  <text x="653" y="348" text-anchor="middle" fill="#3d4a5c">images · themes</text>
+  <text x="653" y="366" text-anchor="middle" fill="#3d4a5c">cached PDFs</text>
+
+  <!-- Arrows -->
+  <g stroke="#3d4a5c" stroke-width="1.5" fill="none" marker-end="url(#arrow)">
+    <path d="M194,64 L290,64"/>
+    <path d="M194,94 C240,120 250,170 290,185"/>
+    <path d="M194,210 L290,210"/>
+    <path d="M194,348 C240,330 260,290 300,272"/>
+    <path d="M482,84 C560,92 640,112 650,158"/>
+    <path d="M482,200 L568,200"/>
+    <path d="M482,40 L756,40 L756,340 L738,340"/>
+    <path d="M482,252 C520,270 530,320 568,330"/>
+  </g>
+  <g fill="#3d4a5c" font-size="11">
+    <text x="214" y="56">git fetch</text>
+    <text x="196" y="138">push webhook</text>
+    <text x="206" y="202">sign in · read</text>
+    <text x="206" y="318">help</text>
+    <text x="580" y="98">publish</text>
+    <text x="488" y="192">jobs · releases</text>
+    <text x="586" y="32">store assets</text>
+    <text x="496" y="312">read assets</text>
+  </g>
+</svg>

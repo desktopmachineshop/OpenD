@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE task PUBLIC "-//OASIS//DTD DITA Task//EN" "task.dtd">
+<task id="docker-compose" product="core" audience="admin">
+  <title>Run OpenD with Docker Compose</title>
+  <shortdesc>The smallest install: the app, the build worker and Postgres on one host, from the Compose file
+    in the repository.</shortdesc>
+  <taskbody>
+    <prereq>
+      <p>You need Docker with Compose, a checkout of <xref keyref="repo"/>, and a host name readers can reach
+        over HTTPS (terminate TLS in a reverse proxy in front of port 3000).</p>
+    </prereq>
+    <steps>
+      <step>
+        <cmd>Create the configuration from the examples.</cmd>
+        <stepxmp>
+          <codeblock>cp deploy/.env.example deploy/.env
+cp deploy/seed/seed.example.yaml deploy/seed/seed.yaml</codeblock>
+        </stepxmp>
+      </step>
+      <step>
+        <cmd>Edit <filepath>deploy/.env</filepath>.</cmd>
+        <info>
+          <p>Set at least <codeph>PUBLIC_URL</codeph> and a random <codeph>SESSION_SECRET</codeph>. For
+            publishing set <codeph>GITHUB_WEBHOOK_SECRET</codeph>; for reader sign-in, the
+            <codeph>OIDC_*</codeph> variables; for the admin API, <codeph>OPEND_ADMIN_TOKEN</codeph>. Change
+            <codeph>POSTGRES_PASSWORD</codeph>. See <xref keyref="env-vars">the environment variable
+            reference</xref>.</p>
+          <note conkeyref="reuse/secret"/>
+        </info>
+      </step>
+      <step>
+        <cmd>Edit <filepath>deploy/seed/seed.yaml</filepath> with your docs repository, organizations,
+          entitlements and readers.</cmd>
+        <info><p>See <xref href="readers-orgs.dita"/> for the format.</p></info>
+      </step>
+      <step>
+        <cmd>Build and start the stack.</cmd>
+        <stepxmp>
+          <codeblock>docker compose -f deploy/docker-compose.yml up -d --build</codeblock>
+        </stepxmp>
+        <stepresult>
+          <p>Compose starts Postgres, runs the <codeph>migrate</codeph> service once to create the schema,
+            then starts <codeph>app</codeph> on port 3000 (or <codeph>OPEND_PORT</codeph>) and
+            <codeph>worker</codeph>. Both share the <codeph>blobs</codeph> volume at
+            <filepath>/data/blobs</filepath>.</p>
+        </stepresult>
+      </step>
+      <step>
+        <cmd>Load the seed file.</cmd>
+        <stepxmp>
+          <codeblock>docker compose -f deploy/docker-compose.yml run --rm migrate seed /seed/seed.yaml</codeblock>
+        </stepxmp>
+        <info><p>Seeding is idempotent: everything is upserted, so run it again after each change.</p></info>
+      </step>
+      <step>
+        <cmd>Check health: <codeph>curl http://localhost:3000/healthz</codeph> returns
+          <systemoutput>{"status":"ok"}</systemoutput>.</cmd>
+      </step>
+      <step>
+        <cmd>Connect GitHub and your identity provider.</cmd>
+        <info>
+          <p>See <xref href="github.dita"/> and <xref href="oidc.dita"/>.</p>
+        </info>
+      </step>
+    </steps>
+    <result>
+      <p>Readers sign in at <codeph>PUBLIC_URL</codeph> and get the live release for their version's line.
+        The first push to a release ref publishes it.</p>
+      <p>To evaluate without an identity provider, set <codeph>NODE_ENV=development</codeph> and
+        <codeph>OPEND_DEV_LOGIN=1</codeph>, then sign in at <filepath>/auth/dev</filepath> as any seeded
+        reader. Never do this with real content.</p>
+    </result>
+  </taskbody>
+</task>
