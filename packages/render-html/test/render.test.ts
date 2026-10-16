@@ -185,6 +185,7 @@ describe('renderNav and renderPage', () => {
 
   it('returns null for pages the reader cannot see and escapes the site title', () => {
     const view = viewRelease(rel, [widgetV1]);
+    expect(renderPage(view, 'a', { topicEnd: '<!--end-->' })).toContain('</article><!--end-->');
     expect(renderPage(view, 'g')).toBeNull();
     expect(renderPage(view, 'missing')).toBeNull();
     expect(renderPage(view, 'a')).toContain('<title>Alpha · Docs &lt;&amp;&gt;</title>');

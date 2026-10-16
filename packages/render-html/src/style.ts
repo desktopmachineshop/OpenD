@@ -68,6 +68,12 @@ img { max-width: 100%; height: auto; }
 opend-cond { display: contents; }
 .opend-alt-sep { color: var(--opend-cond); }
 .opend-badge { font: 11px/1.6 var(--opend-mono); color: var(--opend-cond); }
+.opend-feedback { margin: 32px 0 0; padding-top: 12px; border-top: 1px solid var(--opend-border); font-size: 14px; }
+.opend-feedback form { margin: 0; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.opend-feedback button { font: inherit; padding: 2px 12px; cursor: pointer; }
+.opend-feedback details { flex-basis: 100%; }
+.opend-feedback textarea { display: block; width: 100%; max-width: 560px; min-height: 4em; margin: 6px 0; font: inherit; }
+.opend-feedback-thanks { color: var(--opend-muted); }
 @media (max-width: 720px) {
   .layout { grid-template-columns: 1fr; }
   .toc { border-right: 0; border-bottom: 1px solid var(--opend-border); }
