@@ -1,0 +1,8 @@
+**/node_modules
+**/dist
+**/*.tsbuildinfo
+.git
+.opend
+deploy/.env
+deploy/seed/seed.yaml
+coverage

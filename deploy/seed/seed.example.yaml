@@ -1,0 +1,27 @@
+# Load with: docker compose -f deploy/docker-compose.yml run --rm migrate seed /seed/seed.yaml
+# Safe to re-run: everything is upserted.
+
+repos:
+  - fullName: acme/docs # owner/name as GitHub sends it in webhooks
+    sourceUrl: https://github.com/acme/docs.git
+    # installationId: 12345678   # GitHub App installation, for private repos and commit statuses
+    releaseRefs: [main, 'v*'] # branches and tags that publish
+    docsPath: . # docs root inside the repository
+
+orgs:
+  - slug: acme
+    name: Acme Corp
+    entitlements:
+      products: [widget]
+      features: []
+      version: '1.4' # the release this customer runs; picks the 1.x docs
+    readers: [ann@acme.example]
+  - slug: globex
+    name: Globex
+    entitlements:
+      products: [widget, gadget]
+      features: [sso, audit-log]
+      version: '2.1'
+    readers:
+      - email: gus@globex.example
+        name: Gus

@@ -45,9 +45,12 @@ export async function fetchSource(
   } catch (err) {
     await cleanup();
     const stderr = (err as { stderr?: string }).stderr?.trim();
+    const lines = stderr?.split('\n') ?? [];
+    // git's first "fatal:" line names the cause; later lines are hints.
+    const reason = lines.find((l) => l.startsWith('fatal:')) ?? lines.at(-1);
     // The original error is not attached as `cause`: its `cmd` includes the
     // auth header, and errors end up in logs and the build_jobs table.
     // eslint-disable-next-line preserve-caught-error
-    throw new Error(`fetching ${sha} failed${stderr ? `: ${stderr.split('\n').pop()}` : ''}`);
+    throw new Error(`fetching ${sha} failed${reason ? `: ${reason}` : ''}`);
   }
 }

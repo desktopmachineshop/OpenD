@@ -107,8 +107,9 @@ describe('fetchSource', () => {
 
   it('rejects non-sha input and reports missing commits without leaking tokens', async () => {
     await expect(fetchSource(repo.dir, '--upload-pack=evil')).rejects.toThrow(/not a commit sha/);
+    // The reason is git's first "fatal:" line, not a trailing hint.
     await expect(fetchSource(repo.dir, 'deadbeef'.repeat(5), 'secret-token')).rejects.toThrow(
-      /fetching/,
+      /^fetching \w+ failed: fatal: /,
     );
     await expect(fetchSource(repo.dir, 'deadbeef'.repeat(5), 'secret-token')).rejects.not.toThrow(
       /secret-token/,
