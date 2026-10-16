@@ -202,4 +202,55 @@ create table if not exists polled_refs (
 create index if not exists build_jobs_repo_ref_sha on build_jobs (repo_id, ref, sha);
 `,
   },
+  {
+    id: '004_search',
+    sql: `
+-- Full-text search, written by the worker when it publishes a release (and by
+-- opend-server reindex). Only tsvectors are stored, never readable text, and
+-- results are always re-checked against the reader's filtered view; see ADR 0008.
+create table search_indexes (
+  release_id bigint primary key references releases (id) on delete cascade,
+  -- SEARCH_INDEX_FORMAT of the segmentation that wrote the rows
+  format int not null,
+  indexed_at timestamptz not null default now()
+);
+
+-- Each distinct condition text sits behind. cond_key is a hash of gates, so it
+-- means the same thing in every release and across reindexing.
+create table search_conditions (
+  release_id bigint not null references search_indexes (release_id) on delete cascade,
+  cond_key text not null,
+  gates jsonb not null,
+  primary key (release_id, cond_key)
+);
+
+-- One row per run of topic text with a single condition and weight.
+create table search_segments (
+  release_id bigint not null references search_indexes (release_id) on delete cascade,
+  topic_id text not null,
+  seq int not null,
+  cond_key text not null,
+  tsv tsvector not null,
+  primary key (release_id, topic_id, seq),
+  foreign key (release_id, cond_key) references search_conditions (release_id, cond_key)
+    on delete cascade
+);
+
+-- Every segment of a topic, whatever its condition. Only narrows candidates:
+-- a topic is ranked on the segments the reader can see.
+create table search_topics (
+  release_id bigint not null references search_indexes (release_id) on delete cascade,
+  topic_id text not null,
+  tsv tsvector not null,
+  primary key (release_id, topic_id)
+);
+create index search_topics_tsv on search_topics using gin (tsv);
+
+create aggregate opend_tsvector_agg (tsvector) (
+  sfunc = tsvector_concat,
+  stype = tsvector,
+  initcond = ''
+);
+`,
+  },
 ];
