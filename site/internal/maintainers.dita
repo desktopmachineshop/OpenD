@@ -13,8 +13,11 @@
         <filepath>packages/dita/src/elements.ts</filepath>, with the HTML each element renders as.</li>
       <li>Keep <codeph>release</codeph> in <filepath>opend.config.yaml</filepath> equal to the packages'
         major and minor version.</li>
-      <li>Coming-soon pages carry <codeph>feature="early-access"</codeph>. Replace them with real topics when
-        the web editor and the operator console ship, and give each screen its own key.</li>
+      <li>Coming-soon pages carry <codeph>feature="early-access"</codeph>. Replace the operator console's
+        with real topics when it ships, and give each screen its own key, as the web editor's topics
+        do.</li>
+      <li>The editor's variable table in <filepath>topics/hosting/editor.dita</filepath> mirrors the schema in
+        <filepath>packages/editor/src/config.ts</filepath>; the site test checks it.</li>
     </ul>
   </body>
 </topic>

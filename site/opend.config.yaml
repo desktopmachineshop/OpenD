@@ -17,7 +17,7 @@ publications:
 #   product   what the reader runs. core: the open-source distribution you run yourself
 #             (CLI, previewer and the server image). hosted: a docs site someone else
 #             operates for you. embed: context-sensitive help inside your own apps.
-#   feature   early-access: previews of work in progress, such as the web editor.
+#   feature   early-access: previews of work in progress, such as the operator console.
 #   audience  who a topic is written for. A build-time label only: readers are gated by
 #             product and feature. internal: maintainer notes, removed by the build filter.
 attributes:

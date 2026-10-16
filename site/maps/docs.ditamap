@@ -63,6 +63,14 @@
     <topicref href="../topics/pdf/pdf-limits.dita"/>
   </topichead>
 
+  <!-- Authors edit through an editor someone runs for them, or that they run themselves. -->
+  <topichead navtitle="Web editor" product="core hosted">
+    <topicref href="../topics/editor/editor.dita"/>
+    <topicref href="../topics/editor/editor-edit.dita"/>
+    <topicref href="../topics/editor/editor-publish.dita"/>
+    <topicref href="../topics/editor/editor-conflicts.dita"/>
+  </topichead>
+
   <!-- Self-hosting guides are for core; publishing to a managed site is for hosted. -->
   <topichead navtitle="Hosting" product="core hosted">
     <topicref href="../topics/hosting/architecture.dita"/>
@@ -73,6 +81,7 @@
     <topicref href="../topics/hosting/blob-storage.dita" product="core"/>
     <topicref href="../topics/hosting/github.dita" product="core"/>
     <topicref href="../topics/hosting/oidc.dita" product="core"/>
+    <topicref href="../topics/hosting/editor.dita" product="core"/>
     <topicref href="../topics/hosting/readers-orgs.dita" product="core">
       <!-- A context key on the map entry: map entries are checked before topics. -->
       <topicmeta><resourceid appname="opend-console" appid="orgs.entitlements"/></topicmeta>
@@ -84,7 +93,6 @@
   </topichead>
 
   <topichead navtitle="Coming soon" feature="early-access">
-    <topicref href="../topics/next/editor.dita"/>
     <topicref href="../topics/next/console.dita"/>
   </topichead>
 

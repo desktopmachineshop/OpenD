@@ -49,6 +49,9 @@
         <li product="core hosted"><b>Hosted</b>, a push to the docs repository fires a GitHub webhook. A worker
           builds and validates the commit, and the web service serves signed-in readers their filtered
           pages. A push that fails validation never goes live.</li>
+        <li product="core hosted"><b>In the browser</b>, the web editor lets authors who do not use Git
+          change the same repository. They save to their own branch and publish through a pull request, so
+          a change still goes live only by a merge and a passing build.</li>
         <li product="embed"><b>In your apps</b>, a small widget opens a help panel on the topic for the
           current screen, filtered for the signed-in user.</li>
       </ul>
@@ -70,8 +73,11 @@
         <li>The hosted path: push to publish, OIDC reader sign-in, filtered delivery and an admin API.</li>
         <li>Context-sensitive help embedded in your own web apps.</li>
         <li>PDF publications from bookmaps, filtered per reader.</li>
+        <li>A web editor for authors who do not use Git, with live preview and publishing through pull
+          requests.</li>
       </ul>
-      <p>The web editor and multi-tenancy come later and reuse the same packages. See <xref href="notes/release-0.1.dita"/>.</p>
+      <p>Multi-tenancy and an operator console come later and reuse the same packages. See
+        <xref href="notes/release-0.1.dita"/>.</p>
     </section>
 
     <section id="where-next">
@@ -80,6 +86,7 @@
         <li><xref href="start/install-cli.dita"/></li>
         <li><xref href="authoring/applicability.dita"/></li>
         <li product="embed"><xref href="help/help-overview.dita"/></li>
+        <li product="core hosted"><xref href="editor/editor.dita"/></li>
         <li product="core hosted"><xref href="hosting/architecture.dita"/></li>
       </ul>
       <p>Questions? Ask <ph keyref="help-contact"/>.</p>

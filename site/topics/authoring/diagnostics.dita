@@ -2,8 +2,8 @@
 <!DOCTYPE reference PUBLIC "-//OASIS//DTD DITA Reference//EN" "reference.dtd">
 <reference id="diagnostics" audience="author admin">
   <title>Validation diagnostics</title>
-  <shortdesc>Every problem code <cmdname>opend validate</cmdname>, the previewer and the hosted build
-    report, what it means and how to fix it.</shortdesc>
+  <shortdesc>Every problem code <cmdname>opend validate</cmdname>, the previewer, the web editor and the
+    hosted build report, what it means and how to fix it.</shortdesc>
   <refbody>
     <section id="reading">
       <title>Reading a diagnostic</title>
@@ -41,7 +41,7 @@
         <strow id="missing-id"><stentry><codeph>missing-id</codeph></stentry><stentry>error</stentry><stentry>A topic's root element has no <codeph>id</codeph>.</stentry><stentry>Add one; references use it.</stentry></strow>
         <strow id="duplicate-id"><stentry><codeph>duplicate-id</codeph></stentry><stentry>error</stentry><stentry>Two elements in one topic share an <codeph>id</codeph>.</stentry><stentry>Rename one, and update references to it.</stentry></strow>
         <strow id="unsupported-element"><stentry><codeph>unsupported-element</codeph></stentry><stentry>warning</stentry><stentry>An element is outside the supported subset. It renders as a plain block.</stentry><stentry>Use a supported element: see <xref href="dita-subset.dita"/>.</stentry></strow>
-        <strow id="conflict-markers"><stentry><codeph>conflict-markers</codeph></stentry><stentry>error</stentry><stentry>The web editor refused a save because the file still has conflict markers (<codeph>&lt;&lt;&lt;&lt;&lt;&lt;&lt;</codeph>, <codeph>=======</codeph>, <codeph>&gt;&gt;&gt;&gt;&gt;&gt;&gt;</codeph>) left from resolving a conflict by hand.</stentry><stentry>Keep the text you want from each side and delete the marker lines, then save again.</stentry></strow>
+        <strow id="conflict-markers"><stentry><codeph>conflict-markers</codeph></stentry><stentry>error</stentry><stentry>The web editor refused a save, or a conflict resolution, because the text still has conflict markers (<codeph>&lt;&lt;&lt;&lt;&lt;&lt;&lt;</codeph>, <codeph>=======</codeph>, <codeph>&gt;&gt;&gt;&gt;&gt;&gt;&gt;</codeph>), such as those in the hand-edit box when you resolve a conflict.</stentry><stentry>Keep the text you want from each side and delete the marker lines, then save again.</stentry></strow>
         <strow id="unreferenced-topic"><stentry><codeph>unreferenced-topic</codeph></stentry><stentry>warning</stentry><stentry>A topic file is in no map, and no published topic reuses content from it. It is usually forgotten.</stentry><stentry>Add it to a map, reuse a chunk from it, or delete it.</stentry></strow>
       </simpletable>
     </section>

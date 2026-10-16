@@ -39,7 +39,8 @@
         <substeps>
           <substep><cmd>Create the App with repository permissions <uicontrol>Contents: Read-only</uicontrol>
             and <uicontrol>Commit statuses: Read and write</uicontrol>. You can use the App's own webhook,
-            subscribed to push events, instead of per-repository webhooks.</cmd></substep>
+            subscribed to push events, instead of per-repository webhooks.</cmd>
+            <info><p>The web editor needs more permissions; see <xref href="editor.dita"/>.</p></info></substep>
           <substep><cmd>Generate a private key, and set <codeph>GITHUB_APP_ID</codeph> and
             <codeph>GITHUB_APP_PRIVATE_KEY</codeph> on the worker (and the web service, which shares its
             configuration).</cmd></substep>

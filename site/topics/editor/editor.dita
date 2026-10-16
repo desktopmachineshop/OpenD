@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="editor" product="core hosted" audience="author">
+  <title>Edit docs in the browser</title>
+  <shortdesc>The web editor lets people who do not use Git change the docs. You save to your own working
+    branch as often as you like, and publish through one pull request when you are ready.</shortdesc>
+  <prolog>
+    <resourceid appname="opend-console" appid="editor"/>
+  </prolog>
+  <conbody>
+    <section id="how-it-works">
+      <title>How it works</title>
+      <ul>
+        <li>The docs repository stays the only copy of the docs. The editor reads from it and writes to it
+          through GitHub; it keeps no content of its own.</li>
+        <li><b>Save</b> as often as you like. Each save is a commit to your own working branch. Nothing goes
+          live and nobody is asked to review.</li>
+        <li><b>Publish</b> when you are ready. The editor opens one pull request for everything you saved, and
+          the repository's review rules on GitHub decide when it can merge.</li>
+        <li>Once it merges, the docs site builds and publishes it like any other push.</li>
+        <li>Commits name you as the author, even if you have no GitHub account, and the editor keeps a record
+          of what you did.</li>
+      </ul>
+    </section>
+
+    <section id="sign-in">
+      <title>Sign in</title>
+      <p>The editor has its own address, separate from the docs site. Your reader account does not open it,
+        and signing in to the editor gives you nothing extra on the docs site.</p>
+      <ul>
+        <li><uicontrol>Sign in with GitHub</uicontrol> is for developers. If you can already push to the docs
+          repository, you get in the first time you sign in.</li>
+        <li><uicontrol>Sign in with your company account</uicontrol> is for everyone else. An administrator
+          must add you first, by the email address your company account uses.</li>
+      </ul>
+      <p>If the editor says you cannot edit these docs, or that you are not registered, ask whoever runs the
+        editor to add you. Signing out ends your session at once.</p>
+    </section>
+
+    <section id="pages">
+      <title>The pages</title>
+      <dl>
+        <dlentry>
+          <dt><uicontrol>Files</uicontrol></dt>
+          <dd>The topics and maps in the repository, with the ones you changed marked. Also where you create a
+            topic and preview the docs as a customer org.</dd>
+        </dlentry>
+        <dlentry>
+          <dt><uicontrol>Publish</uicontrol></dt>
+          <dd>Your changes, what the repository needs before they can merge, and your pull request.</dd>
+        </dlentry>
+        <dlentry>
+          <dt><uicontrol>Activity</uicontrol></dt>
+          <dd>What you did in the editor: sign-ins, saves, merges from the main branch, conflict choices,
+            publishes and previews, with their commits and pull requests.</dd>
+        </dlentry>
+      </dl>
+      <p>The editor changes the DITA source of topics (<filepath>.dita</filepath>) and maps
+        (<filepath>.ditamap</filepath>, <filepath>.bookmap</filepath>) in a text box. There is no visual
+        editor yet. Images and other files are still changed in Git.</p>
+    </section>
+
+    <section id="next">
+      <title>Next</title>
+      <ul>
+        <li><xref href="editor-edit.dita"/></li>
+        <li><xref href="editor-publish.dita"/></li>
+        <li><xref href="editor-conflicts.dita"/></li>
+      </ul>
+    </section>
+  </conbody>
+</concept>
