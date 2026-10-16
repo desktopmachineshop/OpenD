@@ -41,8 +41,14 @@ export function registerEmbed(app: FastifyInstance, ctx: AppContext): void {
   if (!embed) return;
   const allowed = new Set(embed.origins);
   const audience = ctx.config.publicUrl;
-  /** Verified bearer tokens → reader id, until shortly before they expire. */
-  const tokens = new LRUCache<string, { readerId: number }>({ max: 5000, ttl: 60_000 });
+  /**
+   * Verified bearer tokens → reader id, for at most a minute and never past the
+   * token's own `exp`, so an expired token is verified again (and rejected).
+   */
+  const tokens = new LRUCache<string, { readerId: number; expiresAtMs: number }>({
+    max: 5000,
+    ttl: 60_000,
+  });
 
   const frameHeaders = embedFrameHeaders([...allowed]);
 
@@ -51,7 +57,7 @@ export function registerEmbed(app: FastifyInstance, ctx: AppContext): void {
     token: string,
   ): Promise<{ readerId: number } | 'invalid' | 'forbidden'> => {
     const cached = tokens.get(token);
-    if (cached) return cached;
+    if (cached && cached.expiresAtMs > Date.now()) return { readerId: cached.readerId };
     let claims;
     try {
       claims = await verifyEmbedToken(token, embed.secret, audience);
@@ -72,9 +78,10 @@ export function registerEmbed(app: FastifyInstance, ctx: AppContext): void {
       });
       return 'forbidden';
     }
-    const result = { readerId: reader.id };
-    tokens.set(token, result);
-    return result;
+    const expiresAtMs = claims.expiresAt * 1000;
+    const ttl = Math.min(60_000, expiresAtMs - Date.now());
+    if (ttl > 0) tokens.set(token, { readerId: reader.id, expiresAtMs }, { ttl });
+    return { readerId: reader.id };
   };
 
   const bearer = (request: FastifyRequest): string | null => {

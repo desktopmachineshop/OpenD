@@ -55,9 +55,15 @@
     <result>
       <ul>
         <li>The webhook checks the <codeph>X-Hub-Signature-256</codeph> signature in constant time and answers
-          401 to a bad one. Each delivery id is recorded, so a redelivered webhook does nothing.</li>
+          401 to a bad one. Each delivery id is recorded, so a redelivered webhook does nothing. The
+          signature does not cover the delivery id, so a push body is also only acted on once: an old
+          push resent under a new delivery id cannot queue an old commit and roll a release back. To
+          publish an older commit on purpose, request a build of it through the admin API.</li>
         <li>For a private repository, the worker fetches with an installation token sent as an HTTP header,
-          never in the URL, so it cannot leak into logs.</li>
+          never in the URL, so it cannot leak into logs. The token is only sent when the
+          <codeph>sourceUrl</codeph> is an <codeph>https</codeph> URL on <codeph>github.com</codeph>, or on
+          the Enterprise host that <codeph>GITHUB_API_URL</codeph> names, so register private repositories
+          with their <codeph>https://</codeph> clone URL.</li>
         <li>With the App installed, every build sets an <codeph>opend/build</codeph> commit status: pending,
           then success (<systemoutput>Published 0.1</systemoutput>), failure with the first errors, or
           error when the build could not run.</li>

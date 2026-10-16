@@ -46,19 +46,48 @@ const readerSchema = z.object({
   email: z.email(),
   name: z.string().min(1).optional(),
 });
-const repoSchema = z.object({
-  fullName: z.string().regex(/^[\w.-]+\/[\w.-]+$/, 'owner/name'),
-  sourceUrl: z.string().min(1),
-  installationId: z.number().int().positive().nullable().optional(),
-  releaseRefs: z.array(z.string().min(1)).min(1).optional(),
-  docsPath: z
+function urlWithProtocol(value: string, protocol: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === protocol && (protocol === 'file:' || url.hostname !== '');
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Where the worker may fetch a repository from: an `https://` clone URL, or,
+ * outside production (tests and local trials), an absolute local path or a
+ * `file:` URL. Other schemes (`http`, `ssh`, `ext::`) and relative paths are
+ * refused.
+ */
+export function sourceUrlSchema(production: boolean) {
+  return z
     .string()
     .refine(
-      (p) => !p.startsWith('/') && !p.split('/').includes('..'),
-      'a path inside the repository',
-    )
-    .optional(),
-});
+      (v) =>
+        urlWithProtocol(v, 'https:') ||
+        (!production && (v.startsWith('/') || urlWithProtocol(v, 'file:'))),
+      production
+        ? 'an https:// clone URL'
+        : 'an https:// clone URL, or a local path or file: URL outside production',
+    );
+}
+
+const repoSchema = (production: boolean) =>
+  z.object({
+    fullName: z.string().regex(/^[\w.-]+\/[\w.-]+$/, 'owner/name'),
+    sourceUrl: sourceUrlSchema(production),
+    installationId: z.number().int().positive().nullable().optional(),
+    releaseRefs: z.array(z.string().min(1)).min(1).optional(),
+    docsPath: z
+      .string()
+      .refine(
+        (p) => !p.startsWith('/') && !p.split('/').includes('..'),
+        'a path inside the repository',
+      )
+      .optional(),
+  });
 const analyticsQuery = z.object({
   days: z.coerce.number().int().min(1).max(3650).default(30),
   limit: z.coerce.number().int().min(1).max(1000).default(20),
@@ -119,7 +148,7 @@ export function registerAdmin(app: FastifyInstance, ctx: AppContext): void {
 
       scope.get('/repos', async () => listRepos(ctx.pool));
       scope.post('/repos', async (request, reply) => {
-        const input = parse(repoSchema, request.body, reply);
+        const input = parse(repoSchema(ctx.config.production), request.body, reply);
         if (!input) return reply;
         const repo = await withTransaction(ctx.pool, async (db) => {
           const r = await upsertRepo(db, input);

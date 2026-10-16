@@ -8,6 +8,8 @@ export interface EmbedClaims {
   email: string;
   /** The reader's org slug; must match the org OpenD has for that email. */
   org: string;
+  /** The token's `exp`, in Unix seconds. */
+  expiresAt: number;
 }
 
 export class EmbedTokenError extends Error {}
@@ -51,5 +53,5 @@ export async function verifyEmbedToken(
   const org = typeof payload.org === 'string' ? payload.org : '';
   if (!email.includes('@') || !org)
     throw new EmbedTokenError('token must name the reader (email) and org');
-  return { email, org };
+  return { email, org, expiresAt: payload.exp! };
 }

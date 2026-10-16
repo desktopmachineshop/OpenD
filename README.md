@@ -142,7 +142,7 @@ For scripted installs, run `node deploy/setup.mjs --non-interactive --public-url
 
 GitHub cannot reach a server behind a firewall or on `localhost`. For those installs, set `POLL_INTERVAL_SECONDS` to 10 or more. Unset or 0 turns polling off.
 
-With polling on, the `opend-server worker` process runs `git ls-remote` against each registered repo's `sourceUrl` on that interval. For private repos it sends the GitHub App installation token as a header, never in the URL. For each branch or tag that matches the repo's `releaseRefs`, it queues a build if no job exists yet for the head sha.
+With polling on, the `opend-server worker` process runs `git ls-remote` against each registered repo's `sourceUrl` on that interval. For private repos it sends the GitHub App installation token as a header, never in the URL, and only to an `https` source on `github.com` (or the Enterprise host named by `GITHUB_API_URL`). For each branch or tag that matches the repo's `releaseRefs`, it queues a build if no job exists yet for the head sha.
 
 - The `polled_refs` table remembers the last sha seen for each repo and ref. Several worker replicas can poll at once, and each new sha is still queued only once.
 - The poller skips any sha that a webhook already queued, so webhooks and polling can run side by side.
@@ -191,6 +191,7 @@ Customer and licence data can come from billing or a CRM, instead of per-org adm
 - `X-OpenD-Timestamp` carries the time in Unix seconds. It must be within 5 minutes of the server's clock.
 - `X-OpenD-Signature` is `sha256=` followed by the hex HMAC-SHA256 of `<timestamp>.<raw body>`.
 - `Idempotency-Key` is required. A repeated key returns `{"status":"duplicate"}` and changes nothing. A delivery that fails validation (422) does not record its key, so the CRM can fix the data and retry with the same key.
+- The key is not signed, so each signed request is also applied only once: resending the same timestamp, body and signature returns `{"status":"duplicate"}` whatever its key. To send an identical change again (for example, re-adding a reader you just removed), sign it with a new timestamp.
 
 **Webhook events:**
 

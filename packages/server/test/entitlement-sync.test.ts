@@ -299,6 +299,25 @@ describe.skipIf(!url)('entitlement sync over HTTP', () => {
     });
   });
 
+  it('applies a signed request once, even when it is resent with a fresh idempotency key', async () => {
+    // The key is not signed, so a captured request could be replayed inside the
+    // timestamp window under a new key.
+    const add = {
+      type: 'events',
+      events: [{ type: 'reader.add', org: 'acme', email: 'z@acme.example' }],
+    };
+    const remove = { type: 'events', events: [{ type: 'reader.remove', email: 'z@acme.example' }] };
+    const addedAt = now();
+    expect((await hook(add, { key: 'add-1', timestamp: addedAt })).json()).toMatchObject({
+      status: 'applied',
+    });
+    expect((await hook(remove, { key: 'remove-1' })).json()).toMatchObject({ status: 'applied' });
+    const replay = await hook(add, { key: 'attacker-key', timestamp: addedAt });
+    expect(replay.statusCode).toBe(200);
+    expect(replay.json()).toEqual({ status: 'duplicate' });
+    expect((await listReaders(h.db.pool)).map((r) => r.email)).not.toContain('z@acme.example');
+  });
+
   it('rejects bad signatures, stale timestamps and malformed requests', async () => {
     const events = { type: 'events', events: [{ type: 'org.delete', slug: 'acme' }] };
     expect((await hook(events, { secret: 'forged-secret' })).statusCode).toBe(401);

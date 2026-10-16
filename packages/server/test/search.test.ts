@@ -253,3 +253,56 @@ describe.skipIf(!url)('hosted search over Postgres', () => {
     });
   });
 });
+
+describe.skipIf(!url)('hosted search with many hidden matches', () => {
+  let h: Harness;
+  let docs: DocsRepo;
+
+  beforeAll(async () => {
+    h = await startHarness(url!);
+    docs = createDocsRepo(STARTER);
+    const map = readFileSync(join(STARTER, 'maps/user-guide.ditamap'), 'utf8');
+    // More sso-only pages than the index is asked for, each matching better
+    // than the one page every reader sees. Their conditions sit on the map's
+    // topicrefs, not in the topics' own text.
+    const hidden = Array.from({ length: 40 }, (_, i) => `pangolin-${i}`);
+    const files: Record<string, string> = Object.fromEntries(
+      hidden.map((id) => [
+        `topics/${id}.dita`,
+        `<topic id="${id}"><title>Pangolin ${id}</title><body><p>Pangolin pangolin pangolin.</p></body></topic>`,
+      ]),
+    );
+    files['topics/open-pangolin.dita'] =
+      '<topic id="open-pangolin"><title>Open page</title><body><p>One pangolin.</p></body></topic>';
+    files['maps/user-guide.ditamap'] = map.replace(
+      '<topicref href="../topics/overview.dita"/>',
+      `<topicref href="../topics/overview.dita"/>
+  <topicref href="../topics/open-pangolin.dita"/>
+  ${hidden.map((id) => `<topicref href="../topics/${id}.dita" feature="sso"/>`).join('\n  ')}`,
+    );
+    const sha = docs.commit(files);
+    const repo = await upsertRepo(h.db.pool, {
+      fullName: 'acme/docs',
+      sourceUrl: docs.dir,
+      releaseRefs: ['main'],
+    });
+    await enqueueJob(h.db.pool, { repoId: repo.id, ref: 'main', sha });
+    const deps = { pool: h.db.pool, blobs: new FsBlobStore(h.blobDir), log: () => {} };
+    expect(await processNext(deps)).toBe('published');
+  });
+  afterAll(async () => {
+    await h?.close();
+    docs?.remove();
+  });
+
+  const ids = async (context: ReaderContext, q: string) => {
+    const r = await readerRelease(h.ctx, context);
+    if (typeof r === 'string') throw new Error(r);
+    return (await searchRelease(h.db.pool, r, q)).map((hit) => hit.topicId);
+  };
+
+  it('never lets topics a reader cannot see push visible matches out of the results', async () => {
+    expect(await ids(BASIC, 'pangolin')).toEqual(['topics/open-pangolin']);
+    expect(await ids(SSO, 'pangolin')).toHaveLength(10);
+  });
+});

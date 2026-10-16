@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import {
   enqueueJob,
@@ -72,6 +72,13 @@ export function registerWebhook(app: FastifyInstance, ctx: AppContext): void {
           if (!(await recordDelivery(db, delivery, event))) return [200, { status: 'duplicate' }];
           if (event === 'ping') return [200, { status: 'pong' }];
           if (event !== 'push') return [202, { status: 'ignored', reason: `event ${event}` }];
+          // GitHub's signature covers the body but not X-GitHub-Delivery, so a
+          // captured push could be resent under a new delivery id to queue an
+          // old commit again and roll its release line back. Every real push
+          // has a different body, so the same signed body is only acted on once.
+          const digest = createHash('sha256').update(body).digest('hex');
+          if (!(await recordDelivery(db, `github-push-body:${digest}`, event)))
+            return [200, { status: 'duplicate' }];
 
           const ref = payload.ref ? shortRef(payload.ref) : null;
           const sha = payload.after ?? '';

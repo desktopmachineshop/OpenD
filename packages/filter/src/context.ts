@@ -1,4 +1,4 @@
-import type { ContextTarget, HelpApp, HelpRoute } from '@opend/model';
+import type { ContextTarget, DocNode, HelpApp, HelpRoute } from '@opend/model';
 import type { ReleaseView } from './view.js';
 
 /**
@@ -116,6 +116,12 @@ export interface ResolvedContext {
   via: 'key' | 'parent' | 'default';
 }
 
+/** Whether an element with this `id` is in the tree. */
+function hasElementId(node: DocNode, id: string): boolean {
+  if (node.type !== 'element') return false;
+  return node.attrs.id === id || node.children.some((c) => hasElementId(c, id));
+}
+
 const compiledCache = new WeakMap<HelpApp, CompiledRoute[]>();
 
 function routesOf(app: HelpApp): CompiledRoute[] {
@@ -132,15 +138,22 @@ function routesOf(app: HelpApp): CompiledRoute[] {
  * path maps to), then its parents, then the app default. A target is used only
  * when its conditions pass for this reader and its topic is visible to them,
  * so a context lookup can never reveal a hidden topic: it falls back instead.
+ * A fragment is kept only when the reader's filtered topic has an element with
+ * that id, so it never names a section the reader cannot see.
  */
 export function resolveContext(view: ReleaseView, request: ContextRequest): ResolvedContext | null {
-  const app = view.release.contexts?.[request.app];
+  // Own properties only: the app and key come from the request, and names such
+  // as `__proto__` or `toString` must read as unknown, not as Object.prototype.
+  const contexts = view.release.contexts;
+  const app = contexts && Object.hasOwn(contexts, request.app) ? contexts[request.app] : undefined;
   if (!app) return null;
   const requested =
     request.key ?? (request.path !== undefined ? matchRoute(routesOf(app), request.path) : null);
 
   const tryKey = (key: string): ContextTarget | undefined =>
-    (app.keys[key] ?? []).find((t) => view.includes(t.conditions) && view.isVisible(t.topicId));
+    (Object.hasOwn(app.keys, key) ? app.keys[key]! : []).find(
+      (t) => view.includes(t.conditions) && view.isVisible(t.topicId),
+    );
 
   const attempts: [string, ResolvedContext['via']][] = [];
   if (requested)
@@ -152,7 +165,9 @@ export function resolveContext(view: ReleaseView, request: ContextRequest): Reso
     const target = tryKey(key);
     if (target) {
       const resolved: ResolvedContext = { topicId: target.topicId, key, via };
-      if (target.fragment) resolved.fragment = target.fragment;
+      const body = target.fragment ? view.topic(target.topicId)?.body : undefined;
+      if (target.fragment && body && hasElementId(body, target.fragment))
+        resolved.fragment = target.fragment;
       return resolved;
     }
   }
