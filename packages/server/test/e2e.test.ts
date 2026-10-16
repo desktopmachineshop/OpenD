@@ -146,6 +146,27 @@ describe.skipIf(!url)('push to publish', () => {
     ]);
   });
 
+  it('never rolls a release line back when an old signed push is replayed', async () => {
+    // GitHub signs the body, not X-GitHub-Delivery, so a captured push can be
+    // resent under a fresh delivery id.
+    const newer = docs.commit({ 'notes.txt': 'a newer commit on main' });
+    expect(
+      (await webhook(h.app, pushPayload('acme/docs', 'refs/heads/main', newer))).json(),
+    ).toMatchObject({ status: 'queued' });
+    expect(await worker()).toBe('published');
+
+    const replay = await webhook(h.app, pushPayload('acme/docs', 'refs/heads/main', mainSha), {
+      delivery: 'replayed-delivery',
+    });
+    expect(replay.json()).toEqual({ status: 'duplicate' });
+    expect(await worker()).toBeNull();
+    const live = (await admin(h.app, 'GET', '/repos/1/releases')).json() as {
+      releaseLine: string;
+      sha: string;
+    }[];
+    expect(live.find((r) => r.releaseLine === '2')?.sha).toBe(newer);
+  });
+
   it('sends signed-out readers to sign in, and rejects tampered sessions', async () => {
     const res = await get('/topics/install.html');
     expect(res.statusCode).toBe(302);
