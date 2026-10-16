@@ -31,6 +31,8 @@ export async function verifyEmbedToken(
       audience,
       algorithms: ['HS256'],
       requiredClaims: ['exp', 'iat'],
+      // Also rejects an `iat` in the future, which would stretch the lifetime check below.
+      maxTokenAge: MAX_TOKEN_SECONDS,
       clockTolerance: 30,
     }));
   } catch (err) {

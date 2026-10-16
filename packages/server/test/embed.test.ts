@@ -61,6 +61,12 @@ describe('verifyEmbedToken', () => {
       /expired/,
     ],
     ['too long-lived', () => token({ email: 'a@b.c', org: 'x' }, { ttl: 3600 }), /at most 600/],
+    [
+      // A short exp - iat span is not enough: a future iat would make the token live for days.
+      'issued in the future',
+      () => token({ email: 'a@b.c', org: 'x' }, { iat: Math.floor(Date.now() / 1000) + 86_400 }),
+      /invalid/,
+    ],
     ['no org', () => token({ email: 'a@b.c' }), /email\) and org/],
     ['not a JWT', async () => 'nope', /invalid/],
   ])('rejects %s', async (_label, make, message) => {
