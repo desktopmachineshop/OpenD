@@ -4,12 +4,16 @@ import { posix } from 'node:path';
 import { formatDiagnostic, type Diagnostic } from '@opend/model';
 import { viewRelease } from '@opend/filter';
 import { readSourceFile } from '@opend/build';
+import { frameScript, widgetScript } from '@opend/embed';
+import { helpLab } from './help-lab.js';
 import {
   escapeHtml,
   pageHref,
   renderIndex,
   renderNotFound,
   renderPage,
+  handleEmbedRequest,
+  type EmbedOptions,
   type PageOptions,
 } from '@opend/render-html';
 import {
@@ -151,6 +155,44 @@ export async function startPreview(options: PreviewOptions): Promise<PreviewServ
       bodyEnd: options.watch === false ? '' : LIVE_RELOAD,
     };
     if (release.theme) pageOptions.themeHref = '/_theme.css';
+
+    if (path === '/embed/frame.js' || path === '/embed/opend-help.js') {
+      send(
+        res,
+        200,
+        'text/javascript; charset=utf-8',
+        path === '/embed/frame.js' ? frameScript() : widgetScript(),
+      );
+      return;
+    }
+    if (path.startsWith('/embed/')) {
+      // The previewer only lets its own help lab embed it.
+      const self = `http://${req.headers.host ?? 'localhost'}`;
+      const embed: EmbedOptions = {
+        showConditions: audience.kind === 'all',
+        hostOrigin: url.searchParams.get('host') === self ? self : null,
+      };
+      const app = url.searchParams.get('app');
+      if (app) embed.app = app;
+      if (release.theme) embed.themeHref = '/_theme.css';
+      const result = handleEmbedRequest(view, path, url.searchParams, embed);
+      send(res, result.status, 'text/html; charset=utf-8', result.html);
+      return;
+    }
+    if (path === '/_opend/help-lab') {
+      send(
+        res,
+        200,
+        'text/html; charset=utf-8',
+        helpLab(
+          view,
+          audience,
+          `http://${req.headers.host ?? 'localhost'}`,
+          url.searchParams.get('path') ?? '',
+        ),
+      );
+      return;
+    }
 
     if (path === '/' || path === '/index.html') {
       const first = view.topicIds()[0];

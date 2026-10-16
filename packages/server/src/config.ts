@@ -1,5 +1,15 @@
 import { z } from 'zod';
 
+/** `https://app.example.com` or `http://localhost:5173`: scheme, host and port only. */
+function isOrigin(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return (url.protocol === 'https:' || url.protocol === 'http:') && url.origin === value;
+  } catch {
+    return false;
+  }
+}
+
 const flag = z
   .string()
   .optional()
@@ -28,6 +38,23 @@ const envSchema = z
       .optional(),
     OPEND_DEV_LOGIN: flag,
     OPEND_SITE_REPO: z.string().min(1).optional(),
+    OPEND_EMBED_SECRET: z
+      .string()
+      .min(32, 'OPEND_EMBED_SECRET must be at least 32 characters')
+      .optional(),
+    OPEND_EMBED_ORIGINS: z
+      .string()
+      .optional()
+      .transform((v) =>
+        (v ?? '')
+          .split(',')
+          .map((o) => o.trim())
+          .filter(Boolean),
+      )
+      .refine((list) => list.every(isOrigin), {
+        message:
+          'OPEND_EMBED_ORIGINS must be comma-separated origins such as https://app.example.com',
+      }),
     NODE_ENV: z.string().default('development'),
   })
   .refine((e) => !(e.OPEND_DEV_LOGIN && e.NODE_ENV === 'production'), {
@@ -37,6 +64,10 @@ const envSchema = z
   .refine((e) => !e.OIDC_ISSUER || (e.OIDC_CLIENT_ID && e.OIDC_CLIENT_SECRET), {
     message: 'OIDC_ISSUER needs OIDC_CLIENT_ID and OIDC_CLIENT_SECRET',
     path: ['OIDC_ISSUER'],
+  })
+  .refine((e) => !e.OPEND_EMBED_SECRET === (e.OPEND_EMBED_ORIGINS.length === 0), {
+    message: 'OPEND_EMBED_SECRET and OPEND_EMBED_ORIGINS must be set together',
+    path: ['OPEND_EMBED_SECRET'],
   })
   .refine((e) => !e.GITHUB_APP_ID === !e.GITHUB_APP_PRIVATE_KEY, {
     message: 'GITHUB_APP_ID and GITHUB_APP_PRIVATE_KEY must be set together',
@@ -58,6 +89,8 @@ export interface ServerConfig {
   production: boolean;
   /** Which repository the site serves when more than one is registered. */
   siteRepo?: string;
+  /** Embedded help in host apps: the token secret and the origins allowed to frame it. */
+  embed?: { secret: string; origins: string[] };
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
@@ -94,5 +127,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
   }
   if (e.OPEND_ADMIN_TOKEN) config.adminToken = e.OPEND_ADMIN_TOKEN;
   if (e.OPEND_SITE_REPO) config.siteRepo = e.OPEND_SITE_REPO;
+  if (e.OPEND_EMBED_SECRET)
+    config.embed = { secret: e.OPEND_EMBED_SECRET, origins: e.OPEND_EMBED_ORIGINS };
   return config;
 }

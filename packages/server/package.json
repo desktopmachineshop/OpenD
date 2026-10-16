@@ -16,6 +16,7 @@
   ],
   "dependencies": {
     "@fastify/cookie": "^11.1.3",
+    "@opend/embed": "workspace:*",
     "@opend/filter": "workspace:*",
     "@opend/model": "workspace:*",
     "@opend/render-html": "workspace:*",
@@ -23,13 +24,11 @@
     "@opend/worker": "workspace:*",
     "commander": "^15.0.0",
     "fastify": "^5.12.7",
+    "jose": "^6.2.12",
     "lru-cache": "^11.5.3",
     "openid-client": "^6.8.8",
     "yaml": "^2.9.1",
     "zod": "^4.6.7"
-  },
-  "devDependencies": {
-    "jose": "^6.2.12"
   },
   "bin": {
     "opend-server": "./dist/bin.js"

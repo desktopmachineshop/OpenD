@@ -74,3 +74,27 @@ export const projectConfigSchema = z
 export type ProjectConfig = z.infer<typeof projectConfigSchema>;
 
 export const CONFIG_FILE = 'opend.config.yaml';
+
+export const HELP_CONTEXTS_FILE = 'help-contexts.yaml';
+
+/** A context key such as `settings.network`: dot-separated, so it can fall back to its parents. */
+export const contextKeySchema = z
+  .string()
+  .regex(/^[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)*$/, 'dot-separated words, e.g. settings.network');
+
+export const helpAppNameSchema = z
+  .string()
+  .regex(/^[A-Za-z0-9_-]+$/, 'letters, digits, dashes and underscores');
+
+/** `help-contexts.yaml`: maps host-app routes to context keys, per app. */
+export const helpContextsSchema = z.object({
+  apps: z.record(
+    helpAppNameSchema,
+    z.object({
+      default: contextKeySchema.optional(),
+      routes: z.record(z.string(), contextKeySchema).default({}),
+    }),
+  ),
+});
+
+export type HelpContextsFile = z.infer<typeof helpContextsSchema>;

@@ -17,6 +17,9 @@
       "path": "packages/validate"
     },
     {
+      "path": "packages/embed"
+    },
+    {
       "path": "packages/render-html"
     },
     {

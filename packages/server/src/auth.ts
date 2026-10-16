@@ -6,6 +6,8 @@ import { newChecks, type OidcChecks } from './oidc.js';
 import { messagePage, simplePage } from './pages.js';
 
 export const SESSION_COOKIE = 'opend_session';
+export const EMBED_COOKIE = 'opend_embed';
+const EMBED_SESSION_MINUTES = 60;
 const OIDC_COOKIE = 'opend_oidc';
 const SESSION_HOURS = 12;
 
@@ -45,9 +47,8 @@ export function setSession(reply: FastifyReply, ctx: AppContext, readerId: numbe
   });
 }
 
-/** The reader id from a valid, unexpired, correctly signed session cookie. */
-export function sessionReaderId(request: FastifyRequest): number | null {
-  const raw = request.cookies[SESSION_COOKIE];
+function readSession(request: FastifyRequest, name: string): number | null {
+  const raw = request.cookies[name];
   if (!raw) return null;
   const unsigned = request.unsignCookie(raw);
   if (!unsigned.valid || unsigned.value === null) return null;
@@ -58,6 +59,35 @@ export function sessionReaderId(request: FastifyRequest): number | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * The reader id from a valid, unexpired, correctly signed session: the docs
+ * site session, or the embed session the help panel gets from a host token.
+ */
+export function sessionReaderId(request: FastifyRequest): number | null {
+  return readSession(request, SESSION_COOKIE) ?? readSession(request, EMBED_COOKIE);
+}
+
+/**
+ * Session for the help panel inside a host app's iframe. It is a third-party
+ * cookie there, so it needs SameSite=None and Secure, and it is Partitioned
+ * (CHIPS): it only exists under that host site, never as a general session.
+ */
+export function setEmbedSession(reply: FastifyReply, readerId: number): void {
+  const value: SessionValue = {
+    r: readerId,
+    e: Math.floor(Date.now() / 1000) + EMBED_SESSION_MINUTES * 60,
+  };
+  reply.setCookie(EMBED_COOKIE, JSON.stringify(value), {
+    signed: true,
+    httpOnly: true,
+    sameSite: 'none',
+    secure: true,
+    partitioned: true,
+    path: '/',
+    maxAge: EMBED_SESSION_MINUTES * 60,
+  });
 }
 
 /** The signed-in reader's access, cached briefly and cleared when entitlements change. */

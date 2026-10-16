@@ -3,6 +3,9 @@
 <task id="install">
   <title>Install the <keyword keyref="product-name"/></title>
   <shortdesc>Install the hub software on a supported server.</shortdesc>
+  <prolog>
+    <resourceid appname="console" appid="setup.install"/>
+  </prolog>
   <taskbody>
     <prereq>
       <p>You need a server running a supported operating system.</p>

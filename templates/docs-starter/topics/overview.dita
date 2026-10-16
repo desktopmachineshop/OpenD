@@ -3,6 +3,9 @@
 <concept id="overview">
   <title><keyword keyref="product-name"/> overview</title>
   <shortdesc>What the <keyword keyref="product-name"/> does and which parts of it you can use.</shortdesc>
+  <prolog>
+    <resourceid appname="console" appid="overview"/>
+  </prolog>
   <conbody>
     <p><image href="../images/logo.svg"><alt>Widget Platform logo</alt></image></p>
     <p>You are reading the documentation for <ph keyref="edition"/>.</p>

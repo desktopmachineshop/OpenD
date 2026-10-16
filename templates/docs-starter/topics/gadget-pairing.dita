@@ -3,6 +3,9 @@
 <task id="gadget-pairing" product="gadget">
   <title>Pair a Gadget</title>
   <shortdesc>Connect a Gadget companion device to the hub.</shortdesc>
+  <prolog>
+    <resourceid appname="console" appid="devices.gadget"/>
+  </prolog>
   <taskbody>
     <steps>
       <step><cmd>Hold the Gadget pairing button for five seconds.</cmd></step>

@@ -18,5 +18,8 @@
     "@opend/dita": "workspace:*",
     "@opend/filter": "workspace:*",
     "@opend/model": "workspace:*"
+  },
+  "devDependencies": {
+    "@opend/build": "workspace:*"
   }
 }

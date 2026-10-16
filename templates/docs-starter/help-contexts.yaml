@@ -1,0 +1,17 @@
+# Context-sensitive help for host apps that embed these docs.
+# Topics declare keys with <resourceid appname="console" appid="settings.sso"/>.
+# A host app passes a key, or its current path, which the routes below map to a key.
+# Keys fall back to their parents (settings.sso -> settings), then to the default,
+# and never to a topic the reader cannot see.
+apps:
+  console:
+    default: overview
+    routes:
+      /: overview
+      /setup/**: setup.install
+      /settings: settings
+      /settings/network: settings
+      /settings/sso: settings.sso
+      /settings/audit: settings.audit
+      /devices/:deviceId/pair: devices.gadget
+      /whats-new: whats-new

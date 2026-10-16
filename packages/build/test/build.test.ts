@@ -114,3 +114,72 @@ describe('readGitRef', () => {
     expect(t.ref).toBe('v1');
   });
 });
+
+describe('context-sensitive help', () => {
+  const base = {
+    'opend.config.yaml': 'release: "1.0"\nmap: m.ditamap\nattributes:\n  product: [gadget]\n',
+    'a.dita':
+      '<topic id="a"><title>A</title><prolog><resourceid appname="app" appid="settings"/></prolog></topic>',
+    'b.dita':
+      '<topic id="b"><title>B</title><prolog><resourceid appname="app" appid="settings"/></prolog>\n<body><p>x</p></body></topic>',
+  };
+
+  it('indexes map and topic resourceids, map first', () => {
+    const result = buildRelease(
+      tree({
+        ...base,
+        'b.dita': '<topic id="b"><title>B</title></topic>',
+        'm.ditamap':
+          '<map><topicref href="b.dita"><topicmeta><resourceid appname="app" appid="settings" product="gadget"/></topicmeta></topicref><topicref href="a.dita"/></map>',
+        'help-contexts.yaml':
+          'apps:\n  app:\n    default: settings\n    routes:\n      /settings/**: settings.network\n',
+      }),
+    );
+    expect(result.diagnostics.map(formatDiagnostic)).toEqual([]);
+    expect(result.release?.contexts).toEqual({
+      app: {
+        default: 'settings',
+        routes: [{ pattern: '/settings/**', key: 'settings.network' }],
+        keys: {
+          settings: [
+            { topicId: 'b', conditions: [{ product: 'gadget' }] },
+            { topicId: 'a', conditions: [] },
+          ],
+        },
+      },
+    });
+  });
+
+  it('reports ambiguous keys, incomplete resourceids and bad help-contexts.yaml', () => {
+    const result = buildRelease(
+      tree({
+        ...base,
+        'c.dita':
+          '<topic id="c"><title>C</title><prolog><resourceid appid="orphan"/></prolog></topic>',
+        'm.ditamap':
+          '<map><topicref href="a.dita"/><topicref href="b.dita"/><topicref href="c.dita"/></map>',
+        'help-contexts.yaml':
+          'apps:\n  app:\n    default: missing\n    routes:\n      /x/**/y: settings\n      /ok: nothing.here\n      relative: settings\n',
+      }),
+    );
+    expect(result.diagnostics.map(formatDiagnostic)).toEqual([
+      'b.dita:1:39: error [duplicate-context] context app/settings already points at a; add conditions or use a different appid',
+      'c.dita:1:39: error [invalid-resourceid] resourceid needs both appname (the host app) and appid (the context key)',
+      'help-contexts.yaml: error [invalid-help-contexts] apps.app.routes "/x/**/y": ** is only allowed as the last segment',
+      'help-contexts.yaml: error [invalid-help-contexts] apps.app.routes "relative": must start with /',
+      'help-contexts.yaml: error [unknown-context] route /ok maps to app/nothing.here, but no topic has that resourceid (or a parent key)',
+      'help-contexts.yaml: error [unknown-context] default for app is missing, but no topic has that resourceid',
+    ]);
+  });
+
+  it('rejects a malformed help-contexts.yaml', () => {
+    const result = buildRelease(
+      tree({
+        ...base,
+        'm.ditamap': '<map><topicref href="a.dita"/></map>',
+        'help-contexts.yaml': 'apps:\n  bad name:\n    routes: {}\n',
+      }),
+    );
+    expect(result.diagnostics.map((d) => d.code)).toContain('invalid-help-contexts');
+  });
+});

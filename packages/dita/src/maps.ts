@@ -44,7 +44,34 @@ export interface MapModel {
   keys: Keyspace;
   /** Topic files the map references, in document order, with where they are referenced. */
   topicFiles: Map<string, { file: string; line?: number }>;
+  /** Context-sensitive help keys from `topicmeta/resourceid` on topicrefs, in document order. */
+  resourceIds: ResourceIdRef[];
   diagnostics: Diagnostic[];
+}
+
+/** A DITA `resourceid` naming a host-app context for a topic. */
+export interface ResourceIdRef {
+  app: string;
+  key: string;
+  topicId: string;
+  fragment?: string;
+  /** Filtering attributes of the resourceid and its ancestors, outermost first. */
+  conditions: Condition[];
+  file: string;
+  line?: number;
+  column?: number;
+}
+
+/**
+ * Reads a `resourceid` element. DITA 1.3 uses `appname` for the application and
+ * `appid` for the context; returns an error message when either is missing.
+ */
+export function readResourceId(el: ElementNode): { app: string; key: string } | string {
+  const app = el.attrs.appname?.trim();
+  const key = el.attrs.appid?.trim();
+  if (!app || !key)
+    return 'resourceid needs both appname (the host app) and appid (the context key)';
+  return { app, key };
 }
 
 /** Map elements that only group their children and have no title of their own. */
@@ -86,6 +113,7 @@ export function loadMap(ws: Workspace, file: string): MapModel {
     nav: [],
     keys: new Map(),
     topicFiles: new Map(),
+    resourceIds: [],
     diagnostics: [],
   };
   const root = ws.document(file);
@@ -215,6 +243,27 @@ function walkMap(
         } else {
           entry.topicId = topicPageId(ref.file);
           if (ref.topicId) entry.fragment = ref.topicId;
+          const meta = firstChild(node, 'topicmeta');
+          for (const rid of meta ? childElements(meta, 'resourceid') : []) {
+            const parsed = readResourceId(rid);
+            if (typeof parsed === 'string') {
+              diag(rid, 'error', 'invalid-resourceid', parsed);
+              continue;
+            }
+            const own = conditionOf(rid.attrs);
+            const target: ResourceIdRef = {
+              ...parsed,
+              topicId: entry.topicId,
+              conditions: isEmptyCondition(own) ? myChain : [...myChain, own],
+              file,
+            };
+            if (ref.topicId) target.fragment = ref.topicId;
+            if (rid.loc) {
+              target.line = rid.loc.line;
+              target.column = rid.loc.column;
+            }
+            model.resourceIds.push(target);
+          }
           if (!model.topicFiles.has(ref.file)) {
             model.topicFiles.set(ref.file, { file, line: node.loc?.line });
           }

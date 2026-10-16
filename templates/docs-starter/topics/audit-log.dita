@@ -3,6 +3,9 @@
 <reference id="audit-log" feature="audit-log" release="2.0..">
   <title>Audit log events</title>
   <shortdesc>Events recorded in the audit log.</shortdesc>
+  <prolog>
+    <resourceid appname="console" appid="settings.audit"/>
+  </prolog>
   <refbody>
     <simpletable>
       <sthead><stentry>Event</stentry><stentry>Recorded when</stentry></sthead>

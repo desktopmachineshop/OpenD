@@ -1,0 +1,17 @@
+{
+  "name": "@opend/embed",
+  "version": "0.1.0",
+  "description": "Embeddable OpenD help: the host-page widget, the in-frame script and their postMessage protocol",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ]
+}

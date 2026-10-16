@@ -37,8 +37,13 @@
   </topichead>
 
   <topichead navtitle="Release notes">
-    <topicref href="../topics/release-notes-1.dita" release="1"/>
-    <topicref href="../topics/release-notes-2.dita" release="2"/>
+    <!-- One context key, two targets: each reader gets the notes for their release. -->
+    <topicref href="../topics/release-notes-1.dita" release="1">
+      <topicmeta><resourceid appname="console" appid="whats-new"/></topicmeta>
+    </topicref>
+    <topicref href="../topics/release-notes-2.dita" release="2">
+      <topicmeta><resourceid appname="console" appid="whats-new"/></topicmeta>
+    </topicref>
   </topichead>
 
   <topicref href="../internal/escalation.dita" audience="internal"/>

@@ -28,7 +28,7 @@ const MAP_ELEMENTS = new Set([
   'anchor', 'anchorref', 'navref', 'chapter', 'part', 'appendix', 'appendices', 'frontmatter',
   'backmatter', 'notices', 'booktitle', 'mainbooktitle', 'booktitlealt', 'bookmeta', 'booklists',
   'toc', 'indexlist', 'glossarylist', 'tablelist', 'figurelist', 'reltable', 'relheader',
-  'relcolspec', 'relrow', 'relcell', 'glossref',
+  'relcolspec', 'relrow', 'relcell', 'glossref', 'resourceid',
 ]);
 
 /**

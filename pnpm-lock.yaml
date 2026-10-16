@@ -17,6 +17,9 @@ importers:
       eslint:
         specifier: ^10.13.0
         version: 10.13.0
+      playwright-core:
+        specifier: 1.56.1
+        version: 1.56.1
       prettier:
         specifier: ^3.9.10
         version: 3.9.10
@@ -50,6 +53,9 @@ importers:
       '@opend/build':
         specifier: workspace:*
         version: link:../build
+      '@opend/embed':
+        specifier: workspace:*
+        version: link:../embed
       '@opend/filter':
         specifier: workspace:*
         version: link:../filter
@@ -81,6 +87,8 @@ importers:
         specifier: ^6.0.0
         version: 6.0.0
 
+  packages/embed: {}
+
   packages/filter:
     dependencies:
       '@opend/model':
@@ -104,12 +112,19 @@ importers:
       '@opend/model':
         specifier: workspace:*
         version: link:../model
+    devDependencies:
+      '@opend/build':
+        specifier: workspace:*
+        version: link:../build
 
   packages/server:
     dependencies:
       '@fastify/cookie':
         specifier: ^11.1.3
         version: 11.1.3
+      '@opend/embed':
+        specifier: workspace:*
+        version: link:../embed
       '@opend/filter':
         specifier: workspace:*
         version: link:../filter
@@ -131,6 +146,9 @@ importers:
       fastify:
         specifier: ^5.12.7
         version: 5.12.7
+      jose:
+        specifier: ^6.2.12
+        version: 6.2.12
       lru-cache:
         specifier: ^11.5.3
         version: 11.5.3
@@ -143,10 +161,6 @@ importers:
       zod:
         specifier: ^4.6.7
         version: 4.6.7
-    devDependencies:
-      jose:
-        specifier: ^6.2.12
-        version: 6.2.12
 
   packages/store:
     dependencies:
@@ -950,6 +964,11 @@ packages:
 
   pino@10.4.0:
     resolution: {integrity: sha512-bk1ZMTwG/Vymx+zPoa28MhNzucFvXJWp3csrSuxuHPSMeUettaCoQ5Jvg07mtC4JGNpcfTwz41oVCnNgBK9+vA==}
+    hasBin: true
+
+  playwright-core@1.56.1:
+    resolution: {integrity: sha512-hutraynyn31F+Bifme+Ps9Vq59hKuUCz7H1kDOcBs+2oGguKkWTU50bBWrtz34OUWmIwpBTWDxaRPXrIXkgvmQ==}
+    engines: {node: '>=18'}
     hasBin: true
 
   postcss@8.5.30:
@@ -1954,6 +1973,8 @@ snapshots:
       safe-stable-stringify: 2.5.0
       sonic-boom: 4.2.1
       thread-stream: 4.2.0
+
+  playwright-core@1.56.1: {}
 
   postcss@8.5.30:
     dependencies:
