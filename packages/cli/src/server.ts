@@ -1,14 +1,17 @@
 import { watch, type FSWatcher } from 'node:fs';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { posix } from 'node:path';
-import { formatDiagnostic, type Diagnostic } from '@opend/model';
+import { findPublication, formatDiagnostic, type Diagnostic } from '@opend/model';
 import { viewRelease } from '@opend/filter';
 import { readSourceFile } from '@opend/build';
 import { frameScript, widgetScript } from '@opend/embed';
+import { createPdfRenderer, type PdfRenderer } from '@opend/pdf';
 import { helpLab } from './help-lab.js';
+import { previewPublicationHtml, publicationsIndex, visiblePublications } from './publications.js';
 import {
   escapeHtml,
   pageHref,
+  publicationHref,
   renderIndex,
   renderNotFound,
   renderPage,
@@ -51,6 +54,8 @@ export interface PreviewOptions {
   host?: string;
   watch?: boolean;
   onRebuild?(project: LoadedProject, ms: number): void;
+  /** Prints `/pdf/*.pdf`. Default: headless Chromium, launched on the first request. */
+  pdf?: PdfRenderer;
 }
 
 export interface PreviewServer {
@@ -72,6 +77,8 @@ export async function startPreview(options: PreviewOptions): Promise<PreviewServ
   const defaultAudience =
     typeof options.audience === 'function' ? options.audience(project) : options.audience;
   const clients = new Set<ServerResponse>();
+  let ownPdf: PdfRenderer | undefined;
+  const pdfRenderer = () => options.pdf ?? (ownPdf ??= createPdfRenderer());
 
   const rebuild = async () => {
     const started = Date.now();
@@ -146,13 +153,18 @@ export async function startPreview(options: PreviewOptions): Promise<PreviewServ
     }
 
     const audience = audienceFor(req);
-    const view = viewRelease(release, [...project.build.buildPolicies, ...policiesFor(audience)], {
+    const policies = [...project.build.buildPolicies, ...policiesFor(audience)];
+    const view = viewRelease(release, policies, {
       resolveChoices: audience.kind !== 'all',
     });
     const pageOptions: PageOptions = {
       showConditions: audience.kind === 'all',
       banner: banner(project, audience),
       bodyEnd: options.watch === false ? '' : LIVE_RELOAD,
+      publications: visiblePublications(release, policies).map((p) => ({
+        title: p.title || p.file,
+        href: publicationHref(p),
+      })),
     };
     if (release.theme) pageOptions.themeHref = '/_theme.css';
 
@@ -177,6 +189,43 @@ export async function startPreview(options: PreviewOptions): Promise<PreviewServ
       if (release.theme) embed.themeHref = '/_theme.css';
       const result = handleEmbedRequest(view, path, url.searchParams, embed);
       send(res, result.status, 'text/html; charset=utf-8', result.html);
+      return;
+    }
+    if (path === '/_opend/publications') {
+      send(
+        res,
+        200,
+        'text/html; charset=utf-8',
+        publicationsIndex(release, policies, describeAudience(audience)),
+      );
+      return;
+    }
+    const pdf = /^\/pdf\/([^/]+)\.(pdf|html)$/.exec(path);
+    if (pdf) {
+      // Print HTML (`.html`) shows authors the print layout without a browser.
+      const [, slug = '', format] = pdf;
+      const publication = findPublication(release.publications, slug);
+      const html =
+        publication &&
+        (await previewPublicationHtml(
+          project,
+          release,
+          publication,
+          audience,
+          policies,
+          `http://${req.headers.host ?? 'localhost'}/`,
+        ));
+      if (!html) send(res, 404, 'text/plain; charset=utf-8', 'Not found');
+      else if (format === 'html') send(res, 200, 'text/html; charset=utf-8', html);
+      else {
+        const body = await pdfRenderer().render(html);
+        res.writeHead(200, {
+          'content-type': 'application/pdf',
+          'content-disposition': `inline; filename="${slug.replace(/[^\w.-]/g, '_')}.pdf"`,
+          'cache-control': 'no-store',
+        });
+        res.end(body);
+      }
       return;
     }
     if (path === '/_opend/help-lab') {
@@ -238,6 +287,7 @@ export async function startPreview(options: PreviewOptions): Promise<PreviewServ
     rebuild,
     close: async () => {
       watcher?.close();
+      await ownPdf?.close();
       for (const res of clients) res.end();
       clients.clear();
       await new Promise<void>((resolve) => server.close(() => resolve()));
@@ -307,6 +357,7 @@ function banner(project: LoadedProject, audience: PreviewAudience): string {
 <strong>Local preview${project.ref ? ` of ${escapeHtml(project.ref)}` : ''}</strong>
 <form method="get"><label>Preview as <select name="as" onchange="this.form.submit()">${choices}</select></label><noscript><button>Apply</button></noscript></form>
 <span>${escapeHtml(describeAudience(audience))}</span>
+<a href="/_opend/publications">Publications</a>
 ${summary}
 </div>`;
 }

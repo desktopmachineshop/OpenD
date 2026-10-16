@@ -8,6 +8,7 @@ import {
   startPreview,
   type PreviewServer,
 } from '../src/index.js';
+import type { PdfRenderer } from '@opend/pdf';
 
 const STARTER = join(import.meta.dirname, '../../../templates/docs-starter');
 
@@ -151,6 +152,72 @@ describe('preview server', () => {
   it('reports diagnostics as JSON', async () => {
     const res = await get('/_opend/diagnostics.json');
     expect(await res.json()).toEqual([]);
+  });
+});
+
+describe('preview PDF publications', () => {
+  let preview: PreviewServer;
+  let base: string;
+  const printed: string[] = [];
+  const pdf: PdfRenderer = {
+    render: async (html) => {
+      printed.push(html);
+      return Buffer.from('%PDF-1.7 fake');
+    },
+    close: async () => {},
+  };
+  beforeAll(async () => {
+    preview = await startPreview({
+      dir: STARTER,
+      audience: (p) => ({ kind: 'named', name: 'v1-basic', context: p.contexts['v1-basic']! }),
+      port: 0,
+      watch: false,
+      pdf,
+    });
+    base = preview.url.replace(/\/$/, '');
+  });
+  afterAll(() => preview.close());
+
+  const get = (path: string, headers: Record<string, string> = {}) =>
+    fetch(base + path, { redirect: 'manual', headers });
+
+  it('prints the publication for the preview reader', async () => {
+    const res = await get('/pdf/admin-guide.pdf');
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toBe('application/pdf');
+    expect(res.headers.get('content-disposition')).toBe('inline; filename="admin-guide.pdf"');
+    expect(Buffer.from(await res.arrayBuffer()).toString()).toBe('%PDF-1.7 fake');
+    const html = printed.at(-1)!;
+    expect(html).toContain('<h1>Widget Platform Administrator Guide</h1>');
+    expect(html).toContain('Prepared for acme');
+    expect(html).toContain('Run the legacy installer');
+    expect(html).not.toContain('Configure single sign-on');
+    expect(html).not.toContain('Audit log events');
+    // Links to site topics point at the previewer; the theme is inlined.
+    expect(html).toContain(`href="${base}/topics/configure.html"`);
+    expect(html).toContain('--opend-accent');
+  });
+
+  it('follows the audience cookie and serves print HTML', async () => {
+    const html = await (await get('/pdf/admin-guide.html', { cookie: 'opend-as=v2-pro' })).text();
+    expect(html).toContain('Configure single sign-on');
+    expect(html).toContain('Audit log events');
+    expect(html).not.toContain('Run the legacy installer');
+    expect(html).not.toContain('data-applies=');
+  });
+
+  it('404s unknown publications', async () => {
+    expect((await get('/pdf/user-guide.pdf')).status).toBe(404);
+    expect((await get('/pdf/../opend.config.pdf')).status).toBe(404);
+  });
+
+  it('lists publications and links them from pages', async () => {
+    const index = await (await get('/_opend/publications')).text();
+    expect(index).toContain('Widget Platform Administrator Guide');
+    expect(index).toContain('href="/pdf/admin-guide.pdf"');
+    const page = await (await get('/topics/install.html')).text();
+    expect(page).toContain('href="/pdf/admin-guide.pdf"');
+    expect(page).toContain('href="/_opend/publications"');
   });
 });
 

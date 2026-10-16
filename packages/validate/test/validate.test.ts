@@ -50,6 +50,23 @@ describe('validate', () => {
     expect(hasErrors(diagnostics)).toBe(true);
   });
 
+  it('accepts topics only a publication uses, and rejects publications sharing a file name', () => {
+    const files = {
+      'opend.config.yaml':
+        'release: "2.0"\nmap: m.ditamap\npublications: [a/guide.bookmap, b/guide.bookmap]\n',
+      'm.ditamap': '<map><topicref href="site.dita"/></map>',
+      'a/guide.bookmap': '<bookmap><chapter href="../book.dita"/></bookmap>',
+      'b/guide.bookmap': '<bookmap><chapter href="../site.dita"/></bookmap>',
+      'site.dita': '<topic id="site"><title>Site</title></topic>',
+      'book.dita': '<topic id="book"><title>Book only</title></topic>',
+    };
+    const result = buildRelease(tree(files));
+    expect(result.release?.topics['book']?.title).toBe('Book only');
+    expect(validate(result).map(formatDiagnostic)).toEqual([
+      'opend.config.yaml: error [duplicate-publication] publication b/guide.bookmap has the same file name as a/guide.bookmap, so only one can be downloaded as guide.pdf',
+    ]);
+  });
+
   it('does not flag topics excluded at build time as unreferenced', () => {
     const diagnostics = validate(
       buildRelease(

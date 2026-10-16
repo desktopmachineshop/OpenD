@@ -7,7 +7,7 @@ This repository holds:
 - **Stage 1:** the shared build and filter core, and a local previewer.
 - **Stage 2:** the hosted path. A push fires a GitHub webhook, a worker builds and validates the docs, and signed-in readers get pages filtered by their org's entitlements.
 
-The web editor, PDF, search and multi-tenancy come later and reuse the same packages.
+It also renders curated publications (bookmaps) to PDF for each reader, through the same filter. The web editor, site-wide search and multi-tenancy come later and reuse the same packages.
 
 ## Quick start
 
@@ -58,7 +58,8 @@ See [docs/adr/0003-applicability.md](docs/adr/0003-applicability.md) for the det
 | [`@opend/dita`](packages/dita)               | DITA subset parser: topics, maps, keyspace, `conref` / `conkeyref` / `keyref`                       |
 | [`@opend/build`](packages/build)             | Source tree (working tree or git ref) to `CompiledRelease`, with chunk-usage index                  |
 | [`@opend/validate`](packages/validate)       | Every check, shared by CI, the CLI and the previewer                                                |
-| [`@opend/render-html`](packages/render-html) | Filtered view to HTML pages and navigation                                                          |
+| [`@opend/render-html`](packages/render-html) | Filtered view to HTML pages and navigation, and a publication to one print HTML document            |
+| [`@opend/pdf`](packages/pdf)                 | Prints self-contained HTML to PDF with one reused headless Chromium (`playwright-core`)             |
 | [`@opend/cli`](packages/cli)                 | `opend validate`, `opend build`, `opend preview`                                                    |
 | [`@opend/store`](packages/store)             | Postgres schema and migrations, build queue, releases, orgs, readers and entitlements; blob store   |
 | [`@opend/worker`](packages/worker)           | Fetches a pushed commit, builds, validates, then publishes or reports the failure                   |
@@ -85,6 +86,8 @@ Then:
 3. Readers sign in, and each is served the live release for their version's line (1.x or 2.x) through the same filter as the previewer.
 4. A push that fails validation never goes live. It shows as a failed `opend/build` status on the commit, and its diagnostics are available from `GET /admin/api/builds/:id`.
 
+Built images and theme files go to a blob store. By default that is a local folder (`BLOB_DIR`), so the app and the worker must share a volume, as they do in the Compose file. Where they cannot, as on Railway, where web and worker are separate services, set `S3_BUCKET`, `S3_ENDPOINT`, `S3_ACCESS_KEY_ID` and `S3_SECRET_ACCESS_KEY` (plus optional `S3_REGION`, default `auto`, `S3_FORCE_PATH_STYLE=1` for MinIO-style endpoints, and `S3_PREFIX`) on both services to use any S3-compatible bucket. On Railway, add a Bucket and map its variables with reference variables, for example `S3_BUCKET=${{Bucket.BUCKET}}` and `S3_ENDPOINT=${{Bucket.ENDPOINT}}`; see [`deploy/.env.example`](deploy/.env.example).
+
 To try it without an identity provider, set `NODE_ENV=development` and `OPEND_DEV_LOGIN=1` and sign in at `/auth/dev` as any seeded reader. The server refuses the development login in production.
 
 | Admin API (`Authorization: Bearer $OPEND_ADMIN_TOKEN`)                                               |                                                     |
@@ -96,6 +99,8 @@ To try it without an identity provider, set `NODE_ENV=development` and `OPEND_DE
 | `GET /admin/api/audit`                                                                               | Audit log                                           |
 
 See [ADR 0004](docs/adr/0004-hosted-architecture.md) for how it fits together.
+
+To run on Railway (web, worker, Postgres and a bucket), see [docs/railway.md](docs/railway.md).
 
 ## Embedding help in your app
 
@@ -157,6 +162,29 @@ const token = await new SignJWT({ email: user.email, org: user.openDOrg })
 
 See [examples/embed-host](examples/embed-host) for a runnable host app and [ADR 0005](docs/adr/0005-embedded-help.md) for the design.
 
+## PDF publications
+
+A publication is a bookmap listed under `publications` in `opend.config.yaml`. Each reader gets it as a PDF holding only what their release and entitlements allow, through the same filter as the website. For example, a 1.x customer with two products gets only the chapters and paragraphs for those products and that release.
+
+```xml
+<bookmap>
+  <booktitle><mainbooktitle>Widget Platform Administrator Guide</mainbooktitle></booktitle>
+  <chapter href="../topics/install.dita"/>
+  <chapter href="../topics/configure-sso.dita" feature="sso"/>
+  <chapter href="../topics/audit-log.dita" feature="audit-log" release="2.0.."/>
+</bookmap>
+```
+
+- **URL:** `/pdf/<map file name>.pdf`, for example `/pdf/admin-guide.pdf`. File names must be unique across publications; `opend validate` reports clashes.
+- **Contents:** a cover (title, site, release, date), a linked contents list, then every chapter and topic the reader can see, in map order. Each chapter starts on a new page, and the project theme is applied.
+- **Conditions:** chapter conditions apply to everything under the chapter, and topic and element conditions apply as on the site. Topics only the bookmap references are included too. A reader who can see nothing in a publication gets a 404 and no download link.
+- **Links:** links between topics in the publication jump within the PDF. Links to other topics go to the docs site when the reader can see them there; otherwise they are plain text. Images are embedded.
+- **Previewing:** `opend preview` serves `/pdf/<name>.pdf` for the current "Preview as" reader. `/pdf/<name>.html` serves the print HTML, for checking the layout without a browser. `/_opend/publications` lists each publication and whether the reader sees anything in it.
+- **Hosted:** readers see a link for each publication they can see in the page header. A PDF is rendered once per release and entitlement set, then cached in the blob store, so readers with the same entitlements share it. The cover never names an organization.
+- **Chromium:** the image includes Debian's Chromium and sets `OPEND_CHROMIUM_PATH`. Outside Docker, install a browser with `pnpm exec playwright-core install chromium` or point `OPEND_CHROMIUM_PATH` at one. Chromium's own sandbox is off by default; `OPEND_CHROMIUM_SANDBOX=1` turns it on where the runtime allows it.
+
+See [ADR 0006](docs/adr/0006-pdf-rendering.md) for why the renderer is Chromium and how it is contained.
+
 ## Development
 
 ```sh
@@ -177,6 +205,7 @@ The store, worker and server integration tests need Postgres. Set `TEST_DATABASE
 - [0003 Applicability and fail-closed filtering](docs/adr/0003-applicability.md)
 - [0004 Hosted architecture: push to publish](docs/adr/0004-hosted-architecture.md)
 - [0005 Embedded, context-aware help](docs/adr/0005-embedded-help.md)
+- [0006 PDF publications printed by headless Chromium](docs/adr/0006-pdf-rendering.md)
 
 ## Licence
 

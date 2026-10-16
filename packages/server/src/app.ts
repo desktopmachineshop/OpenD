@@ -1,5 +1,6 @@
 import cookie from '@fastify/cookie';
 import Fastify, { type FastifyInstance } from 'fastify';
+import { createPdfRenderer, type PdfRenderer } from '@opend/pdf';
 import { CHANNELS, listen, type BlobStore, type Pool } from '@opend/store';
 import { jsonLog, type Log } from '@opend/worker';
 import { registerAdmin } from './admin.js';
@@ -8,6 +9,7 @@ import type { ServerConfig } from './config.js';
 import { Caches, type AppContext } from './context.js';
 import { registerDelivery } from './delivery.js';
 import { registerEmbed } from './embed.js';
+import { registerPdf } from './pdf.js';
 import { createOidcProvider, type OidcProvider } from './oidc.js';
 import { registerWebhook } from './webhook.js';
 
@@ -19,6 +21,8 @@ export interface AppDeps {
   oidc?: OidcProvider | null;
   /** Listen for cache invalidations over Postgres. Default true. */
   listen?: boolean;
+  /** Override the PDF renderer (tests). Defaults to headless Chromium, launched on first use. */
+  pdf?: PdfRenderer;
 }
 
 export interface OpendApp {
@@ -34,6 +38,7 @@ export async function createApp(config: ServerConfig, deps: AppDeps): Promise<Op
     blobs: deps.blobs,
     log: deps.log ?? jsonLog,
     caches: new Caches(),
+    pdf: deps.pdf ?? createPdfRenderer(),
     oidc:
       deps.oidc !== undefined
         ? deps.oidc
@@ -84,7 +89,10 @@ export async function createApp(config: ServerConfig, deps: AppDeps): Promise<Op
   registerAuth(app, ctx);
   registerAdmin(app, ctx);
   registerEmbed(app, ctx);
+  registerPdf(app, ctx);
   registerDelivery(app, ctx);
+  // The default renderer is ours to close; an injected one belongs to the caller.
+  if (!deps.pdf) app.addHook('onClose', async () => ctx.pdf.close());
 
   if (deps.listen !== false) {
     const listener = listen(

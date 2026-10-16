@@ -50,3 +50,12 @@ jobs:
         run: docker build -f deploy/Dockerfile -t opend:ci .
       - name: Smoke-test the image
         run: docker run --rm opend:ci --help
+      - name: Smoke-test PDF printing with the image's Chromium
+        run: >-
+          docker run --rm --entrypoint node opend:ci --input-type=module -e
+          "import { createPdfRenderer } from '@opend/pdf';
+          const r = createPdfRenderer();
+          const pdf = await r.render('<h1>OpenD</h1>');
+          await r.close();
+          if (pdf.subarray(0, 4).toString() !== '%PDF') process.exit(1);
+          console.log('pdf ok', pdf.length);"

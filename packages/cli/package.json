@@ -19,6 +19,7 @@
     "@opend/embed": "workspace:*",
     "@opend/filter": "workspace:*",
     "@opend/model": "workspace:*",
+    "@opend/pdf": "workspace:*",
     "@opend/render-html": "workspace:*",
     "@opend/validate": "workspace:*",
     "commander": "^15.0.0",

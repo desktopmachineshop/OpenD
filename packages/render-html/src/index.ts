@@ -4,3 +4,4 @@ export * from './page.js';
 export { DEFAULT_CSS } from './style.js';
 export { TAGS } from './elements.js';
 export * from './embed.js';
+export * from './publication.js';
