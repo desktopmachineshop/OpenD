@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE task PUBLIC "-//OASIS//DTD DITA Task//EN" "task.dtd">
+<task id="editor-service" product="core" audience="admin">
+  <title>Run the web editor</title>
+  <shortdesc>The web editor is an optional service on its own host. It signs authors in with GitHub or your
+    company's identity provider, and commits for them through your GitHub App.</shortdesc>
+  <taskbody>
+    <prereq>
+      <ul>
+        <li>A running <keyword keyref="product-name"/> server, with the docs repository registered and the
+          GitHub App installed on it (<parmname>installationId</parmname> set). See
+          <xref href="github.dita"/>.</li>
+        <li>A host name for the editor that is not the docs site's, such as
+          <codeph>edit.docs.example.com</codeph>. Cookies ignore ports, so in production a different port on
+          the same host is refused.</li>
+      </ul>
+    </prereq>
+    <steps>
+      <step>
+        <cmd>Give the GitHub App the permissions the editor needs, and accept the change on the
+          installation.</cmd>
+        <info>
+          <simpletable relcolwidth="2* 2* 4*">
+            <sthead><stentry>Repository permission</stentry><stentry>Access</stentry><stentry>For</stentry></sthead>
+            <strow><stentry>Contents</stentry><stentry>Read and write</stentry><stentry>Reading files, saving commits, merging the main branch in</stentry></strow>
+            <strow><stentry>Pull requests</stentry><stentry>Read and write</stentry><stentry>Opening, updating and merging pull requests</stentry></strow>
+            <strow><stentry>Administration</stentry><stentry>Read</stentry><stentry>Reading branch protection and rulesets</stentry></strow>
+            <strow><stentry>Commit statuses</stentry><stentry>Read (keep Read and write for build statuses)</stentry><stentry>Showing required checks</stentry></strow>
+            <strow><stentry>Checks</stentry><stentry>Read</stentry><stentry>Showing required checks</stentry></strow>
+            <strow><stentry>Metadata</stentry><stentry>Read</stentry><stentry>Checking a developer's permission on the repository</stentry></strow>
+          </simpletable>
+          <p>Without Administration read the editor still works, but it cannot see the review rules, so it
+            never merges by itself: a maintainer merges each pull request on GitHub.</p>
+        </info>
+      </step>
+      <step>
+        <cmd>Set up at least one way to sign in.</cmd>
+        <choices>
+          <choice><b>GitHub</b>, for developers: create an OAuth app (or use the GitHub App's own client id and
+            secret) with the callback URL <filepath>$EDITOR_PUBLIC_URL/auth/github/callback</filepath>.
+            Anyone with write, maintain or admin permission on the docs repository gets an account the first
+            time they sign in.</choice>
+          <choice><b>Company OIDC</b>, for other authors: register a client with your identity provider, with
+            the redirect URI <filepath>$EDITOR_PUBLIC_URL/auth/oidc/callback</filepath>. It can be the same
+            provider as reader sign-in, but use a separate client. These authors must be added before they
+            can sign in.</choice>
+        </choices>
+      </step>
+      <step>
+        <cmd>Set the editor's variables.</cmd>
+        <info>
+          <p>The editor reads its own settings and checks them all at start-up. It shares
+            <codeph>DATABASE_URL</codeph> and the GitHub App with the other services, but never the session
+            secret.</p>
+          <properties relcolwidth="3* 2* 6*">
+            <prophead><proptypehd>Variable</proptypehd><propvaluehd>Default</propvaluehd><propdeschd>Meaning and rules</propdeschd></prophead>
+            <property id="DATABASE_URL"><proptype><codeph>DATABASE_URL</codeph></proptype><propvalue>required</propvalue><propdesc>The same Postgres database as the docs site.</propdesc></property>
+            <property id="EDITOR_PUBLIC_URL"><proptype><codeph>EDITOR_PUBLIC_URL</codeph></proptype><propvalue>required</propvalue><propdesc>Where authors reach the editor. Must not share a host with <codeph>PUBLIC_URL</codeph>; in production the host names must differ.</propdesc></property>
+            <property id="EDITOR_SESSION_SECRET"><proptype><codeph>EDITOR_SESSION_SECRET</codeph></proptype><propvalue>required</propvalue><propdesc>Signs the editor's session cookie. At least 32 characters, and not the docs site's <codeph>SESSION_SECRET</codeph>.</propdesc></property>
+            <property id="GITHUB_APP_ID"><proptype><codeph>GITHUB_APP_ID</codeph></proptype><propvalue>required</propvalue><propdesc>The GitHub App that commits and opens pull requests.</propdesc></property>
+            <property id="GITHUB_APP_PRIVATE_KEY"><proptype><codeph>GITHUB_APP_PRIVATE_KEY</codeph></proptype><propvalue>required</propvalue><propdesc>The App's private key, as for the worker.</propdesc></property>
+            <property id="GITHUB_OAUTH_CLIENT_ID"><proptype><codeph>GITHUB_OAUTH_CLIENT_ID</codeph></proptype><propvalue>none</propvalue><propdesc>Turns on GitHub sign-in. Set together with <codeph>GITHUB_OAUTH_CLIENT_SECRET</codeph>.</propdesc></property>
+            <property id="GITHUB_OAUTH_CLIENT_SECRET"><proptype><codeph>GITHUB_OAUTH_CLIENT_SECRET</codeph></proptype><propvalue>none</propvalue><propdesc>The OAuth client secret.</propdesc></property>
+            <property id="EDITOR_OIDC_ISSUER"><proptype><codeph>EDITOR_OIDC_ISSUER</codeph></proptype><propvalue>none</propvalue><propdesc>Turns on company sign-in. Needs <codeph>EDITOR_OIDC_CLIENT_ID</codeph> and <codeph>EDITOR_OIDC_CLIENT_SECRET</codeph>.</propdesc></property>
+            <property id="EDITOR_OIDC_CLIENT_ID"><proptype><codeph>EDITOR_OIDC_CLIENT_ID</codeph></proptype><propvalue>none</propvalue><propdesc>The editor's OIDC client id.</propdesc></property>
+            <property id="EDITOR_OIDC_CLIENT_SECRET"><proptype><codeph>EDITOR_OIDC_CLIENT_SECRET</codeph></proptype><propvalue>none</propvalue><propdesc>The editor's OIDC client secret.</propdesc></property>
+            <property id="EDITOR_OIDC_SCOPES"><proptype><codeph>EDITOR_OIDC_SCOPES</codeph></proptype><propvalue><codeph>openid email profile</codeph></propvalue><propdesc>Scopes to request.</propdesc></property>
+            <property id="EDITOR_REPO"><proptype><codeph>EDITOR_REPO</codeph></proptype><propvalue><codeph>OPEND_SITE_REPO</codeph></propvalue><propdesc>The registered repository to edit, such as <codeph>acme/docs</codeph>. Not needed when only one is registered.</propdesc></property>
+            <property id="OPEND_SITE_REPO"><proptype><codeph>OPEND_SITE_REPO</codeph></proptype><propvalue>none</propvalue><propdesc>Used when <codeph>EDITOR_REPO</codeph> is unset.</propdesc></property>
+            <property id="EDITOR_BASE_BRANCH"><proptype><codeph>EDITOR_BASE_BRANCH</codeph></proptype><propvalue><codeph>main</codeph></propvalue><propdesc>The branch authors' work is based on and published to.</propdesc></property>
+            <property id="PUBLIC_URL"><proptype><codeph>PUBLIC_URL</codeph></proptype><propvalue>none</propvalue><propdesc>The docs site, if set: the editor refuses to start on the same host.</propdesc></property>
+            <property id="PORT"><proptype><codeph>PORT</codeph></proptype><propvalue><codeph>3001</codeph></propvalue><propdesc>Port to listen on. The image sets <codeph>3000</codeph>.</propdesc></property>
+            <property id="HOST"><proptype><codeph>HOST</codeph></proptype><propvalue><codeph>0.0.0.0</codeph></propvalue><propdesc>Interface to listen on.</propdesc></property>
+            <property id="GITHUB_API_URL"><proptype><codeph>GITHUB_API_URL</codeph></proptype><propvalue><codeph>https://api.github.com</codeph></propvalue><propdesc>For GitHub Enterprise Server.</propdesc></property>
+            <property id="GITHUB_WEB_URL"><proptype><codeph>GITHUB_WEB_URL</codeph></proptype><propvalue><codeph>https://github.com</codeph></propvalue><propdesc>Where GitHub sign-in sends authors, for GitHub Enterprise Server.</propdesc></property>
+            <property id="NODE_ENV"><proptype><codeph>NODE_ENV</codeph></proptype><propvalue><codeph>development</codeph></propvalue><propdesc>Set <codeph>production</codeph> for real use.</propdesc></property>
+          </properties>
+          <note conkeyref="reuse/secret"/>
+        </info>
+      </step>
+      <step>
+        <cmd>Start the editor.</cmd>
+        <choices>
+          <choice><b>Docker Compose</b>: <codeph>docker compose -f deploy/docker-compose.yml --profile editor
+            up -d</codeph> starts the <codeph>editor</codeph> service on port 3001 (or
+            <codeph>OPEND_EDITOR_PORT</codeph>). Put it behind your reverse proxy on its own host
+            name.</choice>
+          <choice><b>Railway</b>: add a third service, <codeph>editor</codeph>, from the same repository and
+            <filepath>deploy/Dockerfile</filepath>, with the start command <codeph>node dist/bin.js editor
+            serve</codeph>, the health check <filepath>/healthz</filepath> and its own public domain on port
+            3000. It needs no pre-deploy step: the web service runs the migrations. See
+            <xref href="railway.dita"/>.</choice>
+          <choice><b>Anywhere else</b>: run <codeph>opend-server editor serve</codeph> from the image.</choice>
+        </choices>
+      </step>
+      <step>
+        <cmd>Add the authors who sign in with their company account.</cmd>
+        <stepxmp>
+          <codeblock>opend-server editor add-user writer@example.com --name "Wendy Writer"
+opend-server editor add-user dev@example.com --github dev-login
+opend-server editor list-users
+opend-server editor disable-user writer@example.com</codeblock>
+        </stepxmp>
+        <info>
+          <p>These commands need only <codeph>DATABASE_URL</codeph>. With Compose, run them as
+            <codeph>docker compose -f deploy/docker-compose.yml run --rm migrate editor add-user …</codeph>.</p>
+          <ul>
+            <li><codeph>add-user</codeph> registers an email address, with the name used on commits.
+              <codeph>--github</codeph> also lets that GitHub account in, for developers without write
+              access. Adding a disabled editor again turns them back on.</li>
+            <li>Company accounts are matched by verified email at first sign-in, then by the provider's
+              subject.</li>
+            <li><codeph>disable-user</codeph> stops someone signing in and ends their sessions at once.</li>
+          </ul>
+        </info>
+      </step>
+    </steps>
+    <result>
+      <p>Authors sign in at <codeph>EDITOR_PUBLIC_URL</codeph>. See <xref href="../editor/editor.dita"/> for
+        what they can do.</p>
+      <ul>
+        <li><b>Separate accounts.</b> Editors are not readers. A reader session never opens the editor, and
+          an editor session grants nothing on the docs site.</li>
+        <li><b>Commits.</b> Each save is a commit by the App to the author's branch
+          <codeph>editor/&lt;user-id&gt;/&lt;name&gt;</codeph>, with the author's name and email and a
+          <codeph>Co-authored-by</codeph> line. The editor refuses to write to any other branch, including
+          the main branch.</li>
+        <li><b>Preview as an org.</b> Any signed-in editor can preview their branch as an org that has
+          entitlements. Each preview is tied to that editor, one commit and the org's entitlements at that
+          moment, expires after 30 minutes, and is logged. There are no editor roles yet.</li>
+        <li><b>Audit.</b> Every sign-in, save, merge from the main branch, conflict resolution, publish,
+          merge, request for a developer and preview is recorded in the <codeph>editor_audit</codeph> table,
+          with the session, user, commit and pull request. Each author sees their own on the
+          <uicontrol>Activity</uicontrol> page.</li>
+        <li><b>Large repositories.</b> The preview rebuilds the whole docs project in memory. That suits
+          hundreds of topics; a repository too large for GitHub's recursive tree listing is refused.</li>
+      </ul>
+    </result>
+  </taskbody>
+</task>

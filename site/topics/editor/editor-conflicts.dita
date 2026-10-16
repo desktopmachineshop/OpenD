@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE task PUBLIC "-//OASIS//DTD DITA Task//EN" "task.dtd">
+<task id="editor-conflicts" product="core hosted" audience="author">
+  <title>Resolve conflicts with the main branch</title>
+  <shortdesc>When someone changed the same lines on the main branch as you did, choose which version to
+    keep, or combine them by hand.</shortdesc>
+  <prolog>
+    <resourceid appname="opend-console" appid="editor.conflicts"/>
+  </prolog>
+  <taskbody>
+    <context>
+      <p>Each time you open a page, and after every save, the editor merges the latest main branch into your
+        working branch. It never rewrites your commits. Changes to different files, or to different parts of
+        one file, merge on their own. When the same lines changed on both sides, the editor shows
+        <systemoutput>The main branch has changes that conflict with yours</systemoutput>, and you cannot
+        publish until you resolve them.</p>
+    </context>
+    <steps>
+      <step>
+        <cmd>Choose <uicontrol>Resolve the conflicts</uicontrol>.</cmd>
+        <info>
+          <p>Each file in conflict shows <uicontrol>Your version</uicontrol> and the <uicontrol>Current
+            version</uicontrol> on the main branch side by side.</p>
+        </info>
+      </step>
+      <step>
+        <cmd>For each file, choose one.</cmd>
+        <choices>
+          <choice><uicontrol>Keep your version</uicontrol>.</choice>
+          <choice><uicontrol>Keep the current version</uicontrol>, dropping your change to that file.</choice>
+          <choice><uicontrol>Edit by hand</uicontrol>, then combine the two in the box below.</choice>
+        </choices>
+        <info>
+          <p>The hand-edit box starts with both versions between marker lines
+            (<codeph>&lt;&lt;&lt;&lt;&lt;&lt;&lt;</codeph>, <codeph>=======</codeph>,
+            <codeph>&gt;&gt;&gt;&gt;&gt;&gt;&gt;</codeph>). Keep the text you want and delete the marker
+            lines. A version with markers left in, or that is not well-formed XML, is refused; see
+            <xref keyref="diagnostics"/>.</p>
+        </info>
+      </step>
+      <step>
+        <cmd>Choose <uicontrol>Save my choices</uicontrol>.</cmd>
+        <stepresult>
+          <p>Your choices are saved to your branch as a merge commit. Nothing is published.</p>
+        </stepresult>
+        <info>
+          <p>If your branch or the main branch changed while you were choosing, the editor refuses the save
+            and asks you to review the files again.</p>
+        </info>
+      </step>
+    </steps>
+    <result id="developer">
+      <p>Some conflicts cannot be resolved by choosing a version:</p>
+      <ul>
+        <li>you deleted a file that was changed on the main branch, or it was deleted there after you
+          changed it;</li>
+        <li>a file that is not text, such as an image, changed on both sides;</li>
+        <li>sections you edited (elements with an <codeph>id</codeph>) were deleted on the main
+          branch.</li>
+      </ul>
+      <p>The page then says <systemoutput>A developer needs to resolve this</systemoutput>. Choose
+        <uicontrol>Ask a developer</uicontrol>: the editor opens or updates your pull request with a note
+        naming the files, and a developer resolves them there.</p>
+    </result>
+  </taskbody>
+</task>

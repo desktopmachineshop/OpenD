@@ -19,6 +19,7 @@
     <topicref href="../topics/hosting/blob-storage.dita"/>
     <topicref href="../topics/hosting/github.dita"/>
     <topicref href="../topics/hosting/oidc.dita"/>
+    <topicref href="../topics/hosting/editor.dita"/>
   </chapter>
 
   <chapter href="../topics/hosting/managed-site.dita" product="hosted"/>

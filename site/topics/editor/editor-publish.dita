@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE task PUBLIC "-//OASIS//DTD DITA Task//EN" "task.dtd">
+<task id="editor-publish" product="core hosted" audience="author">
+  <title>Publish your changes</title>
+  <shortdesc>Publishing sends everything saved on your branch as one pull request. The repository's review
+    rules on GitHub decide when it merges.</shortdesc>
+  <prolog>
+    <resourceid appname="opend-console" appid="editor.publish"/>
+  </prolog>
+  <taskbody>
+    <prereq>
+      <p>You can publish once your branch has saved changes, no validation errors and no unresolved
+        <xref href="editor-conflicts.dita">conflicts with the main branch</xref>. The
+        <uicontrol>Publish</uicontrol> page says which of these is missing.</p>
+    </prereq>
+    <steps>
+      <step>
+        <cmd>Open <uicontrol>Publish</uicontrol>.</cmd>
+        <info>
+          <p><uicontrol>What publishing needs</uicontrol> lists what the main branch requires before a change
+            can merge, read from its branch protection and rulesets on GitHub: a number of approving reviews,
+            a review from a code owner, or checks that must pass. <uicontrol>Your changes</uicontrol> lists
+            the files on your branch.</p>
+        </info>
+      </step>
+      <step>
+        <cmd>Choose <uicontrol>Publish</uicontrol>, or <uicontrol>Update and publish</uicontrol> when your
+          pull request is already open.</cmd>
+        <stepresult>
+          <p>The editor opens a pull request for your branch, or updates the open one. If nothing blocks the
+            merge, it merges at once and says <systemoutput>Published: your changes are merged and will go
+            live after the build.</systemoutput> Otherwise the pull request stays open, and the page lists
+            who approved it, its checks, and what still blocks the merge.</p>
+        </stepresult>
+      </step>
+      <step>
+        <cmd>When reviewers approve and the checks pass, choose <uicontrol>Update and publish</uicontrol>
+          again.</cmd>
+        <info><p>A maintainer can also merge the pull request on GitHub.</p></info>
+      </step>
+    </steps>
+    <result id="blockers">
+      <p>What can block the merge, and what to do:</p>
+      <simpletable relcolwidth="2* 3*">
+        <sthead><stentry>The page says</stentry><stentry>What to do</stentry></sthead>
+        <strow><stentry>Needs approving reviews, or a review from a code owner</stentry><stentry>Wait for
+          reviewers on GitHub, then publish again.</stentry></strow>
+        <strow><stentry>A required check failed or has not passed yet</stentry><stentry>Wait for it to
+          finish. If it failed, open the pull request to see why, fix it in the editor and save.</stentry></strow>
+        <strow><stentry>Changes requested</stentry><stentry>Keep editing on your branch: each save updates
+          the pull request. Publish again when you are done.</stentry></strow>
+        <strow><stentry>The pull request has conflicts with the base branch</stentry><stentry>Open any page
+          in the editor to merge the main branch in, and resolve the conflicts.</stentry></strow>
+        <strow><stentry>GitHub does not let the editor read the rules, or the rules could not be
+          read</stentry><stentry>The editor cannot tell whether the merge is allowed, so it never merges by
+          itself. A maintainer merges the pull request on GitHub.</stentry></strow>
+      </simpletable>
+    </result>
+    <postreq id="after">
+      <p>After the merge, your working branch is retired, and your next save starts a new one. The docs
+        site builds the merged commit like any push, and it goes live once the build passes. The commit on
+        the main branch credits you as co-author.</p>
+    </postreq>
+  </taskbody>
+</task>
