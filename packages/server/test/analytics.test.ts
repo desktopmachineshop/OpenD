@@ -335,6 +335,7 @@ describe.skipIf(!url)('docs analytics and feedback', () => {
         { cookie: gusEmbed, origin: DOCS },
       );
       expect(embedRes.statusCode).toBe(303);
+      expect(embedRes.headers['content-security-policy']).toContain(`frame-ancestors ${HOST}`);
       expect(embedRes.headers.location).toBe(`${panelPath}&feedback=thanks#opend-feedback`);
 
       const tooLong = await post(
@@ -396,6 +397,7 @@ describe.skipIf(!url)('docs analytics and feedback', () => {
       expect(hidden.headers['content-type']).toBe(missing.headers['content-type']);
       expect(hidden.headers['content-length']).toBe(missing.headers['content-length']);
       expect(hidden.body).not.toContain('configure-sso');
+      expect(hidden.headers['content-security-policy']).toContain("frame-ancestors 'none'");
       // The same topic is fine for a reader who can see it (gus did above).
       const n = await h.db.pool.query(
         "select count(*)::int as n from analytics_feedback where org_slug = 'acme'",

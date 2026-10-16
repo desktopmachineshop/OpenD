@@ -5,6 +5,7 @@ import { FEEDBACK_PATH } from './analytics.js';
 import { checkReaderCsrf, currentAccess, safeReturnTo } from './auth.js';
 import type { AppContext } from './context.js';
 import { PAGE_HEADERS, readerRelease } from './delivery.js';
+import { embedFrameHeaders } from './embed.js';
 import { messagePage } from './pages.js';
 
 const feedbackSchema = z.object({
@@ -34,16 +35,22 @@ function thanksLocation(returnTo: unknown): string {
  * hidden topic gets the very same 404 as one that does not exist.
  */
 export function registerFeedback(app: FastifyInstance, ctx: AppContext): void {
-  const page = (reply: FastifyReply, status: number, title: string, message: string) =>
-    reply
-      .code(status)
-      .headers(PAGE_HEADERS)
-      .type('text/html; charset=utf-8')
-      .send(messagePage(title, message));
-  const notFound = (reply: FastifyReply) =>
-    page(reply, 404, 'Page not found', 'This page does not exist or is not available to you.');
+  const panelHeaders = ctx.config.embed ? embedFrameHeaders(ctx.config.embed.origins) : null;
 
   app.post(FEEDBACK_PATH, async (request, reply) => {
+    // From the help panel, answers must stay frameable by the host app (an expired
+    // embed session would otherwise show a blocked frame). Same answers either way.
+    const fromPanel = (request.body as { surface?: unknown } | undefined)?.surface === 'embed';
+    const headers = fromPanel && panelHeaders ? panelHeaders : PAGE_HEADERS;
+    const page = (reply: FastifyReply, status: number, title: string, message: string) =>
+      reply
+        .code(status)
+        .headers(headers)
+        .type('text/html; charset=utf-8')
+        .send(messagePage(title, message));
+    const notFound = (reply: FastifyReply) =>
+      page(reply, 404, 'Page not found', 'This page does not exist or is not available to you.');
+
     const access = await currentAccess(request, ctx);
     if (!access)
       return page(reply, 401, 'Signed out', 'Sign in again to send feedback about this page.');
@@ -75,6 +82,6 @@ export function registerFeedback(app: FastifyInstance, ctx: AppContext): void {
       ctx.log({ level: 'warn', msg: 'feedback insert failed', error: String(err) });
       return page(reply, 503, 'Feedback not sent', 'Something went wrong. Please try again later.');
     }
-    return reply.headers(PAGE_HEADERS).redirect(thanksLocation(input.return), 303);
+    return reply.headers(headers).redirect(thanksLocation(input.return), 303);
   });
 }

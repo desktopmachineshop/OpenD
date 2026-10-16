@@ -19,6 +19,16 @@ import type { AppContext } from './context.js';
 import { readerRelease, type ReaderRelease } from './delivery.js';
 import { EmbedTokenError, verifyEmbedToken } from './embed-token.js';
 
+/** Headers for help-panel pages: only the configured host apps may frame them. */
+export function embedFrameHeaders(origins: readonly string[]): Record<string, string> {
+  return {
+    'cache-control': 'private, no-store',
+    'x-content-type-options': 'nosniff',
+    'referrer-policy': 'strict-origin',
+    'content-security-policy': `default-src 'none'; script-src 'self'; img-src 'self' https: data:; style-src 'self' 'unsafe-inline'; connect-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors ${origins.join(' ')}`,
+  };
+}
+
 /**
  * Embedded help for host apps: the panel pages a host frames, the widget and
  * frame scripts, the token-to-session exchange, and a JSON API for apps that
@@ -33,13 +43,7 @@ export function registerEmbed(app: FastifyInstance, ctx: AppContext): void {
   /** Verified bearer tokens → reader id, until shortly before they expire. */
   const tokens = new LRUCache<string, { readerId: number }>({ max: 5000, ttl: 60_000 });
 
-  const frameHeaders = {
-    'cache-control': 'private, no-store',
-    'x-content-type-options': 'nosniff',
-    'referrer-policy': 'strict-origin',
-    // Only the configured host apps may frame the panel.
-    'content-security-policy': `default-src 'none'; script-src 'self'; img-src 'self' https: data:; style-src 'self' 'unsafe-inline'; connect-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors ${[...allowed].join(' ')}`,
-  };
+  const frameHeaders = embedFrameHeaders([...allowed]);
 
   /** Resolves a token to a reader whose org matches the claim. */
   const readerForToken = async (
