@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE reference PUBLIC "-//OASIS//DTD DITA Reference//EN" "reference.dtd">
+<reference id="pdf-limits" audience="author admin">
+  <title>PDF rendering and limits</title>
+  <shortdesc>How PDFs are printed, what the renderer needs, and what it cannot do yet.</shortdesc>
+  <refbody>
+    <section id="renderer">
+      <title>The renderer</title>
+      <p>A headless Chromium, driven by <codeph>playwright-core</codeph>, prints the publication's
+        self-contained HTML. One browser is launched on the first request and reused.</p>
+      <ul>
+        <li>Each document gets a fresh browser context with JavaScript disabled, and every network request is
+          refused. Authored content therefore cannot make the server fetch a URL.</li>
+        <li>At most two documents print at once; others wait. Each has 60 seconds to load and print.</li>
+        <li>Pages are A4 with 20 mm top, 18 mm side and bottom margins.</li>
+      </ul>
+    </section>
+    <section id="chromium">
+      <title>Getting Chromium</title>
+      <ul>
+        <li product="core hosted">The server image includes Debian's Chromium and sets
+          <codeph>OPEND_CHROMIUM_PATH=/usr/bin/chromium</codeph>.</li>
+        <li>Outside Docker, install a browser with <codeph>pnpm exec playwright-core install chromium</codeph>
+          in the OpenD checkout, or point <codeph>OPEND_CHROMIUM_PATH</codeph> at one.</li>
+        <li>Chromium's own sandbox is off by default, because unprivileged containers usually cannot create the
+          namespaces it needs. <codeph>OPEND_CHROMIUM_SANDBOX=1</codeph> turns it on where the runtime allows
+          it.</li>
+      </ul>
+    </section>
+    <section id="limits">
+      <title>Limits</title>
+      <ul>
+        <li>The contents list has links but no page numbers: Chromium does not support
+          <codeph>target-counter()</codeph>. Use the PDF outline for page-accurate navigation.</li>
+        <li>The header and footer also appear on the cover.</li>
+        <li>External images (<codeph>https:</codeph> URLs) are not loaded, because the renderer refuses network
+          requests. Keep images in the project.</li>
+        <li><codeph>url()</codeph> references in the theme are not resolved.</li>
+        <li>The first request for a new release and entitlement set takes a moment, about a second for a small
+          manual. Later requests are served from the cache.</li>
+      </ul>
+    </section>
+  </refbody>
+</reference>

@@ -199,6 +199,11 @@ export function embedContextHref(
 export interface EmbedResult {
   status: number;
   html: string;
+  /**
+   * Redirect target, for a context that resolves to a section of a page (a
+   * `resourceid` in a nested topic): the panel opens the topic at that anchor.
+   */
+  location?: string;
 }
 
 /**
@@ -224,6 +229,11 @@ export function handleEmbedRequest(
     if (key) request.key = key;
     else if (hostPath) request.path = hostPath;
     const resolved = resolveContext(view, request);
+    // resolveContext only returns topics this reader can see.
+    if (resolved?.fragment) {
+      const location = `${embedTopicHref(resolved.topicId, o)}#${encodeURIComponent(resolved.fragment)}`;
+      return { status: 303, html: '', location };
+    }
     if (resolved) {
       const html = renderEmbed(view, resolved.topicId, o);
       if (html) return { status: 200, html };

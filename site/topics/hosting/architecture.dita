@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="architecture" product="core hosted" audience="admin">
+  <title>Hosted architecture: push to publish</title>
+  <shortdesc>A push to the docs repository becomes live, filtered docs through four parts: a web service, a
+    build worker, Postgres and a blob store.</shortdesc>
+  <conbody>
+    <fig id="fig-architecture">
+      <title>Web, worker, Postgres and a blob store</title>
+      <image href="../../images/architecture.svg" placement="break">
+        <alt>Diagram: the docs repository sends a push webhook to the web service, which queues a job in
+          Postgres. The worker fetches the commit, builds and validates it, stores assets in the blob store and
+          publishes the release to Postgres. Readers and host apps are served by the web service through the
+          reader filter.</alt>
+      </image>
+    </fig>
+    <section id="parts">
+      <title>The parts</title>
+      <dl>
+        <dlentry>
+          <dt>web (<codeph>opend-server serve</codeph>)</dt>
+          <dd>Receives GitHub webhooks, signs readers in, serves pages, the help panel, PDFs and the admin API.
+            Stateless: run as many replicas as you like.</dd>
+        </dlentry>
+        <dlentry>
+          <dt>worker (<codeph>opend-server worker</codeph>)</dt>
+          <dd>Claims build jobs, fetches the exact pushed commit, builds and validates it, uploads images and
+            the theme, and publishes. Several workers can share the queue.</dd>
+        </dlentry>
+        <dlentry>
+          <dt>Postgres</dt>
+          <dd>The job queue, release snapshots, which release is live for each release line, organizations,
+            entitlements, readers, webhook deliveries and the audit log.</dd>
+        </dlentry>
+        <dlentry>
+          <dt>Blob store</dt>
+          <dd>Images and themes for each commit, and cached PDFs. A local folder when web and worker share a
+            disk, otherwise any S3-compatible bucket.</dd>
+        </dlentry>
+      </dl>
+      <p product="core">One image runs every role: <codeph>serve</codeph>, <codeph>worker</codeph>,
+        <codeph>migrate</codeph> and <codeph>seed</codeph>. It is configured only with environment variables;
+        see <xref keyref="env-vars">the environment variable reference</xref>.</p>
+    </section>
+
+    <section id="publish">
+      <title>From push to live</title>
+      <ol>
+        <li>GitHub sends a push webhook to <filepath>/webhooks/github</filepath>. The web service checks its
+          signature, ignores deliveries it has already seen, and queues a build if the pushed branch or tag is
+          one of the repository's release refs. It answers 202 only once the job is safely stored.</li>
+        <li>A worker claims the job (it wakes on a notification, and also polls every five seconds), fetches
+          that one commit, and runs the same build and validation as <cmdname>opend validate</cmdname>.</li>
+        <li>If validation finds an error, the build fails: the diagnostics are stored with the job, the commit
+          gets a failed <codeph>opend/build</codeph> status, and the previous release stays live.</li>
+        <li>Otherwise the worker stores the images and theme, saves the release snapshot, and makes it live for
+          its release line, unless a newer build already went live.</li>
+        <li>Infrastructure problems, such as a failed fetch, are retried with growing delays, up to five
+          attempts.</li>
+      </ol>
+    </section>
+
+    <section id="serve">
+      <title>Serving readers</title>
+      <ul>
+        <li>A signed-in reader's organization gives their products, features and version. The version's major
+          number picks the live release; the reader filter does the rest.</li>
+        <li>Filtered views and pages are cached per entitlement set, not per user, and cleared at once when an
+          admin changes entitlements or a new release goes live.</li>
+        <li>Pages are sent with <codeph>Cache-Control: private, no-store</codeph> and a strict Content Security
+          Policy, and run no scripts.</li>
+        <li>The site serves one docs repository. If several are registered, <codeph>OPEND_SITE_REPO</codeph>
+          says which.</li>
+      </ul>
+      <p>Multi-tenancy, with many sites in one deployment, is planned for a later release.</p>
+    </section>
+  </conbody>
+</concept>

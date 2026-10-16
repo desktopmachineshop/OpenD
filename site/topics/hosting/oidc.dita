@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE task PUBLIC "-//OASIS//DTD DITA Task//EN" "task.dtd">
+<task id="oidc" product="core" audience="admin">
+  <title>Set up reader sign-in with OIDC</title>
+  <shortdesc>Readers sign in through any OpenID Connect provider. <keyword keyref="product-name"/> matches
+    them to the readers you registered by verified email.</shortdesc>
+  <taskbody>
+    <steps>
+      <step>
+        <cmd>Register a web application with your identity provider, with the redirect URI
+          <filepath>$PUBLIC_URL/auth/callback</filepath>.</cmd>
+      </step>
+      <step>
+        <cmd>Set the provider details on the web service.</cmd>
+        <stepxmp>
+          <codeblock>OIDC_ISSUER=https://login.example.com
+OIDC_CLIENT_ID=...
+OIDC_CLIENT_SECRET=...
+# OIDC_SCOPES=openid email profile   (the default)</codeblock>
+        </stepxmp>
+      </step>
+      <step>
+        <cmd>Register each reader by email, in their organization.</cmd>
+        <info><p>See <xref href="readers-orgs.dita"/>.</p></info>
+      </step>
+      <step>
+        <cmd>Restart the web service and sign in at <filepath>$PUBLIC_URL/auth/login</filepath>.</cmd>
+      </step>
+    </steps>
+    <result>
+      <p id="how-matching-works">How sign-in works:</p>
+        <ul>
+          <li>The flow is the authorization code flow with PKCE, state and nonce.</li>
+          <li>A reader already linked to the provider's issuer and subject is signed in. Otherwise, a
+            <i>verified</i> email that matches a registered reader links that reader to the subject on first
+            sign-in. An unverified email never matches.</li>
+          <li>Anyone else sees "No access" and is not signed in.</li>
+          <li>The session is a signed, <codeph>HttpOnly</codeph> cookie holding only the reader id, valid for
+            12 hours. Entitlements are re-read through a short cache that is cleared as soon as an admin
+            changes them.</li>
+          <li>A reader whose organization has no entitlements yet sees "No access yet".</li>
+          <li>Sign out at <filepath>/auth/logout</filepath>.</li>
+        </ul>
+    </result>
+  </taskbody>
+</task>

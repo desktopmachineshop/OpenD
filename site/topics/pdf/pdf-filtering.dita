@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="pdf-filtering" audience="author admin">
+  <title>Per-reader filtering in PDFs</title>
+  <shortdesc>A publication is filtered with exactly the same rules as the site. Chapter conditions cover
+    everything in the chapter.</shortdesc>
+  <conbody>
+    <ul>
+      <li>Conditions on a <codeph>chapter</codeph>, <codeph>part</codeph> or <codeph>topicref</codeph> apply
+        to everything under it. The Administrator Guide's self-hosting chapter has
+        <codeph>product="core"</codeph>, so a managed customer's copy has no such chapter at all.</li>
+      <li>Conditions on topics and elements apply as on the site, paragraph by paragraph.</li>
+      <li>A heading whose chapters are all hidden is left out, and so is its contents entry.</li>
+      <li>A reader who can see nothing in a publication gets a 404, the same as for a publication that does
+        not exist, and no download link.</li>
+      <li>Links to topics in the same publication jump within the PDF. Links to other topics point at the
+        docs site when the reader can see them there, and are plain text otherwise.</li>
+      <li>Only images in topics the reader can see are embedded.</li>
+    </ul>
+    <section id="sharing">
+      <title>Who shares a render</title>
+      <p product="core hosted">On the hosted site a PDF is printed once per release and entitlement set, then
+        cached in the blob store, so readers with the same products, features and version share one file.
+        A new release gets new files; nothing needs clearing. Because one file serves several organizations,
+        the hosted cover never names an organization.</p>
+      <p>In the previewer, the cover says "Prepared for" the preview reader's <parmname>org</parmname>, when
+        the reader has one, so you can tell printouts apart. The staff view prints the first alternative of
+        each conditional key.</p>
+    </section>
+  </conbody>
+</concept>

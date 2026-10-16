@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE troubleshooting PUBLIC "-//OASIS//DTD DITA Troubleshooting//EN" "troubleshooting.dtd">
+<troubleshooting id="troubleshooting" product="embed" audience="developer">
+  <title>Troubleshoot embedded help</title>
+  <shortdesc>The usual reasons the help panel stays empty, refuses to sign in, or opens the wrong
+    topic.</shortdesc>
+  <troublebody>
+    <condition>
+      <title>The panel is blank, or the browser console says it refused to frame the page</title>
+      <p>The docs server does not list your page's origin in <codeph>frame-ancestors</codeph>, or your own
+        CSP blocks the frame.</p>
+    </condition>
+    <troubleSolution>
+      <cause><p>Your app's origin is missing from <codeph>OPEND_EMBED_ORIGINS</codeph>, or is written with a
+        path or trailing slash.</p></cause>
+      <remedy>
+        <p>Add the exact origin, such as <codeph>https://console.example.com</codeph>, and restart the server.
+          Also allow the docs origin in your app's <codeph>frame-src</codeph> and
+          <codeph>script-src</codeph>.</p>
+      </remedy>
+    </troubleSolution>
+    <troubleSolution>
+      <cause><p>Embedding is off: <filepath>/embed/opend-help.js</filepath> does not return the script.</p></cause>
+      <remedy><p>Set both <codeph>OPEND_EMBED_SECRET</codeph> and <codeph>OPEND_EMBED_ORIGINS</codeph>.</p></remedy>
+    </troubleSolution>
+  </troublebody>
+  <troubleshooting id="sign-in-failed">
+    <title>The panel says "Sign-in failed."</title>
+    <troublebody>
+      <condition><p>The token exchange at <filepath>/embed/session</filepath> answered 401.</p></condition>
+      <troubleSolution>
+        <cause><p>The token is wrong: a different secret, an audience other than the docs site's
+          <codeph>PUBLIC_URL</codeph> (watch for a trailing slash), a lifetime over 600 seconds, a missing
+          <codeph>iat</codeph>, or an expired token because your server's clock is off.</p></cause>
+        <remedy><p>Decode the token and check each claim against <xref href="tokens.dita"/>. The server logs
+          <systemoutput>embed token rejected</systemoutput> with the reason.</p></remedy>
+      </troubleSolution>
+      <troubleSolution>
+        <cause><p><parmname>getToken</parmname> rejected or returned something other than the bare token,
+          such as JSON.</p></cause>
+        <remedy><p>Return the token as plain text, or unwrap it in <parmname>getToken</parmname>.</p></remedy>
+      </troubleSolution>
+    </troublebody>
+  </troubleshooting>
+  <troubleshooting id="no-access">
+    <title>The panel says "You do not have access to this help."</title>
+    <troublebody>
+      <condition><p>The token is valid, but the exchange answered 403.</p></condition>
+      <troubleSolution>
+        <cause><p>The email is not registered as a reader, or is registered in a different organization from
+          the token's <codeph>org</codeph>.</p></cause>
+        <remedy><p>Register the reader in the right organization. The server logs
+          <systemoutput>embed token for unknown reader or wrong org</systemoutput>.</p></remedy>
+      </troubleSolution>
+    </troublebody>
+  </troubleshooting>
+  <troubleshooting id="wrong-topic">
+    <title>The panel opens the wrong topic, or "No help here yet"</title>
+    <troublebody>
+      <condition><p>The context resolves differently from what you expected.</p></condition>
+      <troubleSolution>
+        <cause><p>The route, the key or the reader's entitlements do not lead where you think.</p></cause>
+        <remedy>
+          <steps>
+            <step><cmd>Open the previewer's help lab, preview as a reader like the user, and try the same key
+              or path.</cmd></step>
+            <step><cmd>Check that the widget's <parmname>app</parmname> matches the <codeph>appname</codeph>
+              in the topics and <filepath>help-contexts.yaml</filepath>.</cmd></step>
+            <step><cmd>Remember that a hidden target falls back to the parent key or the default; see
+              <xref href="fallback.dita"/>.</cmd></step>
+          </steps>
+        </remedy>
+      </troubleSolution>
+    </troublebody>
+  </troubleshooting>
+  <troubleshooting id="session-lost">
+    <title>The panel asks for a token on every page</title>
+    <troublebody>
+      <condition><p>The session cookie does not stick.</p></condition>
+      <troubleSolution>
+        <cause><p>The docs site is served over plain HTTP, so the browser drops the <codeph>Secure</codeph>
+          cookie, or the browser blocks partitioned third-party cookies.</p></cause>
+        <remedy><p>Serve the docs site over HTTPS. For browsers that block partitioned cookies, render help
+          from the <xref href="json-api.dita">JSON API</xref> instead.</p></remedy>
+      </troubleSolution>
+    </troublebody>
+  </troubleshooting>
+</troubleshooting>

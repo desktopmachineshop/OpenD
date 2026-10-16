@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE reference PUBLIC "-//OASIS//DTD DITA Reference//EN" "reference.dtd">
+<reference id="release-ranges" audience="author">
+  <title>Release range grammar</title>
+  <shortdesc>The exact syntax and matching rules of the <codeph>release</codeph> attribute.</shortdesc>
+  <refbody>
+    <refsyn id="grammar">
+      <title>Grammar</title>
+      <codeblock>value   = token { whitespace token }
+token   = version                 (* exact: that version and everything under it *)
+        | version ".."            (* from: that version and later *)
+        | ".." version            (* to: up to and including everything under it *)
+        | version ".." version    (* from .. to *)
+version = [ "v" | "V" ] digits { "." digits }
+digits  = "0" .. "9" { "0" .. "9" }</codeblock>
+      <p>Content applies when the reader's version matches <i>any</i> token. <codeph>..</codeph> on its own
+        is not a range, and a range whose start is after its end is invalid. Validation reports any token
+        that does not parse as <codeph>invalid-release</codeph>.</p>
+    </refsyn>
+
+    <section id="examples">
+      <title>Examples</title>
+      <simpletable relcolwidth="2* 4* 4*">
+        <sthead><stentry>Token</stentry><stentry>Matches</stentry><stentry>Does not match</stentry></sthead>
+        <strow><stentry><codeph>1.4</codeph></stentry><stentry>1.4, 1.4.0, 1.4.7</stentry><stentry>1.40, 1.5, 1</stentry></strow>
+        <strow><stentry><codeph>2</codeph></stentry><stentry>2, 2.0, 2.13.1</stentry><stentry>1.9, 3.0</stentry></strow>
+        <strow><stentry><codeph>2.0..</codeph></stentry><stentry>2.0, 2.1, 10.0</stentry><stentry>1.9.9</stentry></strow>
+        <strow><stentry><codeph>..1.9</codeph></stentry><stentry>0.1, 1.0, 1.9, 1.9.12</stentry><stentry>1.10, 2.0</stentry></strow>
+        <strow><stentry><codeph>1.2..1.9</codeph></stentry><stentry>1.2, 1.5.3, 1.9.4</stentry><stentry>1.1.9, 1.10, 2.0</stentry></strow>
+        <strow><stentry><codeph>v2.0..</codeph></stentry><stentry>the same as <codeph>2.0..</codeph></stentry><stentry></stentry></strow>
+        <strow><stentry><codeph>1 3..</codeph></stentry><stentry>any 1.x, and 3.0 and later</stentry><stentry>2.x</stentry></strow>
+      </simpletable>
+    </section>
+
+    <section id="matching">
+      <title>Matching rules</title>
+      <ul>
+        <li>Versions compare number by number, so 1.10 is after 1.9. A missing number counts as 0 when
+          comparing, so <codeph>2.0..</codeph> matches 2.</li>
+        <li>An exact token and the end of a range compare only as many numbers as they have. That is why
+          <codeph>1.4</codeph> matches 1.4.7, and <codeph>..1.9</codeph> includes every 1.9.x.</li>
+        <li>An exact token with more numbers than the reader's version does not match it:
+          <codeph>1.4</codeph> does not match a reader on <codeph>1</codeph>.</li>
+        <li>The start of a range is inclusive and compares the full version.</li>
+        <li>Release values are not declared in <filepath>opend.config.yaml</filepath>, because they are
+          ranges.</li>
+      </ul>
+    </section>
+
+    <section id="reader-versions">
+      <title>Reader versions and release lines</title>
+      <p>Each reader has one version, from their organization's entitlements, such as
+        <codeph>0.1</codeph>. It must be a version of the same form, with an optional leading
+        <codeph>v</codeph>. A reader whose version does not parse matches no release token, so content with
+        a <codeph>release</codeph> attribute is hidden from them.</p>
+      <p product="core hosted">On the hosted platform, a reader is served the live release of their
+        <i>release line</i>: the major number of their version. A <codeph>1.4</codeph> reader keeps getting
+        the docs built from the branch whose <parmname>release</parmname> is 1.x after 2.0 is published.
+        See <xref href="release-branches.dita"/>.</p>
+    </section>
+  </refbody>
+</reference>

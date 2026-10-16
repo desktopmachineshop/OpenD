@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE task PUBLIC "-//OASIS//DTD DITA Task//EN" "task.dtd">
+<task id="backups" product="core" audience="admin">
+  <title>Back up and restore</title>
+  <shortdesc>Postgres holds everything that cannot be rebuilt. Back it up regularly, and keep a copy away
+    from the database's own disk.</shortdesc>
+  <taskbody>
+    <context>
+      <ul>
+        <li><b>Postgres</b>: release snapshots, which release is live, organizations, entitlements, readers
+          and their sign-in links, build history and the audit log. Back this up.</li>
+        <li><b>Blob store</b>: images and themes, which the worker can upload again by rebuilding from Git, and
+          cached PDFs, which are printed again on demand. Back it up if rebuilding old commits would be
+          inconvenient.</li>
+        <li><b>The docs themselves</b> live in Git.</li>
+      </ul>
+    </context>
+    <steps>
+      <step>
+        <cmd>Dump the database on a schedule.</cmd>
+        <stepxmp>
+          <codeblock># Docker Compose
+docker compose -f deploy/docker-compose.yml exec -T db pg_dump -U opend -Fc opend &gt; opend-$(date +%F).dump
+# Anywhere else
+pg_dump -Fc "$DATABASE_URL" &gt; opend-$(date +%F).dump</codeblock>
+        </stepxmp>
+        <info>
+          <p>On Railway, Postgres volume backups are available, but also schedule a <cmdname>pg_dump</cmdname>
+            to the bucket or elsewhere so a copy lives off the volume.</p>
+        </info>
+      </step>
+      <step>
+        <cmd>Copy the dumps off the host, and test a restore now and then.</cmd>
+      </step>
+    </steps>
+    <result>
+      <p>To restore, stop the web service and the worker, restore into an empty database, then start them
+        again:</p>
+      <codeblock>pg_restore --clean --if-exists -d "$DATABASE_URL" opend-2026-10-16.dump</codeblock>
+      <p>If blobs were lost too, rebuild the current commit of each release ref through the admin API so the
+        live releases get their images back.</p>
+    </result>
+  </taskbody>
+</task>

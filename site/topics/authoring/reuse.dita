@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE task PUBLIC "-//OASIS//DTD DITA Task//EN" "task.dtd">
+<task id="reuse" audience="author">
+  <title>Reuse content with conref and conkeyref</title>
+  <shortdesc>Write a note, step or paragraph once in a chunks file and pull it into any topic. The build
+    inlines it, and every page that uses it updates together.</shortdesc>
+  <taskbody>
+    <steps>
+      <step>
+        <cmd>Put reusable elements, each with an <codeph>id</codeph>, in a topic under
+          <filepath>reuse/</filepath>.</cmd>
+        <stepxmp>
+          <codeblock><![CDATA[<topic id="common">
+  <title>Reusable content</title>
+  <body>
+    <note id="restart" type="note">Restart the web service and the worker after changing a variable.</note>
+    <steps>
+      <step id="step-build"><cmd>Build the packages: <codeph>pnpm build</codeph>.</cmd></step>
+    </steps>
+  </body>
+</topic>]]></codeblock>
+        </stepxmp>
+        <info>
+          <p>Leave the file out of every map. A chunks file is not published on its own, and validation does
+            not warn about it as long as some published topic uses one of its chunks.</p>
+        </info>
+      </step>
+      <step>
+        <cmd>Pull a chunk in with <codeph>conref</codeph>, using the path, the topic id and the element
+          id.</cmd>
+        <stepxmp>
+          <codeblock><![CDATA[<note conref="../../reuse/common.dita#common/restart"/>]]></codeblock>
+        </stepxmp>
+      </step>
+      <step>
+        <cmd>Or define a key for the chunks file once, and use <codeph>conkeyref</codeph> so topics need no
+          relative paths.</cmd>
+        <stepxmp>
+          <codeblock><![CDATA[<!-- in a map -->
+<keydef keys="reuse" href="../reuse/common.dita"/>
+
+<!-- in any topic -->
+<step conkeyref="reuse/step-build"/>]]></codeblock>
+        </stepxmp>
+        <info>
+          <p>This page itself pulls its restart note in with <codeph>conkeyref</codeph>:</p>
+          <note conkeyref="reuse/restart"/>
+        </info>
+      </step>
+    </steps>
+    <result>
+      <p>How references behave:</p>
+      <ul>
+        <li>References work within a file and across files, and chunks may reference other chunks.
+          Cycles are reported as <codeph>conref-cycle</codeph>.</li>
+        <li>The referencing element should have the same name as the chunk. A
+          <codeph>&lt;p&gt;</codeph> that pulls a <codeph>&lt;note&gt;</codeph> works but warns
+          (<codeph>conref-type-mismatch</codeph>).</li>
+        <li>Filtering attributes on the referencing element apply to the pulled content, so
+          <codeph>&lt;note conkeyref="reuse/restart" product="core"/&gt;</codeph> shows the shared note to
+          core readers only. Attributes on the chunk itself apply too.</li>
+        <li>Keys inside a chunk resolve in the keyspace of the map publishing the topic that pulls it.</li>
+        <li><codeph>conrefend</codeph> and <codeph>conaction</codeph> are not supported: only the start
+          element is pulled, with a warning.</li>
+      </ul>
+      <p>The release snapshot records which topics use each chunk, so tools can show the impact of
+        changing one.</p>
+    </result>
+  </taskbody>
+</task>

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="project-layout" audience="author">
+  <title>Docs project layout</title>
+  <shortdesc>A docs project is a folder, usually a whole Git repository, with
+    <filepath>opend.config.yaml</filepath> at its root. Copy <filepath>templates/docs-starter</filepath>
+    to start one.</shortdesc>
+  <conbody>
+    <p>Only <filepath>opend.config.yaml</filepath> and the root map it names are required. The rest is
+      convention, and the starter template follows it:</p>
+    <simpletable relcolwidth="2* 5*">
+      <sthead><stentry>Path</stentry><stentry>What it holds</stentry></sthead>
+      <strow><stentry><filepath>opend.config.yaml</filepath></stentry><stentry>Release, root map, publications, declared attribute values, build filter and theme. See <xref href="config-reference.dita"/>.</stentry></strow>
+      <strow><stentry><filepath>maps/</filepath></stentry><stentry>The site map, bookmaps for PDF publications, and submaps such as shared key definitions.</stentry></strow>
+      <strow><stentry><filepath>topics/</filepath></stentry><stentry>One topic file per page. The page URL is the file path without its extension, for example <filepath>/topics/install.html</filepath>.</stentry></strow>
+      <strow><stentry><filepath>reuse/</filepath></stentry><stentry>Reusable chunks pulled in with <codeph>conref</codeph> or <codeph>conkeyref</codeph>. Kept out of every map, so they are never published on their own.</stentry></strow>
+      <strow><stentry><filepath>images/</filepath></stentry><stentry>SVG, PNG, JPEG, GIF or WebP files that topics reference.</stentry></strow>
+      <strow><stentry><filepath>filters/publish.ditaval</filepath></stentry><stentry>The build-time filter, for example to drop <codeph>audience="internal"</codeph> for everyone.</stentry></strow>
+      <strow><stentry><filepath>theme/site.css</filepath></stentry><stentry>Brand colours and fonts for the site, the help panel and PDFs.</stentry></strow>
+      <strow><stentry><filepath>preview-contexts.yaml</filepath></stentry><stentry>Sample readers for the previewer. See <xref href="preview-contexts.dita"/>.</stentry></strow>
+      <strow product="embed"><stentry><filepath>help-contexts.yaml</filepath></stentry><stentry>Maps host-app routes to context-sensitive help keys. See <xref href="../help/help-contexts.dita"/>.</stentry></strow>
+      <strow><stentry><filepath>.github/workflows/validate.yml</filepath></stentry><stentry>Validates every pull request. See <xref href="ci.dita"/>.</stentry></strow>
+    </simpletable>
+    <section id="what-the-build-reads">
+      <title>What the build reads</title>
+      <ul>
+        <li>Files ending in <filepath>.dita</filepath>, <filepath>.ditamap</filepath>,
+          <filepath>.bookmap</filepath>, <filepath>.ditaval</filepath>, <filepath>.xml</filepath>,
+          <filepath>.yaml</filepath> and <filepath>.yml</filepath> are read as text. Other files are only
+          checked for existence until something references them.</li>
+        <li>Folders named <filepath>.git</filepath>, <filepath>node_modules</filepath>,
+          <filepath>.opend</filepath> and <filepath>dist</filepath> are ignored.</li>
+        <li><filepath>.xml</filepath> files whose root is not a topic are left alone, so other XML can live in
+          the project.</li>
+        <li>Paths in maps, references and the config must stay inside the docs root.</li>
+      </ul>
+    </section>
+  </conbody>
+</concept>

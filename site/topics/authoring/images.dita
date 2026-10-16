@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE task PUBLIC "-//OASIS//DTD DITA Task//EN" "task.dtd">
+<task id="images" audience="author">
+  <title>Add images and diagrams</title>
+  <shortdesc>Reference image files from topics with <codeph>&lt;image&gt;</codeph>. They are published with
+    the release and shown only to readers who can see a topic that uses them.</shortdesc>
+  <taskbody>
+    <steps>
+      <step>
+        <cmd>Put the file in the project, for example in <filepath>images/</filepath>.</cmd>
+        <info>
+          <p>SVG, PNG, JPEG, GIF and WebP are served on the site and embedded in PDFs. For diagrams, prefer
+            SVG with a <codeph>&lt;title&gt;</codeph> and <codeph>&lt;desc&gt;</codeph> and a solid
+            background, so it reads in both light and dark themes. The diagrams on
+            <xref href="../overview.dita">the overview</xref> are hand-written SVG.</p>
+        </info>
+      </step>
+      <step>
+        <cmd>Reference it with a path relative to the topic, and always give alternative text.</cmd>
+        <stepxmp>
+          <codeblock><![CDATA[<fig id="fig-architecture">
+  <title>The hosted platform</title>
+  <image href="../images/architecture.svg" placement="break">
+    <alt>Diagram: the docs repository sends a push webhook to the web service...</alt>
+  </image>
+</fig>]]></codeblock>
+        </stepxmp>
+        <info>
+          <p><codeph>placement="break"</codeph> puts the image on its own line; without it the image is
+            inline. <codeph>width</codeph> and <codeph>height</codeph> are passed through.
+            <codeph>keyref</codeph> works too, with the key's <codeph>href</codeph> naming the file.</p>
+        </info>
+      </step>
+      <step>
+        <cmd>Validate.</cmd>
+        <info>
+          <p>A missing file is an error, <codeph>missing-image</codeph>. External images (an
+            <codeph>https:</codeph> URL or <codeph>scope="external"</codeph>) are not checked and are not
+            embedded in PDFs.</p>
+        </info>
+      </step>
+    </steps>
+    <result>
+      <p>On the hosted site, images are served from <filepath>/_assets/</filepath> only when a topic visible
+        to the signed-in reader references them, so guessing a path reveals nothing. Author files, SVG
+        included, are served with a sandboxing Content Security Policy.</p>
+    </result>
+  </taskbody>
+</task>

@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE reference PUBLIC "-//OASIS//DTD DITA Reference//EN" "reference.dtd">
+<reference id="config-reference" audience="author">
+  <title>opend.config.yaml reference</title>
+  <shortdesc>Every field of the project configuration file, with its default and rules.</shortdesc>
+  <refbody>
+    <properties id="fields" relcolwidth="2* 2* 5*">
+      <prophead><proptypehd>Field</proptypehd><propvaluehd>Default</propvaluehd><propdeschd>Meaning and rules</propdeschd></prophead>
+      <property>
+        <proptype><parmname>release</parmname></proptype>
+        <propvalue>required</propvalue>
+        <propdesc>The version this branch documents, such as <codeph>0.1</codeph> or <codeph>2.1</codeph>.
+          The hosted build also requires it to be a version number: its major part is the release line, so
+          <codeph>1.4</codeph> readers keep getting the 1.x docs after 2.0 is published.</propdesc>
+      </property>
+      <property>
+        <proptype><parmname>map</parmname></proptype>
+        <propvalue>required</propvalue>
+        <propdesc>The root map for the site navigation and keys, such as
+          <filepath>maps/docs.ditamap</filepath>.</propdesc>
+      </property>
+      <property>
+        <proptype><parmname>publications</parmname></proptype>
+        <propvalue><codeph>[]</codeph></propvalue>
+        <propdesc>Bookmaps (or maps) published as PDFs. Their file names must be unique, because each is
+          served at <filepath>/pdf/&lt;file name&gt;.pdf</filepath>.</propdesc>
+      </property>
+      <property>
+        <proptype><parmname>attributes</parmname></proptype>
+        <propvalue><codeph>{}</codeph></propvalue>
+        <propdesc>The allowed values of each filtering attribute, such as
+          <codeph>product: [core, hosted, embed]</codeph>. Keys must be filtering attributes:
+          <codeph>product</codeph>, <codeph>feature</codeph>, <codeph>audience</codeph>,
+          <codeph>platform</codeph>, <codeph>otherprops</codeph>, <codeph>props</codeph> or
+          <codeph>deliveryTarget</codeph>. <codeph>release</codeph> must not be listed: it takes version
+          ranges. Each value is a single token of letters, digits, <codeph>_</codeph>, <codeph>.</codeph>,
+          <codeph>:</codeph> and <codeph>-</codeph>.</propdesc>
+      </property>
+      <property>
+        <proptype><parmname>buildFilter</parmname></proptype>
+        <propvalue>none</propvalue>
+        <propdesc>A DITAVAL file applied to every reader at build time. See
+          <xref href="build-filter.dita"/>.</propdesc>
+      </property>
+      <property>
+        <proptype><parmname>theme</parmname></proptype>
+        <propvalue>none</propvalue>
+        <propdesc>A stylesheet loaded after the built-in styles on every page, in the help panel and in
+          PDFs.</propdesc>
+      </property>
+      <property>
+        <proptype><parmname>title</parmname></proptype>
+        <propvalue><codeph>Documentation</codeph></propvalue>
+        <propdesc>The site title in the page header and the PDF cover. Set it to an empty string to use the
+          root map's title instead.</propdesc>
+      </property>
+    </properties>
+    <example id="example">
+      <title>Example</title>
+      <codeblock>title: OpenD Documentation
+release: '0.1'
+map: maps/docs.ditamap
+publications:
+  - maps/admin-guide.bookmap
+  - maps/author-guide.bookmap
+attributes:
+  product: [core, hosted, embed]
+  feature: [early-access]
+  audience: [author, admin, developer, internal]
+buildFilter: filters/publish.ditaval
+theme: theme/site.css</codeblock>
+      <p>Quote the release. Unquoted, YAML reads <codeph>0.1</codeph> as a number, and the config is
+        rejected.</p>
+      <p>Every path must stay inside the docs root: no leading <codeph>/</codeph> and no
+        <codeph>..</codeph>. Mistakes are reported as <codeph>invalid-config</codeph>.</p>
+    </example>
+  </refbody>
+</reference>

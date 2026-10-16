@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE task PUBLIC "-//OASIS//DTD DITA Task//EN" "task.dtd">
+<task id="ci" audience="author">
+  <title>Validate every pull request</title>
+  <shortdesc>Run <cmdname>opend validate</cmdname> in GitHub Actions so problems show inline on the pull
+    request, before anything is merged or published.</shortdesc>
+  <taskbody>
+    <context>
+      <p>The starter template ships <filepath>.github/workflows/validate.yml</filepath>, which runs the
+        published CLI with <codeph>npx @opend/cli@0</codeph>. Until the CLI is published to npm, build it from
+        a checkout of the OpenD repository instead, as this workflow does.</p>
+    </context>
+    <steps>
+      <step>
+        <cmd>Add a workflow to the docs repository.</cmd>
+        <stepxmp>
+          <codeblock>name: Validate docs
+on:
+  pull_request:
+  push:
+    branches: [main, 'v*']
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: docs
+      - uses: actions/checkout@v4
+        with:
+          repository: desktopmachineshop/opend
+          path: opend
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: opend/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: pnpm install --frozen-lockfile &amp;&amp; pnpm build
+        working-directory: opend
+      - run: node opend/packages/cli/dist/bin.js validate docs --format github</codeblock>
+        </stepxmp>
+      </step>
+      <step>
+        <cmd>Optional: add <option>--strict</option> to fail on warnings too.</cmd>
+        <info>
+          <p>This site's own CI validates <filepath>site/</filepath> with <option>--strict</option>.</p>
+        </info>
+      </step>
+    </steps>
+    <result>
+      <p>With <option>--format github</option>, each problem becomes a workflow annotation on the line it
+        is about, titled with its code.</p>
+      <p product="core hosted">On the hosted platform the worker runs the same validation on every push,
+        and a failing push never goes live. CI tells authors earlier.</p>
+    </result>
+  </taskbody>
+</task>

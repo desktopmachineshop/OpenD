@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="topics-and-maps" audience="author">
+  <title>Topics, maps and bookmaps</title>
+  <shortdesc>Each page is a topic in its own file. A map arranges topics into the site navigation and
+    defines keys; a bookmap arranges them into a PDF publication.</shortdesc>
+  <conbody>
+    <section id="topics">
+      <title>Topics</title>
+      <p>A topic file holds one topic: <codeph>topic</codeph>, <codeph>concept</codeph>,
+        <codeph>task</codeph>, <codeph>reference</codeph>, <codeph>glossentry</codeph> or
+        <codeph>troubleshooting</codeph>. Its root element needs an <codeph>id</codeph>, and every
+        <codeph>id</codeph> inside one topic must be unique.</p>
+      <codeblock><![CDATA[<task id="install-cli">
+  <title>Install the CLI from a checkout</title>
+  <shortdesc>Build the opend command and check that it runs.</shortdesc>
+  <taskbody>
+    <steps>
+      <step><cmd>Clone the repository.</cmd></step>
+    </steps>
+  </taskbody>
+</task>]]></codeblock>
+      <p>The page URL is the file's path without its extension, so <filepath>topics/start/install-cli.dita</filepath>
+        is served at <filepath>/topics/start/install-cli.html</filepath>. Keep file names stable: links
+        from outside the site depend on them.</p>
+      <p>A topic may contain nested topics, which render as sections of the same page and can be linked
+        with <codeph>file.dita#nested-id</codeph>. A <codeph>&lt;dita&gt;</codeph> wrapper may hold several
+        topics; the first is the page.</p>
+    </section>
+
+    <section id="maps">
+      <title>Maps</title>
+      <p>The root map named by <parmname>map</parmname> in <filepath>opend.config.yaml</filepath> defines
+        the navigation, in document order:</p>
+      <codeblock><![CDATA[<map>
+  <title>OpenD Documentation</title>
+  <mapref href="keys.ditamap"/>
+  <topicref href="../topics/overview.dita"/>
+  <topichead navtitle="Get started">
+    <topicref href="../topics/start/install-cli.dita"/>
+  </topichead>
+  <topichead navtitle="Embedded help" product="embed">
+    <topicref href="../topics/help/help-overview.dita"/>
+  </topichead>
+</map>]]></codeblock>
+      <ul>
+        <li><codeph>topicref</codeph> adds a topic. Without a <codeph>navtitle</codeph>, the navigation shows
+          the topic's title as the reader sees it, so a conditional phrase in a title stays filtered.</li>
+        <li><codeph>topichead</codeph> adds a heading with a <codeph>navtitle</codeph> and no page. A heading
+          with nothing visible under it is left out of that reader's navigation.</li>
+        <li><codeph>topicgroup</codeph>, <codeph>frontmatter</codeph> and <codeph>backmatter</codeph> group
+          entries without adding a level.</li>
+        <li><codeph>mapref</codeph> (or a <codeph>topicref</codeph> to a <filepath>.ditamap</filepath>)
+          includes a submap at that point. Its entries and keys are merged in; reference cycles are
+          errors.</li>
+        <li><codeph>toc="no"</codeph> publishes a topic without listing it in the navigation.</li>
+        <li><codeph>keydef</codeph> and <codeph>processing-role="resource-only"</codeph> define keys without
+          adding navigation. See <xref href="keys.dita"/>.</li>
+      </ul>
+      <p>A topic is published to a reader only when a navigation entry they can see points at it and the
+        topic's own root passes their filter. Filtering attributes on a map entry apply to everything under
+        it.</p>
+    </section>
+
+    <section id="bookmaps">
+      <title>Bookmaps</title>
+      <p>A bookmap listed under <parmname>publications</parmname> becomes a PDF. Its
+        <codeph>booktitle/mainbooktitle</codeph> is the publication title, and <codeph>chapter</codeph>,
+        <codeph>part</codeph> and <codeph>appendix</codeph> entries work like <codeph>topicref</codeph>. A
+        bookmap resolves keys in its own keyspace, so pull shared keys in with a
+        <codeph>mapref</codeph>. See <xref href="../pdf/bookmaps.dita"/>.</p>
+    </section>
+  </conbody>
+</concept>

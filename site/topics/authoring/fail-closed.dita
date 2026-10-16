@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="fail-closed" audience="author">
+  <title>Fail-closed filtering</title>
+  <shortdesc>When <keyword keyref="product-name"/> is unsure whether a reader may see something, it hides
+    it. A mistake in a condition can hide content, but never leak it.</shortdesc>
+  <conbody>
+    <p>For readers, each of these excludes the content it is on:</p>
+    <ul>
+      <li>a <codeph>product</codeph> or <codeph>feature</codeph> value the reader's organization does not
+        hold;</li>
+      <li>a value that is not declared in <filepath>opend.config.yaml</filepath>, such as a typo like
+        <codeph>product="embd"</codeph>, because no reader can hold it;</li>
+      <li>a <codeph>release</codeph> token that does not parse, such as <codeph>release="next"</codeph>;</li>
+      <li>any <codeph>release</codeph> condition, when the reader's own version does not parse.</li>
+    </ul>
+    <p>Because a typo silently hides content, validation reports undeclared values
+      (<codeph>undeclared-value</codeph>) and bad ranges (<codeph>invalid-release</codeph>) as errors, and the
+      hosted build refuses to publish them. You find out in the previewer or in CI, before readers do.</p>
+    <section id="lookups">
+      <title>Lookups fall back, they don't reveal</title>
+      <p>The same rule holds wherever content is looked up rather than browsed:</p>
+      <ul>
+        <li>A link to a topic the reader cannot see renders as its authored text, without the target's
+          title.</li>
+        <li>A context-sensitive help key whose topic is hidden falls back to a parent key or the app's
+          default, never to the hidden topic.</li>
+        <li>An image is served only when a topic visible to that reader references it.</li>
+        <li>A PDF publication with nothing visible returns the same 404 as one that does not exist.</li>
+      </ul>
+      <p conkeyref="reuse/same-404"/>
+    </section>
+    <section id="audience-and-friends">
+      <title>Build attributes are different</title>
+      <p><codeph>audience</codeph>, <codeph>platform</codeph>, <codeph>otherprops</codeph>,
+        <codeph>props</codeph> and <codeph>deliveryTarget</codeph> follow DITAVAL rules at build time instead:
+        a value with no rule is included. Declare them anyway; validation still reports undeclared ones.</p>
+    </section>
+  </conbody>
+</concept>

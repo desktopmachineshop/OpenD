@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE reference PUBLIC "-//OASIS//DTD DITA Reference//EN" "reference.dtd">
+<reference id="env-vars" product="core" audience="admin">
+  <title>Environment variable reference</title>
+  <shortdesc>Every setting of <cmdname><keyword keyref="server-cli"/></cmdname>, with its default and the
+    rules it is checked against at start-up.</shortdesc>
+  <refbody>
+    <section id="rules">
+      <title>How settings are read</title>
+      <ul>
+        <li>All settings are environment variables; nothing is baked into the image. Give the web service and
+          the worker the same values.</li>
+        <li>Every command (<codeph>serve</codeph>, <codeph>worker</codeph>, <codeph>migrate</codeph>,
+          <codeph>seed</codeph>) checks the whole set at start-up and refuses to start with a list of every
+          problem.</li>
+        <li>An empty value counts as unset. So does an unresolved reference variable on Railway.</li>
+        <li>Flags are on when set to <codeph>1</codeph> or <codeph>true</codeph>, and off otherwise.</li>
+      </ul>
+      <note conkeyref="reuse/restart"/>
+    </section>
+
+    <section id="core">
+      <title>Core</title>
+      <properties relcolwidth="3* 2* 6*">
+        <prophead><proptypehd>Variable</proptypehd><propvaluehd>Default</propvaluehd><propdeschd>Meaning and rules</propdeschd></prophead>
+        <property id="DATABASE_URL"><proptype><codeph>DATABASE_URL</codeph></proptype><propvalue>required</propvalue><propdesc>Postgres connection string, such as <codeph>postgres://opend:secret@db:5432/opend</codeph>.</propdesc></property>
+        <property id="PUBLIC_URL"><proptype><codeph>PUBLIC_URL</codeph></proptype><propvalue><codeph>http://localhost:3000</codeph></propvalue><propdesc>Where readers reach the site. Must be a URL; a trailing slash is removed. It is the OIDC callback base, the audience of embed tokens, and the base of absolute links in PDFs and the JSON API. When it starts with <codeph>https://</codeph>, cookies are marked <codeph>Secure</codeph>.</propdesc></property>
+        <property id="PORT"><proptype><codeph>PORT</codeph></proptype><propvalue><codeph>3000</codeph></propvalue><propdesc>Port to listen on: an integer from 0 to 65535.</propdesc></property>
+        <property id="HOST"><proptype><codeph>HOST</codeph></proptype><propvalue><codeph>0.0.0.0</codeph></propvalue><propdesc>Interface to listen on.</propdesc></property>
+        <property id="SESSION_SECRET"><proptype><codeph>SESSION_SECRET</codeph></proptype><propvalue>required</propvalue><propdesc>Signs session cookies. At least 32 characters. Changing it signs every reader out.</propdesc></property>
+        <property id="NODE_ENV"><proptype><codeph>NODE_ENV</codeph></proptype><propvalue><codeph>development</codeph> (the image sets <codeph>production</codeph>)</propvalue><propdesc>With <codeph>production</codeph>, the server refuses to start with <codeph>OPEND_DEV_LOGIN</codeph>, and sign-in refuses an <codeph>http://</codeph> OIDC issuer.</propdesc></property>
+        <property id="OPEND_SITE_REPO"><proptype><codeph>OPEND_SITE_REPO</codeph></proptype><propvalue>none</propvalue><propdesc>The repository the site serves, as <codeph>owner/name</codeph>, when more than one is registered. Without it, the site works only while exactly one repository is registered.</propdesc></property>
+        <property id="OPEND_ADMIN_TOKEN"><proptype><codeph>OPEND_ADMIN_TOKEN</codeph></proptype><propvalue>none</propvalue><propdesc>Bearer token for the admin API. At least 24 characters. Without it the admin API does not exist.</propdesc></property>
+      </properties>
+    </section>
+
+    <section id="github">
+      <title>GitHub</title>
+      <properties relcolwidth="3* 2* 6*">
+        <prophead><proptypehd>Variable</proptypehd><propvaluehd>Default</propvaluehd><propdeschd>Meaning and rules</propdeschd></prophead>
+        <property id="GITHUB_WEBHOOK_SECRET"><proptype><codeph>GITHUB_WEBHOOK_SECRET</codeph></proptype><propvalue>none</propvalue><propdesc>The secret set on the repository's or GitHub App's webhook. Without it, <filepath>/webhooks/github</filepath> answers 503.</propdesc></property>
+        <property id="GITHUB_APP_ID"><proptype><codeph>GITHUB_APP_ID</codeph></proptype><propvalue>none</propvalue><propdesc>The GitHub App's id, for private repositories and commit statuses. Set together with <codeph>GITHUB_APP_PRIVATE_KEY</codeph>.</propdesc></property>
+        <property id="GITHUB_APP_PRIVATE_KEY"><proptype><codeph>GITHUB_APP_PRIVATE_KEY</codeph></proptype><propvalue>none</propvalue><propdesc>The App's private key, PEM, PKCS#1 as GitHub issues it or PKCS#8. Literal <codeph>\n</codeph> sequences are turned into line breaks, so the key fits on one line. Set together with <codeph>GITHUB_APP_ID</codeph>.</propdesc></property>
+        <property id="GITHUB_API_URL"><proptype><codeph>GITHUB_API_URL</codeph></proptype><propvalue><codeph>https://api.github.com</codeph></propvalue><propdesc>API base URL, for GitHub Enterprise Server, such as <codeph>https://github.example.com/api/v3</codeph>. Must be a URL.</propdesc></property>
+      </properties>
+    </section>
+
+    <section id="oidc">
+      <title>Reader sign-in</title>
+      <properties relcolwidth="3* 2* 6*">
+        <prophead><proptypehd>Variable</proptypehd><propvaluehd>Default</propvaluehd><propdeschd>Meaning and rules</propdeschd></prophead>
+        <property id="OIDC_ISSUER"><proptype><codeph>OIDC_ISSUER</codeph></proptype><propvalue>none</propvalue><propdesc>The OpenID Connect issuer URL. Requires <codeph>OIDC_CLIENT_ID</codeph> and <codeph>OIDC_CLIENT_SECRET</codeph>.</propdesc></property>
+        <property id="OIDC_CLIENT_ID"><proptype><codeph>OIDC_CLIENT_ID</codeph></proptype><propvalue>none</propvalue><propdesc>The client id registered with the provider.</propdesc></property>
+        <property id="OIDC_CLIENT_SECRET"><proptype><codeph>OIDC_CLIENT_SECRET</codeph></proptype><propvalue>none</propvalue><propdesc>The client secret.</propdesc></property>
+        <property id="OIDC_SCOPES"><proptype><codeph>OIDC_SCOPES</codeph></proptype><propvalue><codeph>openid email profile</codeph></propvalue><propdesc>Scopes to request, space-separated. Keep <codeph>email</codeph>: readers are matched by verified email.</propdesc></property>
+        <property id="OPEND_DEV_LOGIN"><proptype><codeph>OPEND_DEV_LOGIN</codeph></proptype><propvalue>off</propvalue><propdesc>Flag. Adds <filepath>/auth/dev</filepath>, where anyone can sign in as any registered reader, for evaluation without an identity provider. Refused when <codeph>NODE_ENV=production</codeph>.</propdesc></property>
+      </properties>
+    </section>
+
+    <section id="blobs">
+      <title>Blob storage</title>
+      <properties relcolwidth="3* 2* 6*">
+        <prophead><proptypehd>Variable</proptypehd><propvaluehd>Default</propvaluehd><propdeschd>Meaning and rules</propdeschd></prophead>
+        <property id="BLOB_DIR"><proptype><codeph>BLOB_DIR</codeph></proptype><propvalue><codeph>./data/blobs</codeph> (the image sets <codeph>/data/blobs</codeph>)</propvalue><propdesc>Folder for images, themes and PDFs when no bucket is configured. Web and worker must share it.</propdesc></property>
+        <property id="S3_BUCKET"><proptype><codeph>S3_BUCKET</codeph></proptype><propvalue>none</propvalue><propdesc>Bucket name. Setting it switches to S3-compatible storage, and then <codeph>S3_ENDPOINT</codeph>, <codeph>S3_ACCESS_KEY_ID</codeph> and <codeph>S3_SECRET_ACCESS_KEY</codeph> are required too: all four or none.</propdesc></property>
+        <property id="S3_ENDPOINT"><proptype><codeph>S3_ENDPOINT</codeph></proptype><propvalue>none</propvalue><propdesc>Service URL, such as <codeph>https://s3.us-east-1.amazonaws.com</codeph>. Must be a URL.</propdesc></property>
+        <property id="S3_ACCESS_KEY_ID"><proptype><codeph>S3_ACCESS_KEY_ID</codeph></proptype><propvalue>none</propvalue><propdesc>Access key id.</propdesc></property>
+        <property id="S3_SECRET_ACCESS_KEY"><proptype><codeph>S3_SECRET_ACCESS_KEY</codeph></proptype><propvalue>none</propvalue><propdesc>Secret access key.</propdesc></property>
+        <property id="S3_REGION"><proptype><codeph>S3_REGION</codeph></proptype><propvalue><codeph>auto</codeph></propvalue><propdesc>Region. Most S3-compatible services accept <codeph>auto</codeph>.</propdesc></property>
+        <property id="S3_FORCE_PATH_STYLE"><proptype><codeph>S3_FORCE_PATH_STYLE</codeph></proptype><propvalue>off</propvalue><propdesc>Flag. Address the bucket as <codeph>/&lt;bucket&gt;/&lt;key&gt;</codeph> instead of <codeph>&lt;bucket&gt;.&lt;host&gt;</codeph>, for MinIO and similar services.</propdesc></property>
+        <property id="S3_PREFIX"><proptype><codeph>S3_PREFIX</codeph></proptype><propvalue>none</propvalue><propdesc>Prepended to every key, such as <codeph>opend/</codeph>, to share a bucket.</propdesc></property>
+      </properties>
+    </section>
+
+    <section id="embed">
+      <title>Embedded help</title>
+      <properties relcolwidth="3* 2* 6*">
+        <prophead><proptypehd>Variable</proptypehd><propvaluehd>Default</propvaluehd><propdeschd>Meaning and rules</propdeschd></prophead>
+        <property id="OPEND_EMBED_SECRET"><proptype><codeph>OPEND_EMBED_SECRET</codeph></proptype><propvalue>none</propvalue><propdesc>Shared secret host apps sign embed tokens with. At least 32 characters. Set together with <codeph>OPEND_EMBED_ORIGINS</codeph>; without both, embedding is off.</propdesc></property>
+        <property id="OPEND_EMBED_ORIGINS"><proptype><codeph>OPEND_EMBED_ORIGINS</codeph></proptype><propvalue>none</propvalue><propdesc>Comma-separated origins allowed to frame the help panel and call the JSON API, such as <codeph>https://console.example.com,http://localhost:5173</codeph>. Each must be <codeph>http</codeph> or <codeph>https</codeph> with no path or trailing slash.</propdesc></property>
+      </properties>
+    </section>
+
+    <section id="pdf">
+      <title>PDF printing</title>
+      <p>Read by the PDF renderer when it first starts Chromium.</p>
+      <properties relcolwidth="3* 2* 6*">
+        <prophead><proptypehd>Variable</proptypehd><propvaluehd>Default</propvaluehd><propdeschd>Meaning and rules</propdeschd></prophead>
+        <property id="OPEND_CHROMIUM_PATH"><proptype><codeph>OPEND_CHROMIUM_PATH</codeph></proptype><propvalue>the browser Playwright installed (the image sets <codeph>/usr/bin/chromium</codeph>)</propvalue><propdesc>Path of the Chromium binary that prints PDFs.</propdesc></property>
+        <property id="OPEND_CHROMIUM_SANDBOX"><proptype><codeph>OPEND_CHROMIUM_SANDBOX</codeph></proptype><propvalue>off</propvalue><propdesc>Set to exactly <codeph>1</codeph> to run Chromium with its own sandbox, where the runtime allows the namespaces it needs.</propdesc></property>
+      </properties>
+    </section>
+
+    <section id="compose-only">
+      <title>Docker Compose only</title>
+      <p><codeph>POSTGRES_PASSWORD</codeph> (default <codeph>opend</codeph>) and <codeph>OPEND_PORT</codeph>
+        (default <codeph>3000</codeph>) are read by <filepath>deploy/docker-compose.yml</filepath>, not by the
+        server.</p>
+    </section>
+  </refbody>
+</reference>

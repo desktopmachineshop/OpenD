@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="help-overview" product="embed" audience="developer author">
+  <title>Context-sensitive help in your apps</title>
+  <shortdesc>Show <keyword keyref="product-name"/> help inside your own web app, in a side panel that opens
+    on the help for the current screen and is filtered for the signed-in user.</shortdesc>
+  <conbody>
+    <p>The help is served live from the docs repository, through the same reader filter as the docs site.
+      A user on release 0.1 with the embed product sees exactly the help their organization is entitled to,
+      no more.</p>
+    <section id="pieces">
+      <title>How the pieces fit</title>
+      <ol>
+        <li><b>Authors tag topics</b> with context keys using DITA's <codeph>resourceid</codeph>:
+          <codeph>&lt;resourceid appname="opend-console" appid="tenants.detail"/&gt;</codeph>. See
+          <xref href="resourceid.dita"/>.</li>
+        <li><b>Authors map routes to keys</b> in <filepath>help-contexts.yaml</filepath>, so an app can just
+          send its current path. See <xref href="help-contexts.dita"/>.</li>
+        <li><b>The app loads the widget</b>, tells it the current route, and opens the panel from a help
+          button. See <xref href="widget.dita"/>.</li>
+        <li><b>The app's backend signs a short-lived token</b> for its signed-in user, which the panel
+          exchanges for a session. See <xref href="tokens.dita"/>.</li>
+        <li><b>OpenD resolves the context</b> for that reader: the key, then its parents, then the app's
+          default, never a topic the reader cannot see. See <xref href="fallback.dita"/>.</li>
+      </ol>
+      <p>Apps that render help in their own UI can call the JSON API instead of showing the panel: see
+        <xref href="json-api.dita"/>.</p>
+    </section>
+    <section id="in-the-panel">
+      <title>What the panel shows</title>
+      <ul>
+        <li>The topic, compact, with links that stay in the panel.</li>
+        <li>"In this section": the topic's visible children and siblings in the navigation.</li>
+        <li>Search over the topics this reader can see, and nothing else.</li>
+        <li>"Open in full docs", which opens the page on the docs site in a new tab.</li>
+      </ul>
+      <p>The project theme applies in the panel too.</p>
+    </section>
+    <section id="turning-it-on">
+      <title>Turning it on</title>
+      <p product="core">Embedding is off until you set <codeph>OPEND_EMBED_SECRET</codeph> and
+        <codeph>OPEND_EMBED_ORIGINS</codeph> on <ph keyref="your-server"/>. Until then nothing under
+        <filepath>/embed</filepath> or <filepath>/api/v1/help</filepath> exists.</p>
+      <p product="hosted">Ask the operator of your docs site to turn on embedding for your app's origins and
+        to share the embed secret with your backend team.</p>
+      <p>To check context help before publishing, use the previewer's
+        <xref href="../start/help-lab.dita">help lab</xref>.</p>
+    </section>
+  </conbody>
+</concept>
