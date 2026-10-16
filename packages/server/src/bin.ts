@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { readFile } from 'node:fs/promises';
 import { Command } from 'commander';
-import { FsBlobStore, createPool, migrate } from '@opend/store';
+import { createBlobStore, createPool, migrate } from '@opend/store';
 import { GitHubApp, jsonLog, startWorker } from '@opend/worker';
 import { createApp } from './app.js';
 import { loadConfig } from './config.js';
@@ -28,7 +28,7 @@ program
   .action(async () => {
     const config = loadConfig();
     const pool = createPool(config.databaseUrl);
-    const { app } = await createApp(config, { pool, blobs: new FsBlobStore(config.blobDir) });
+    const { app } = await createApp(config, { pool, blobs: createBlobStore(config.blobs) });
     await app.listen({ port: config.port, host: config.host });
     jsonLog({
       level: 'info',
@@ -38,6 +38,7 @@ program
       devLogin: config.devLogin,
       webhook: Boolean(config.webhookSecret),
       admin: Boolean(config.adminToken),
+      blobs: config.blobs.kind,
     });
     const shutdown = async () => {
       await app.close();
@@ -57,11 +58,16 @@ program
     const github = config.github ? new GitHubApp(config.github) : null;
     const worker = startWorker({
       pool,
-      blobs: new FsBlobStore(config.blobDir),
+      blobs: createBlobStore(config.blobs),
       github,
       databaseUrl: config.databaseUrl,
     });
-    jsonLog({ level: 'info', msg: 'worker started', github: Boolean(github) });
+    jsonLog({
+      level: 'info',
+      msg: 'worker started',
+      github: Boolean(github),
+      blobs: config.blobs.kind,
+    });
     const shutdown = async () => {
       await worker.stop();
       await pool.end();
