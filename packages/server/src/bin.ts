@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { readFile } from 'node:fs/promises';
 import { Command } from 'commander';
+import { editorCommand } from '@opend/editor';
 import { createBlobStore, createPool, migrate } from '@opend/store';
 import { GitHubApp, jsonLog, startPoller, startWorker } from '@opend/worker';
 import { createApp } from './app.js';
@@ -106,6 +107,9 @@ program
   .action(async (options: ReconcileCommandOptions) => {
     await runReconcileCommand(loadConfig(), options);
   });
+
+// The web editor runs as its own service on its own host; see ADR 0007.
+program.addCommand(editorCommand());
 
 program.parseAsync(process.argv).catch((err: unknown) => {
   process.stderr.write(`opend-server: ${err instanceof Error ? err.message : String(err)}\n`);

@@ -5,6 +5,7 @@ export * from './jobs.js';
 export * from './releases.js';
 export * from './readers.js';
 export * from './audit.js';
+export * from './editor.js';
 export * from './blobs.js';
 export * from './s3.js';
 export * from './blob-config.js';
