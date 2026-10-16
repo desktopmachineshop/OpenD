@@ -8,7 +8,18 @@ import {
   TOPIC_TYPES,
   parseXml,
 } from '@opend/dita';
-import { SPECIAL_ELEMENTS, TAGS, renderNav, renderPage, renderTopic } from '../src/index.js';
+import {
+  MAX_SEARCH_QUERY,
+  SPECIAL_ELEMENTS,
+  TAGS,
+  renderIndex,
+  renderNav,
+  renderNotFound,
+  renderPage,
+  renderSearch,
+  renderTopic,
+  siteSearchQuery,
+} from '../src/index.js';
 
 function body(xml: string): ElementNode {
   const { root, diagnostics } = parseXml(xml, 't.dita');
@@ -189,5 +200,66 @@ describe('renderNav and renderPage', () => {
     expect(renderPage(view, 'g')).toBeNull();
     expect(renderPage(view, 'missing')).toBeNull();
     expect(renderPage(view, 'a')).toContain('<title>Alpha · Docs &lt;&amp;&gt;</title>');
+  });
+});
+
+describe('site search', () => {
+  const a = topic('a', '<topic id="a"><title>Alpha</title></topic>');
+  const view = viewRelease(release([a]), [widgetV1]);
+  const search = { action: '/search' };
+  const XSS = '"><script>alert(1)</script><img src=x onerror=alert(2)>';
+
+  it('puts a labelled GET search form in the header of every page, when asked', () => {
+    for (const html of [
+      renderPage(view, 'a', { search })!,
+      renderIndex(view, { search }),
+      renderNotFound(view, { search }),
+    ]) {
+      const header = /<header class="site-header">.*<\/header>/.exec(html)![0];
+      expect(header).toContain(
+        '<form class="site-search" role="search" method="get" action="/search">',
+      );
+      expect(header).toContain('<label class="opend-visually-hidden" for="opend-search-q">');
+      expect(header).toContain('id="opend-search-q" name="q" value=""');
+      expect(header).toContain(`maxlength="${MAX_SEARCH_QUERY}"`);
+    }
+    expect(renderPage(view, 'a')).not.toContain('class="site-search"');
+    expect(renderPage(view, 'a', { search, base: '/x/' })).toContain('action="/search"');
+  });
+
+  it('lists hits with links and snippets, and echoes the query escaped', () => {
+    const html = renderSearch(
+      view,
+      XSS,
+      [{ topicId: 'a', title: 'Alpha <b>', snippet: `…${XSS}…`, score: 1 }],
+      { search, base: '/docs/' },
+    );
+    expect(html).not.toMatch(/<script|<img|<b>/);
+    expect(html).toContain('1 result for <q>&quot;&gt;&lt;script&gt;');
+    expect(html).toContain('<a href="/docs/a.html">Alpha &lt;b&gt;</a>');
+    expect(html).toContain('<p class="search-snippet">…&quot;&gt;&lt;script&gt;');
+    expect(html).toContain('value="&quot;&gt;&lt;script&gt;alert(1)');
+    expect(html).toContain('<title>Search: &quot;&gt;&lt;script&gt;');
+  });
+
+  it('says when nothing matched, when nothing was asked, and when results are capped', () => {
+    expect(renderSearch(view, 'zebra', [], { search })).toContain('No topics match <q>zebra</q>.');
+    const empty = renderSearch(view, '', [], { search });
+    expect(empty).toContain('Enter one or more words');
+    expect(empty).toContain('<title>Search · Docs');
+    const hit = { topicId: 'a', title: 'Alpha', snippet: '', score: 1 };
+    expect(renderSearch(view, 'a', [hit, hit], { limit: 2 })).toContain('Top 2 results for');
+    expect(renderSearch(view, 'a', [hit, hit], { limit: 3 })).toContain('>2 results for');
+    expect(renderSearch(view, 'a', [hit])).not.toContain('class="search-snippet"');
+  });
+
+  it('takes the first q, trimmed and cut to 200 characters', () => {
+    expect(siteSearchQuery('  wizard  ')).toBe('wizard');
+    expect(siteSearchQuery(['one', 'two'])).toBe('one');
+    expect(siteSearchQuery(undefined)).toBe('');
+    expect(siteSearchQuery({ q: 1 })).toBe('');
+    expect(siteSearchQuery('x'.repeat(500))).toHaveLength(MAX_SEARCH_QUERY);
+    // Cut by character, never through a surrogate pair.
+    expect(siteSearchQuery('😀'.repeat(300))).toBe('😀'.repeat(MAX_SEARCH_QUERY));
   });
 });
