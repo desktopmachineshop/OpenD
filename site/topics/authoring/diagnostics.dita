@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE reference PUBLIC "-//OASIS//DTD DITA Reference//EN" "reference.dtd">
+<reference id="diagnostics" audience="author admin">
+  <title>Validation diagnostics</title>
+  <shortdesc>Every problem code <cmdname>opend validate</cmdname>, the previewer and the hosted build
+    report, what it means and how to fix it.</shortdesc>
+  <refbody>
+    <section id="reading">
+      <title>Reading a diagnostic</title>
+      <codeblock>topics/install.dita:14:9: error [broken-link] link target not found: setup.dita</codeblock>
+      <p>That is the file, line and column, the severity, the code and a message. An <b>error</b> fails
+        validation and stops a hosted build from publishing. A <b>warning</b> does not, unless you validate with
+        <option>--strict</option>. Codes are stable, so tools can filter on them.</p>
+    </section>
+
+    <section id="project">
+      <title>Project files</title>
+      <simpletable relcolwidth="3* 1* 4* 4*">
+        <sthead><stentry>Code</stentry><stentry>Severity</stentry><stentry>Meaning</stentry><stentry>Fix</stentry></sthead>
+        <strow id="missing-config"><stentry><codeph>missing-config</codeph></stentry><stentry>error</stentry><stentry><filepath>opend.config.yaml</filepath> is not in the folder you validated.</stentry><stentry>Pass the docs root, or create the file.</stentry></strow>
+        <strow id="invalid-config"><stentry><codeph>invalid-config</codeph></stentry><stentry>error</stentry><stentry>The config is not valid YAML, or a field breaks its rules. The hosted build also reports it when <parmname>release</parmname> is not a version number.</stentry><stentry>Follow the message, which names the field. See <xref href="config-reference.dita"/>.</stentry></strow>
+        <strow id="missing-ditaval"><stentry><codeph>missing-ditaval</codeph></stentry><stentry>error</stentry><stentry>The <parmname>buildFilter</parmname> file does not exist.</stentry><stentry>Fix the path, which is relative to the docs root.</stentry></strow>
+        <strow id="invalid-ditaval"><stentry><codeph>invalid-ditaval</codeph></stentry><stentry>error</stentry><stentry>The DITAVAL root is not <codeph>&lt;val&gt;</codeph>, or a <codeph>prop</codeph> has an unknown <codeph>action</codeph>.</stentry><stentry>Use <codeph>include</codeph>, <codeph>exclude</codeph>, <codeph>flag</codeph> or <codeph>passthrough</codeph>.</stentry></strow>
+        <strow id="missing-theme"><stentry><codeph>missing-theme</codeph></stentry><stentry>error</stentry><stentry>The <parmname>theme</parmname> file does not exist.</stentry><stentry>Fix the path.</stentry></strow>
+        <strow id="duplicate-publication"><stentry><codeph>duplicate-publication</codeph></stentry><stentry>error</stentry><stentry>Two publications have the same file name, so only one could be downloaded at <filepath>/pdf/&lt;name&gt;.pdf</filepath>.</stentry><stentry>Rename one bookmap.</stentry></strow>
+        <strow id="invalid-preview-contexts"><stentry><codeph>invalid-preview-contexts</codeph></stentry><stentry>error</stentry><stentry><filepath>preview-contexts.yaml</filepath> is not valid YAML, or a reader is malformed, for example without a <parmname>version</parmname>. Reported by the CLI only.</stentry><stentry>See <xref href="preview-contexts.dita"/>.</stentry></strow>
+        <strow id="xml-syntax"><stentry><codeph>xml-syntax</codeph></stentry><stentry>error</stentry><stentry>A topic, map or DITAVAL file is not well-formed XML.</stentry><stentry>Look at the line and column: an unclosed tag, a stray <codeph>&amp;</codeph> or <codeph>&lt;</codeph> (write <codeph>&amp;amp;</codeph> and <codeph>&amp;lt;</codeph>, or use CDATA), or an unknown entity.</stentry></strow>
+      </simpletable>
+    </section>
+
+    <section id="maps">
+      <title>Maps and topics</title>
+      <simpletable relcolwidth="3* 1* 4* 4*">
+        <sthead><stentry>Code</stentry><stentry>Severity</stentry><stentry>Meaning</stentry><stentry>Fix</stentry></sthead>
+        <strow id="missing-map"><stentry><codeph>missing-map</codeph></stentry><stentry>error</stentry><stentry>The root map, or a map a <codeph>mapref</codeph> points at, does not exist, or a <codeph>mapref</codeph> has no usable <codeph>href</codeph>.</stentry><stentry>Fix the path.</stentry></strow>
+        <strow id="map-cycle"><stentry><codeph>map-cycle</codeph></stentry><stentry>error</stentry><stentry>Maps reference each other in a loop. The message shows the chain.</stentry><stentry>Remove one <codeph>mapref</codeph>.</stentry></strow>
+        <strow id="missing-topic"><stentry><codeph>missing-topic</codeph></stentry><stentry>error</stentry><stentry>A <codeph>topicref</codeph> points at a file that does not exist, or that is not a <filepath>.dita</filepath> or <filepath>.xml</filepath> file.</stentry><stentry>Fix the <codeph>href</codeph>.</stentry></strow>
+        <strow id="unsupported-topicref"><stentry><codeph>unsupported-topicref</codeph></stentry><stentry>warning</stentry><stentry>A <codeph>topicref</codeph> points at an external URL, or has a <codeph>format</codeph> other than <codeph>dita</codeph>. It is skipped.</stentry><stentry>Link to external pages from a topic with <codeph>xref</codeph> instead.</stentry></strow>
+        <strow id="empty-topicref"><stentry><codeph>empty-topicref</codeph></stentry><stentry>warning</stentry><stentry>A navigation entry has neither an <codeph>href</codeph> nor a <codeph>navtitle</codeph>, so it has nothing to show.</stentry><stentry>Add one, or use <codeph>topicgroup</codeph> to group without a heading.</stentry></strow>
+        <strow id="not-a-topic"><stentry><codeph>not-a-topic</codeph></stentry><stentry>error</stentry><stentry>A file a map references has no topic root element.</stentry><stentry>Make the root a topic type, or point the map elsewhere.</stentry></strow>
+        <strow id="missing-id"><stentry><codeph>missing-id</codeph></stentry><stentry>error</stentry><stentry>A topic's root element has no <codeph>id</codeph>.</stentry><stentry>Add one; references use it.</stentry></strow>
+        <strow id="duplicate-id"><stentry><codeph>duplicate-id</codeph></stentry><stentry>error</stentry><stentry>Two elements in one topic share an <codeph>id</codeph>.</stentry><stentry>Rename one, and update references to it.</stentry></strow>
+        <strow id="unsupported-element"><stentry><codeph>unsupported-element</codeph></stentry><stentry>warning</stentry><stentry>An element is outside the supported subset. It renders as a plain block.</stentry><stentry>Use a supported element: see <xref href="dita-subset.dita"/>.</stentry></strow>
+        <strow id="unreferenced-topic"><stentry><codeph>unreferenced-topic</codeph></stentry><stentry>warning</stentry><stentry>A topic file is in no map, and no published topic reuses content from it. It is usually forgotten.</stentry><stentry>Add it to a map, reuse a chunk from it, or delete it.</stentry></strow>
+      </simpletable>
+    </section>
+
+    <section id="conditions">
+      <title>Conditions</title>
+      <simpletable relcolwidth="3* 1* 4* 4*">
+        <sthead><stentry>Code</stentry><stentry>Severity</stentry><stentry>Meaning</stentry><stentry>Fix</stentry></sthead>
+        <strow id="undeclared-value"><stentry><codeph>undeclared-value</codeph></stentry><stentry>error</stentry><stentry>A filtering attribute has a value that is not declared in <filepath>opend.config.yaml</filepath>, or the attribute has no declared values at all. Readers never see that content.</stentry><stentry>Fix the typo, or declare the value under <parmname>attributes</parmname>.</stentry></strow>
+        <strow id="invalid-release"><stentry><codeph>invalid-release</codeph></stentry><stentry>error</stentry><stentry>A <codeph>release</codeph> token is not a version or range. Readers never see that content.</stentry><stentry>Use <codeph>1.4</codeph>, <codeph>2.0..</codeph>, <codeph>..1.9</codeph> or <codeph>1.2..1.9</codeph>. See <xref keyref="release-ranges"/>.</stentry></strow>
+      </simpletable>
+    </section>
+
+    <section id="references">
+      <title>Links, images, keys and reuse</title>
+      <simpletable relcolwidth="3* 1* 4* 4*">
+        <sthead><stentry>Code</stentry><stentry>Severity</stentry><stentry>Meaning</stentry><stentry>Fix</stentry></sthead>
+        <strow id="broken-link"><stentry><codeph>broken-link</codeph></stentry><stentry>error</stentry><stentry>A link points outside the docs root, or at a file, topic or element that does not exist.</stentry><stentry>Fix the <codeph>href</codeph>. Same-file links take <codeph>#topic-id/element-id</codeph>.</stentry></strow>
+        <strow id="link-to-unpublished"><stentry><codeph>link-to-unpublished</codeph></stentry><stentry>warning</stentry><stentry>A link points at a topic that is not in the site navigation, so every reader sees plain text.</stentry><stentry>Add the target to the site map (with <codeph>toc="no"</codeph> to keep it unlisted), or remove the link.</stentry></strow>
+        <strow id="missing-image"><stentry><codeph>missing-image</codeph></stentry><stentry>error</stentry><stentry>An image file, or the file a key for an image names, does not exist.</stentry><stentry>Fix the path, relative to the topic or map.</stentry></strow>
+        <strow id="unresolved-key"><stentry><codeph>unresolved-key</codeph></stentry><stentry>warning for <codeph>keyref</codeph>, error for <codeph>conkeyref</codeph></stentry><stentry>The key is not defined in the keyspace of the map publishing this topic. A <codeph>keyref</codeph> falls back to the element's own content; a <codeph>conkeyref</codeph> pulls nothing.</stentry><stentry>Define the key, or pull the shared key map into this map or bookmap with a <codeph>mapref</codeph>.</stentry></strow>
+        <strow id="missing-conref"><stentry><codeph>missing-conref</codeph></stentry><stentry>error</stentry><stentry>A <codeph>conref</codeph> is not of the form <codeph>file#topic/element</codeph>, its file, topic or element does not exist, or a <codeph>conkeyref</codeph> key has no local <codeph>href</codeph>.</stentry><stentry>Check the ids in the chunks file.</stentry></strow>
+        <strow id="conref-cycle"><stentry><codeph>conref-cycle</codeph></stentry><stentry>error</stentry><stentry>Content references pull each other in a loop. The message shows the chain.</stentry><stentry>Break the loop.</stentry></strow>
+        <strow id="conref-type-mismatch"><stentry><codeph>conref-type-mismatch</codeph></stentry><stentry>warning</stentry><stentry>An element pulls a chunk of a different element type, such as a <codeph>p</codeph> pulling a <codeph>note</codeph>. The chunk is used as it is.</stentry><stentry>Make the referencing element the same type as the chunk.</stentry></strow>
+        <strow id="unsupported-conref"><stentry><codeph>unsupported-conref</codeph></stentry><stentry>warning</stentry><stentry>The element uses <codeph>conrefend</codeph> or <codeph>conaction</codeph>. Only the start element is pulled.</stentry><stentry>Reference each element separately, or wrap the range in one element with an id.</stentry></strow>
+      </simpletable>
+    </section>
+
+    <section id="help">
+      <title>Context-sensitive help</title>
+      <simpletable relcolwidth="3* 1* 4* 4*">
+        <sthead><stentry>Code</stentry><stentry>Severity</stentry><stentry>Meaning</stentry><stentry>Fix</stentry></sthead>
+        <strow id="invalid-resourceid"><stentry><codeph>invalid-resourceid</codeph></stentry><stentry>error</stentry><stentry>A <codeph>resourceid</codeph> lacks <codeph>appname</codeph> (the host app) or <codeph>appid</codeph> (the context key).</stentry><stentry>Give both.</stentry></strow>
+        <strow id="duplicate-context"><stentry><codeph>duplicate-context</codeph></stentry><stentry>error</stentry><stentry>Two topics claim the same app and key without conditions, so the second could never be shown.</stentry><stentry>Add conditions to tell them apart, or use a different key.</stentry></strow>
+        <strow id="invalid-help-contexts"><stentry><codeph>invalid-help-contexts</codeph></stentry><stentry>error</stentry><stentry><filepath>help-contexts.yaml</filepath> is not valid YAML, does not match the expected shape, or has a bad route pattern.</stentry><stentry>See <xref href="../help/help-contexts.dita">the help-contexts.yaml reference</xref>.</stentry></strow>
+        <strow id="unknown-context"><stentry><codeph>unknown-context</codeph></stentry><stentry>error</stentry><stentry>A route or default in <filepath>help-contexts.yaml</filepath> maps to a key that no topic declares, nor any parent of it.</stentry><stentry>Add a <codeph>resourceid</codeph> for the key, or fix the key.</stentry></strow>
+      </simpletable>
+    </section>
+
+    <section id="where">
+      <title>Where diagnostics appear</title>
+      <ul>
+        <li>In the terminal, from <cmdname>opend validate</cmdname> and <cmdname>opend preview</cmdname>.</li>
+        <li>In the previewer's banner, and at <filepath>/_opend/diagnostics.json</filepath>.</li>
+        <li>As GitHub workflow annotations with <option>--format github</option>.</li>
+        <li product="core hosted">On the hosted platform: a failing push shows a failed
+          <codeph>opend/build</codeph> commit status with the first errors, and the full list is in the build's
+          record from the <xref href="../hosting/admin-api.dita#builds">admin API</xref>.</li>
+      </ul>
+    </section>
+  </refbody>
+</reference>

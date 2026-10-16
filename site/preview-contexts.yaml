@@ -1,0 +1,27 @@
+# Sample readers for `pnpm opend preview site --as <name>`. Each one is what the
+# entitlement service would produce for a signed-in reader of these docs.
+contexts:
+  # Writes docs that publish to a site someone else operates.
+  author:
+    products: [hosted]
+    version: '0.1'
+  # Operates an OpenD server and tries early-access features.
+  admin:
+    org: opend-team
+    products: [core, hosted]
+    features: [early-access]
+    version: '0.1'
+  # Builds an app that shows OpenD help in a side panel.
+  developer:
+    products: [core, embed]
+    version: '0.1'
+  # Runs everything themselves on the open-source distribution.
+  self-hoster:
+    org: acme
+    products: [core]
+    version: '0.1'
+  # Publishes to a docs site someone else operates, and embeds help in their app.
+  managed-customer:
+    org: globex
+    products: [hosted, embed]
+    version: '0.1'

@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE task PUBLIC "-//OASIS//DTD DITA Task//EN" "task.dtd">
+<task id="readers-orgs" product="core" audience="admin">
+  <title>Manage organizations, entitlements and readers</title>
+  <shortdesc>An organization's entitlements decide what its readers see. Load them from a seed file, or
+    change them through the admin API.</shortdesc>
+  <taskbody>
+    <context>
+      <ul>
+        <li>An <b>organization</b> has a slug and a name.</li>
+        <li>Its <b>entitlements</b> are the products and features it holds and the version it runs, exactly
+          the fields of a preview context. Without entitlements, its readers see "No access yet".</li>
+        <li>A <b>reader</b> belongs to one organization and is identified by email. Sign-in links the email to
+          the identity provider's account the first time.</li>
+      </ul>
+    </context>
+    <steps>
+      <step>
+        <cmd>Write a seed file.</cmd>
+        <stepxmp>
+          <codeblock>repos:
+  - fullName: acme/docs              # owner/name as GitHub sends it
+    sourceUrl: https://github.com/acme/docs.git
+    # installationId: 12345678       # GitHub App installation, for private repos
+    releaseRefs: [main, 'v*']        # branches and tags that publish (default [main])
+    docsPath: .                      # docs root inside the repository (default .)
+
+orgs:
+  - slug: acme
+    name: Acme Corp
+    entitlements:
+      products: [core]
+      features: []
+      version: '0.1'                 # picks the 0.x docs
+    readers: [ann@acme.example]
+  - slug: globex
+    name: Globex
+    entitlements:
+      products: [hosted, embed]
+      version: '0.1'
+    readers:
+      - email: gus@globex.example
+        name: Gus</codeblock>
+        </stepxmp>
+      </step>
+      <step>
+        <cmd>Load it with the <codeph>seed</codeph> command.</cmd>
+        <stepxmp>
+          <codeblock>opend-server seed /seed/seed.yaml
+# with Docker Compose:
+docker compose -f deploy/docker-compose.yml run --rm migrate seed /seed/seed.yaml</codeblock>
+        </stepxmp>
+        <info>
+          <p>Everything is upserted in one transaction, so the file can be applied again after each change.
+            Seeding never deletes anything.</p>
+        </info>
+      </step>
+      <step>
+        <cmd>For day-to-day changes, use the admin API.</cmd>
+        <stepxmp>
+          <codeblock>H="authorization: Bearer $OPEND_ADMIN_TOKEN"
+# Change what an organization may see
+curl -X PUT "$PUBLIC_URL/admin/api/orgs/acme/entitlements" -H "$H" -H 'content-type: application/json' \
+  -d '{"products":["core","embed"],"features":[],"version":"0.1"}'
+# Add a reader, or move one to another organization
+curl -X POST "$PUBLIC_URL/admin/api/readers" -H "$H" -H 'content-type: application/json' \
+  -d '{"orgSlug":"acme","email":"bo@acme.example","name":"Bo"}'</codeblock>
+        </stepxmp>
+      </step>
+    </steps>
+    <result>
+      <p>Entitlement changes take effect at once on every replica: the server is notified through Postgres and
+        clears its caches. Every change through the API or a seed is written to the audit log. Values are
+        tokens (letters, digits, <codeph>_</codeph>, <codeph>.</codeph>, <codeph>:</codeph>,
+        <codeph>-</codeph>), and the version is a version number such as <codeph>0.1</codeph>. Use the same
+        product and feature values the docs declare in <filepath>opend.config.yaml</filepath>.</p>
+    </result>
+  </taskbody>
+</task>

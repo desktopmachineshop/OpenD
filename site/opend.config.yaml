@@ -1,0 +1,31 @@
+# OpenD's own documentation, built and served by OpenD.
+# Preview it from the repository root with: pnpm opend preview site
+title: OpenD Documentation
+
+# The release this branch documents: the version of the @opend/* packages.
+release: '0.1'
+
+# Root map for the website navigation.
+map: maps/docs.ditamap
+
+# PDF publications, one bookmap each. Served at /pdf/<file name>.pdf.
+publications:
+  - maps/admin-guide.bookmap
+  - maps/author-guide.bookmap
+
+# Allowed values for each filtering attribute. Any other value is a validation error.
+#   product   what the reader runs. core: the open-source distribution you run yourself
+#             (CLI, previewer and the server image). hosted: a docs site someone else
+#             operates for you. embed: context-sensitive help inside your own apps.
+#   feature   early-access: previews of work in progress, such as the web editor.
+#   audience  who a topic is written for. A build-time label only: readers are gated by
+#             product and feature. internal: maintainer notes, removed by the build filter.
+attributes:
+  product: [core, hosted, embed]
+  feature: [early-access]
+  audience: [author, admin, developer, internal]
+
+# Applied to every reader at build time.
+buildFilter: filters/publish.ditaval
+
+theme: theme/site.css

@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE reference PUBLIC "-//OASIS//DTD DITA Reference//EN" "reference.dtd">
+<reference id="json-api" product="embed" audience="developer">
+  <title>Help JSON API reference</title>
+  <shortdesc>For apps that render help in their own UI: the same filtered help as the panel, as
+    JSON.</shortdesc>
+  <refbody>
+    <section id="auth">
+      <title>Authentication and CORS</title>
+      <p>Send an embed token, the same kind the widget uses, on every request:
+        <codeph>Authorization: Bearer &lt;token&gt;</codeph>. See <xref href="tokens.dita"/>.</p>
+      <ul>
+        <li>Browser requests must come from one of the allowed embed origins; others get 403
+          <codeph>{"error":"origin not allowed"}</codeph>. Requests without an <codeph>Origin</codeph> header,
+          such as from your backend, are allowed.</li>
+        <li>Preflight <codeph>OPTIONS</codeph> requests are answered for allowed origins, permitting
+          <codeph>GET</codeph> and the <codeph>authorization</codeph> header.</li>
+        <li>Responses are sent with <codeph>Cache-Control: private, no-store</codeph>.</li>
+      </ul>
+    </section>
+
+    <section id="context">
+      <title>GET /api/v1/help/context</title>
+      <p>The help for a context. Query parameters: <parmname>app</parmname> (required), and
+        <parmname>key</parmname> or <parmname>path</parmname>. Resolves as described in
+        <xref href="fallback.dita"/>.</p>
+      <codeblock>curl -H "Authorization: Bearer $TOKEN" \
+  "https://docs.example.com/api/v1/help/context?app=opend-console&amp;path=/tenants/acme"</codeblock>
+      <codeblock>{
+  "key": "tenants",
+  "via": "parent",
+  "fragment": null,
+  "topicId": "topics/next/console",
+  "title": "Operator console (coming soon)",
+  "shortdesc": "…",
+  "html": "&lt;article class=\"concept topic\" id=\"console\"&gt;…&lt;/article&gt;",
+  "related": [{ "topicId": "topics/next/editor", "title": "Web editor (coming soon)" }],
+  "fullUrl": "https://docs.example.com/topics/next/console.html",
+  "embedUrl": "https://docs.example.com/embed/topics/topics/next/console.html"
+}</codeblock>
+      <properties relcolwidth="2* 5*">
+        <prophead><proptypehd>Field</proptypehd><propdeschd>Meaning</propdeschd></prophead>
+        <property><proptype><parmname>key</parmname>, <parmname>via</parmname></proptype><propdesc>The key that matched, and how: <codeph>key</codeph>, <codeph>parent</codeph> or <codeph>default</codeph>.</propdesc></property>
+        <property><proptype><parmname>fragment</parmname></proptype><propdesc>The element or nested topic to scroll to, or <codeph>null</codeph>.</propdesc></property>
+        <property><proptype><parmname>topicId</parmname></proptype><propdesc>The topic's page id, for <filepath>/api/v1/help/topics/</filepath>.</propdesc></property>
+        <property><proptype><parmname>title</parmname>, <parmname>shortdesc</parmname></proptype><propdesc>Plain text, filtered for the reader.</propdesc></property>
+        <property><proptype><parmname>html</parmname></proptype><propdesc>The topic as an HTML <codeph>article</codeph>, filtered for the reader, with absolute links to the docs site. Sanitize or sandbox it like any HTML you did not write.</propdesc></property>
+        <property><proptype><parmname>related</parmname></proptype><propdesc>Up to eight visible children and siblings in the navigation.</propdesc></property>
+        <property><proptype><parmname>fullUrl</parmname>, <parmname>embedUrl</parmname></proptype><propdesc>The page on the docs site, and in the panel.</propdesc></property>
+      </properties>
+    </section>
+
+    <section id="topics">
+      <title>GET /api/v1/help/topics/&lt;topicId&gt;</title>
+      <p>One topic by page id, such as <filepath>/api/v1/help/topics/topics/help/widget</filepath>. Same
+        fields as above, without <parmname>key</parmname>, <parmname>via</parmname> and
+        <parmname>fragment</parmname>.</p>
+    </section>
+
+    <section id="search">
+      <title>GET /api/v1/help/search?q=</title>
+      <p>Searches only the topics this reader can see. Every word of two or more letters must appear; title
+        matches weigh most, then the short description, then the body. Up to ten hits.</p>
+      <codeblock>{ "query": "token", "hits": [
+  { "topicId": "topics/help/tokens", "title": "Sign embed tokens in your backend",
+    "snippet": "…prove that with a short-lived token signed…", "score": 42 } ] }</codeblock>
+    </section>
+
+    <section id="errors">
+      <title>Errors</title>
+      <simpletable relcolwidth="1* 5*">
+        <sthead><stentry>Status</stentry><stentry>When</stentry></sthead>
+        <strow><stentry>401</stentry><stentry>The token is missing, invalid or expired.</stentry></strow>
+        <strow><stentry>403</stentry><stentry>The origin is not allowed, the email is not a registered reader of that organization, or the organization has no entitlements.</stentry></strow>
+        <strow><stentry>404</stentry><stentry>No help for this context, no such topic (or one the reader cannot see), or nothing published yet for the reader's release line.</stentry></strow>
+      </simpletable>
+      <p>Errors are JSON: <codeph>{"error": "..."}</codeph>.</p>
+    </section>
+
+    <section id="images">
+      <title>Images</title>
+      <p>Image URLs in <parmname>html</parmname> point at the docs site and need a docs session. If your app
+        renders help natively and the topics contain gated images, proxy them through your backend.</p>
+    </section>
+  </refbody>
+</reference>

@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE task PUBLIC "-//OASIS//DTD DITA Task//EN" "task.dtd">
+<task id="validate" audience="author">
+  <title>Validate a docs project</title>
+  <shortdesc>Run the same checks as CI and the hosted build: broken links, missing chunks, undeclared
+    values, bad release ranges and more.</shortdesc>
+  <taskbody>
+    <context>
+      <p><cmdname>opend validate</cmdname> builds the project in memory and reports every problem with its
+        file, line and column. The previewer and the hosted worker run exactly the same checks, so a
+        project that validates locally publishes.</p>
+    </context>
+    <steps>
+      <step>
+        <cmd>From the OpenD checkout, validate your docs folder.</cmd>
+        <stepxmp>
+          <codeblock>pnpm opend validate path/to/docs</codeblock>
+        </stepxmp>
+        <stepresult>
+          <p>Each problem prints on its own line, followed by a summary:</p>
+          <codeblock>topics/install.dita:14:9: error [broken-link] link target not found: setup.dita
+topics/install.dita:20:7: warning [unresolved-key] key "edition" is not defined; using fallback content
+1 error(s), 1 warning(s)</codeblock>
+        </stepresult>
+      </step>
+      <step>
+        <cmd>Fix each problem.</cmd>
+        <info>
+          <p>The code in brackets identifies the problem. <xref keyref="diagnostics"/> explains every code
+            and how to fix it.</p>
+        </info>
+      </step>
+      <step>
+        <cmd>Optional: validate a release branch or tag without checking it out.</cmd>
+        <stepxmp>
+          <codeblock>pnpm opend validate path/to/docs --ref v1</codeblock>
+        </stepxmp>
+      </step>
+    </steps>
+    <result>
+      <p>The command exits with status 1 when there is at least one error, and 0 otherwise. Warnings do
+        not fail it unless you pass <option>--strict</option>.</p>
+    </result>
+    <postreq>
+      <p>To validate every pull request, see <xref href="../authoring/ci.dita"/>. For every option, see
+        <xref href="cli-reference.dita"/>.</p>
+    </postreq>
+  </taskbody>
+</task>

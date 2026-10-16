@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE task PUBLIC "-//OASIS//DTD DITA Task//EN" "task.dtd">
+<task id="help-lab" product="embed" audience="author developer">
+  <title>Check context help in the help lab</title>
+  <shortdesc>See what every help key and route resolves to for each reader, and click through the real
+    help widget, before you publish.</shortdesc>
+  <taskbody>
+    <context>
+      <p>Host apps open help by context key or by their current path. The help lab, served by the
+        previewer, lists every app, key and route in the project with the topic it resolves to for the
+        reader you are previewing as.</p>
+    </context>
+    <steps>
+      <step>
+        <cmd>Start the previewer and open <filepath>http://127.0.0.1:4000/_opend/help-lab</filepath>.</cmd>
+      </step>
+      <step>
+        <cmd>Read the table for each app.</cmd>
+        <info>
+          <p>Each key shows the topic it opens. When the reader cannot see the topic the key names, the lab
+            shows where it falls back to, for example <systemoutput>(via parent: tenants)</systemoutput> or
+            <systemoutput>(via default: overview)</systemoutput>. <systemoutput>nothing visible</systemoutput>
+            means the reader gets no help for it at all.</p>
+        </info>
+      </step>
+      <step>
+        <cmd>Type a host-app path, such as <userinput>/tenants/acme</userinput>, into
+          <uicontrol>Try a host-app path</uicontrol> and choose <uicontrol>Resolve</uicontrol>.</cmd>
+        <stepresult>The lab shows the topic that path opens for the current reader.</stepresult>
+      </step>
+      <step>
+        <cmd>Choose <uicontrol>Open in widget</uicontrol> next to a key to open the real help panel.</cmd>
+      </step>
+      <step>
+        <cmd>Switch <uicontrol>Preview as</uicontrol> and check again for each kind of reader.</cmd>
+      </step>
+    </steps>
+    <result>
+      <p>When every key opens a topic each reader can see, publish. To learn how keys, routes and fallback
+        work, see <xref href="../help/help-overview.dita"/>.</p>
+    </result>
+  </taskbody>
+</task>

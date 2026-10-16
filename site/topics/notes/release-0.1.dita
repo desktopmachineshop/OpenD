@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE topic PUBLIC "-//OASIS//DTD DITA Topic//EN" "topic.dtd">
+<!-- release="0.1..": every reader on 0.1 or later sees these notes. -->
+<topic id="release-0.1" release="0.1.." audience="author admin developer">
+  <title>Release notes for 0.1</title>
+  <shortdesc>The first release of <keyword keyref="product-name"/>: the build and filter core, the hosted
+    path, embedded help and PDF publications.</shortdesc>
+  <prolog>
+    <resourceid appname="opend-console" appid="whats-new"/>
+  </prolog>
+  <body>
+    <section id="core">
+      <title>Build, filter and preview</title>
+      <ul>
+        <li>A DITA 1.3 subset parsed in TypeScript, with line and column for every problem: topics, maps,
+          bookmaps, keys, <codeph>conref</codeph> and <codeph>conkeyref</codeph>.</li>
+        <li>One applicability rule: <codeph>product</codeph> and <codeph>feature</codeph> against entitlements,
+          <codeph>release</codeph> ranges against the reader's version, other attributes through a build-time
+          DITAVAL. Fail-closed, with conditional keys resolved per reader.</li>
+        <li><cmdname>opend validate</cmdname> with text, JSON and GitHub annotation output;
+          <cmdname>opend build</cmdname>; and <cmdname>opend preview</cmdname> with "Preview as", a staff view
+          that marks conditions, live reload and git refs.</li>
+        <li>A starter template with sample content, a bookmap, reusable chunks, a theme and a validation
+          workflow.</li>
+      </ul>
+    </section>
+    <section id="hosted">
+      <title>Hosted path</title>
+      <ul>
+        <li>Push to publish: a GitHub webhook queues a build, the worker builds and validates the exact commit,
+          and a failing push never goes live.</li>
+        <li>Release lines: 1.x and 2.x docs live side by side, each reader served their own line.</li>
+        <li>OIDC reader sign-in, matched by verified email; filtered pages, navigation and images, cached per
+          entitlement set.</li>
+        <li>An admin API with an audit log, a seed command, one Docker image for every role, a Compose file,
+          S3-compatible blob storage, published images, and a Railway runbook.</li>
+      </ul>
+    </section>
+    <section id="embed">
+      <title>Context-sensitive help</title>
+      <ul>
+        <li><codeph>resourceid</codeph> context keys with parent fallback, and route patterns in
+          <filepath>help-contexts.yaml</filepath>.</li>
+        <li>An embeddable help panel with per-reader search, the <codeph>OpenDHelp</codeph> widget and
+          <codeph>&lt;opend-help-button&gt;</codeph>, host-signed tokens and partitioned sessions.</li>
+        <li>A JSON API for apps that render help themselves, and the previewer's help lab.</li>
+      </ul>
+    </section>
+    <section id="pdf">
+      <title>PDF publications</title>
+      <ul>
+        <li>Bookmaps printed per reader through the same filter, with a cover, linked contents, an outline and
+          the project theme.</li>
+        <li>Print HTML and PDFs in the previewer; cached per release and entitlement set on the server.</li>
+      </ul>
+    </section>
+    <section id="known-limits">
+      <title>Known limitations</title>
+      <ul>
+        <li>Not supported yet: DTD specialisation, <codeph>conrefend</codeph>, relationship tables, key scopes
+          and branch filtering. See <xref href="../authoring/dita-subset.dita"/>.</li>
+        <li>The contents list in PDFs has no page numbers.</li>
+        <li>One docs site and one embed secret per deployment.</li>
+        <li>No web editor, operator console or site-wide search page yet.</li>
+      </ul>
+    </section>
+  </body>
+</topic>

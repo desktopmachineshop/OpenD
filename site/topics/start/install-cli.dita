@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE task PUBLIC "-//OASIS//DTD DITA Task//EN" "task.dtd">
+<task id="install-cli" audience="author developer">
+  <title>Install the CLI from a checkout</title>
+  <shortdesc>Build the <cmdname><keyword keyref="cli"/></cmdname> command from the OpenD repository and
+    check that it runs.</shortdesc>
+  <taskbody>
+    <prereq>
+      <p conkeyref="reuse/node-prereq"/>
+    </prereq>
+    <context>
+      <p>The CLI is not published to npm yet, so you run it from a checkout. Everything it does happens on
+        your machine: it never contacts a server.</p>
+    </context>
+    <steps>
+      <step>
+        <cmd>Clone the repository and install its dependencies.</cmd>
+        <stepxmp>
+          <codeblock>git clone https://github.com/desktopmachineshop/opend.git
+cd opend
+pnpm install</codeblock>
+        </stepxmp>
+      </step>
+      <step conkeyref="reuse/step-build"/>
+      <step>
+        <cmd>Check the CLI runs: <codeph>pnpm opend --help</codeph>.</cmd>
+        <stepresult>It lists the <codeph>validate</codeph>, <codeph>build</codeph> and
+          <codeph>preview</codeph> commands.</stepresult>
+      </step>
+      <step>
+        <cmd>Optional: try it on the starter template.</cmd>
+        <stepxmp>
+          <codeblock>pnpm opend validate templates/docs-starter
+pnpm opend preview templates/docs-starter</codeblock>
+        </stepxmp>
+      </step>
+    </steps>
+    <result>
+      <p><codeph>pnpm opend</codeph> is a shortcut for <codeph>node packages/cli/dist/bin.js</codeph>. To use
+        the CLI from your own docs repository, run that file with its full path, for example
+        <codeph>node ~/src/opend/packages/cli/dist/bin.js validate .</codeph>, or pass the docs folder to
+        <codeph>pnpm opend</codeph> from the checkout.</p>
+    </result>
+    <postreq>
+      <p>Next: <xref href="validate.dita"/>, then <xref href="preview.dita"/>.</p>
+    </postreq>
+  </taskbody>
+</task>

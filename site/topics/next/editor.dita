@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="editor" feature="early-access" audience="author">
+  <title>Web editor (coming soon)</title>
+  <shortdesc>A browser editor for docs projects, built on the same packages as the CLI and the server, is in
+    development.</shortdesc>
+  <prolog>
+    <resourceid appname="opend-console" appid="editor"/>
+  </prolog>
+  <conbody>
+    <note conkeyref="reuse/coming-soon"/>
+    <p>The editor shares the model and filter packages, so its previews will use the same reader filter as
+      <cmdname>opend preview</cmdname>. Until it ships, edit DITA in your own editor, preview with the CLI and
+      publish by pushing to Git.</p>
+    <p>Help keys for its screens, such as <codeph>editor.save</codeph>, <codeph>editor.publish</codeph> and
+      <codeph>editor.conflicts</codeph>, fall back to this page for now.</p>
+  </conbody>
+</concept>

@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="pdf-overview" audience="author admin">
+  <title>PDF publications</title>
+  <shortdesc>Curated manuals, such as an administrator guide, defined as bookmaps and printed for each
+    reader through the same filter as the website.</shortdesc>
+  <conbody>
+    <p>A PDF gets downloaded and passed around, so a leak there would be worse than on the web. Each reader's
+      PDF holds only the chapters, topics and paragraphs their release and entitlements allow. Two readers
+      with different products get two different PDFs from the same bookmap.</p>
+    <p>This site has two: the <i>OpenD Administrator Guide</i> and the <i>OpenD Author Guide</i>. The links
+      in the page header download the ones you can see.</p>
+    <section id="what-you-get">
+      <title>What a PDF contains</title>
+      <ul>
+        <li>A cover with the publication title, the site title, the release and the date it was
+          generated.</li>
+        <li>A contents list whose entries link to their chapters.</li>
+        <li>Every chapter and topic the reader can see, in map order. Each top-level chapter starts on a new
+          page.</li>
+        <li>A PDF outline (bookmarks) built from the headings, page numbers in the footer and the title in the
+          header. The PDF is tagged for accessibility.</li>
+      </ul>
+    </section>
+    <section id="where">
+      <title>Where to get one</title>
+      <ul>
+        <li>In the previewer: <filepath>/pdf/&lt;name&gt;.pdf</filepath> for the current "Preview as" reader,
+          and <filepath>/_opend/publications</filepath> for the list.</li>
+        <li product="core hosted">On the hosted site: <filepath>/pdf/&lt;name&gt;.pdf</filepath> for the
+          signed-in reader, linked from every page header.</li>
+      </ul>
+      <p>Next: <xref href="bookmaps.dita"/>.</p>
+    </section>
+  </conbody>
+</concept>

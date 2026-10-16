@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Build-time filter for every reader: maintainer notes never reach the content store. -->
+<val>
+  <prop att="audience" val="internal" action="exclude"/>
+</val>

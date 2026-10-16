@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE reference PUBLIC "-//OASIS//DTD DITA Reference//EN" "reference.dtd">
+<reference id="cli-reference" audience="author developer">
+  <title>CLI reference</title>
+  <shortdesc>Every <cmdname><keyword keyref="cli"/></cmdname> command and option.</shortdesc>
+  <refbody>
+    <section id="usage">
+      <p>Each command takes the docs root, the folder that holds <filepath>opend.config.yaml</filepath>, as
+        its argument. It defaults to the current folder. Run <codeph>pnpm opend help &lt;command&gt;</codeph>
+        for the same information.</p>
+    </section>
+
+    <refsyn id="validate">
+      <title>opend validate [dir]</title>
+      <p>Runs every check and prints the problems. Exits with status 1 on any error, or on any problem with
+        <option>--strict</option>.</p>
+      <simpletable relcolwidth="1* 1* 3*">
+        <sthead><stentry>Option</stentry><stentry>Default</stentry><stentry>Meaning</stentry></sthead>
+        <strow><stentry><option>--ref &lt;ref&gt;</option></stentry><stentry>working tree</stentry><stentry>Validate a git branch or tag instead of the files on disk.</stentry></strow>
+        <strow><stentry><option>--strict</option></stentry><stentry>off</stentry><stentry>Treat warnings as failures.</stentry></strow>
+        <strow><stentry><option>--format &lt;format&gt;</option></stentry><stentry><codeph>text</codeph></stentry><stentry><codeph>text</codeph> prints <codeph>file:line:column: severity [code] message</codeph> and a summary. <codeph>json</codeph> prints the problems as a JSON array. <codeph>github</codeph> prints GitHub Actions workflow annotations, so problems show inline on pull requests.</stentry></strow>
+      </simpletable>
+    </refsyn>
+
+    <refsyn id="build">
+      <title>opend build [dir]</title>
+      <p>Compiles the docs into the release snapshot the hosted build stores: JSON holding every topic with
+        its conditions, the navigation, publications, context-sensitive help keys and the reuse index. Fails
+        without writing anything when there is an error.</p>
+      <simpletable relcolwidth="1* 1* 3*">
+        <sthead><stentry>Option</stentry><stentry>Default</stentry><stentry>Meaning</stentry></sthead>
+        <strow><stentry><option>--ref &lt;ref&gt;</option></stentry><stentry>working tree</stentry><stentry>Build a git branch or tag.</stentry></strow>
+        <strow><stentry><option>--out &lt;file&gt;</option></stentry><stentry><filepath>.opend/build/&lt;release&gt;.json</filepath></stentry><stentry>Where to write the snapshot. The default is inside the docs root.</stentry></strow>
+      </simpletable>
+    </refsyn>
+
+    <refsyn id="preview">
+      <title>opend preview [dir]</title>
+      <p>Serves the docs locally and rebuilds on save. See <xref href="preview.dita"/>.</p>
+      <simpletable relcolwidth="1* 1* 3*">
+        <sthead><stentry>Option</stentry><stentry>Default</stentry><stentry>Meaning</stentry></sthead>
+        <strow><stentry><option>--as &lt;name&gt;</option></stentry><stentry></stentry><stentry>Preview as a named reader from <filepath>preview-contexts.yaml</filepath>. An unknown name is an error that lists the known ones.</stentry></strow>
+        <strow><stentry><option>--product &lt;list&gt;</option></stentry><stentry></stentry><stentry>Preview as a reader holding these products, comma-separated. Can be repeated.</stentry></strow>
+        <strow><stentry><option>--feature &lt;list&gt;</option></stentry><stentry></stentry><stentry>Preview as a reader holding these features, comma-separated. Can be repeated.</stentry></strow>
+        <strow><stentry><option>--version &lt;version&gt;</option></stentry><stentry>the project's release</stentry><stentry>The reader's release, such as <codeph>0.1</codeph>.</stentry></strow>
+        <strow><stentry><option>--all</option></stentry><stentry>on</stentry><stentry>The staff view: everything, with conditions marked. Used when no reader option is given.</stentry></strow>
+        <strow><stentry><option>--ref &lt;ref&gt;</option></stentry><stentry>working tree</stentry><stentry>Preview a git branch or tag. Not watched.</stentry></strow>
+        <strow><stentry><option>-p, --port &lt;port&gt;</option></stentry><stentry><codeph>4000</codeph></stentry><stentry>Port to listen on. <codeph>0</codeph> picks a free port.</stentry></strow>
+        <strow><stentry><option>--host &lt;host&gt;</option></stentry><stentry><codeph>127.0.0.1</codeph></stentry><stentry>Interface to bind. Only change it on a trusted network: the staff view shows everything.</stentry></strow>
+        <strow><stentry><option>--no-watch</option></stentry><stentry>watching</stentry><stentry>Do not rebuild when files change.</stentry></strow>
+      </simpletable>
+    </refsyn>
+  </refbody>
+</reference>

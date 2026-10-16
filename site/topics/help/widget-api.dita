@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE reference PUBLIC "-//OASIS//DTD DITA Reference//EN" "reference.dtd">
+<reference id="widget-api" product="embed" audience="developer">
+  <title>Widget API and message protocol</title>
+  <shortdesc>The <codeph>OpenDHelp</codeph> object, the <codeph>&lt;opend-help-button&gt;</codeph> element,
+    and the messages the panel and your page exchange.</shortdesc>
+  <refbody>
+    <section id="script">
+      <title>The script</title>
+      <p><filepath>/embed/opend-help.js</filepath> defines <codeph>window.OpenDHelp</codeph> and the
+        <codeph>opend-help-button</codeph> custom element. It has no dependencies, can be loaded from any
+        origin, and is cached for five minutes. Loading it twice is harmless.</p>
+    </section>
+
+    <section id="init">
+      <title>OpenDHelp.init(options)</title>
+      <p>Call once before anything else; <codeph>open</codeph> throws until you do.</p>
+      <properties relcolwidth="2* 2* 5*">
+        <prophead><proptypehd>Option</proptypehd><propvaluehd>Default</propvaluehd><propdeschd>Meaning</propdeschd></prophead>
+        <property><proptype><parmname>docsUrl</parmname></proptype><propvalue>required</propvalue><propdesc>Base URL of the docs site, such as <codeph>https://docs.example.com</codeph>. Messages are only accepted from, and sent to, its origin.</propdesc></property>
+        <property><proptype><parmname>app</parmname></proptype><propvalue>required</propvalue><propdesc>Your app's name, as in <codeph>resourceid appname</codeph>.</propdesc></property>
+        <property><proptype><parmname>getToken</parmname></proptype><propvalue>none</propvalue><propdesc>Returns a promise of a fresh embed token from your backend. Called whenever the panel has no session. If it rejects, the panel shows that sign-in failed.</propdesc></property>
+        <property><proptype><parmname>width</parmname></proptype><propvalue><codeph>380</codeph></propvalue><propdesc>Panel width in pixels. Screens narrower than 600 pixels get a full-width panel.</propdesc></property>
+        <property><proptype><parmname>side</parmname></proptype><propvalue><codeph>'right'</codeph></propvalue><propdesc><codeph>'right'</codeph> or <codeph>'left'</codeph>.</propdesc></property>
+        <property><proptype><parmname>zIndex</parmname></proptype><propvalue><codeph>2147483000</codeph></propvalue><propdesc>Stacking order of the panel.</propdesc></property>
+        <property><proptype><parmname>onNavigate</parmname></proptype><propvalue>none</propvalue><propdesc>Called with <codeph>{ topicId, title }</codeph> whenever the panel shows a topic, for analytics or to remember the last topic.</propdesc></property>
+      </properties>
+    </section>
+
+    <section id="methods">
+      <title>Methods</title>
+      <p>A context is <codeph>{ key: 'tenants.detail' }</codeph> or <codeph>{ path: '/tenants/acme' }</codeph>.</p>
+      <simpletable relcolwidth="3* 5*">
+        <sthead><stentry>Method</stentry><stentry>What it does</stentry></sthead>
+        <strow><stentry><codeph>open(context?)</codeph></stentry><stentry>Opens the panel, on the given context or the last one set. Remembers which element had focus.</stentry></strow>
+        <strow><stentry><codeph>close()</codeph></stentry><stentry>Closes the panel and returns focus, even into shadow DOM.</stentry></strow>
+        <strow><stentry><codeph>toggle(context?)</codeph></stentry><stentry>Closes the panel if it is open, otherwise opens it.</stentry></strow>
+        <strow><stentry><codeph>setContext(context)</codeph></stentry><stentry>Records where the user is. Reloads the panel if it is open.</stentry></strow>
+        <strow><stentry><codeph>isOpen()</codeph></stentry><stentry>Whether the panel is open.</stentry></strow>
+      </simpletable>
+      <p>Escape closes the panel, whether focus is in your page or in the panel.</p>
+    </section>
+
+    <section id="button">
+      <title>&lt;opend-help-button&gt;</title>
+      <simpletable relcolwidth="2* 5*">
+        <sthead><stentry>Attribute</stentry><stentry>Meaning</stentry></sthead>
+        <strow><stentry><codeph>key</codeph></stentry><stentry>Open this context key instead of the current context.</stentry></strow>
+        <strow><stentry><codeph>path</codeph></stentry><stentry>Open the context for this path.</stentry></strow>
+        <strow><stentry><codeph>label</codeph></stentry><stentry>Accessible name of the button. Default "Help for this page".</stentry></strow>
+      </simpletable>
+      <p>The button is a round "?" that inherits your text colour. Style it from outside with
+        <codeph>opend-help-button::part(button)</codeph>.</p>
+    </section>
+
+    <section id="protocol">
+      <title>postMessage protocol</title>
+      <p>The panel is an iframe on the docs origin. It and the widget talk with
+        <codeph>window.postMessage</codeph>. Every message is an object with
+        <codeph>protocol: 'opend-help'</codeph> and <codeph>v: 1</codeph> plus a <codeph>type</codeph>. Both
+        sides check <codeph>event.origin</codeph> and <codeph>event.source</codeph>, and always send to an
+        explicit origin, never <codeph>*</codeph>.</p>
+      <simpletable relcolwidth="2* 2* 5*">
+        <sthead><stentry>Type</stentry><stentry>Direction</stentry><stentry>Meaning</stentry></sthead>
+        <strow><stentry><codeph>opend:need-token</codeph></stentry><stentry>panel to page</stentry><stentry>The panel has no session. The widget calls <parmname>getToken</parmname>.</stentry></strow>
+        <strow><stentry><codeph>opend:token</codeph></stentry><stentry>page to panel</stentry><stentry><codeph>{ token }</codeph>: the embed token. The panel posts it to <filepath>/embed/session</filepath> and reloads.</stentry></strow>
+        <strow><stentry><codeph>opend:ready</codeph></stentry><stentry>panel to page</stentry><stentry>The panel has a session and has loaded.</stentry></strow>
+        <strow><stentry><codeph>opend:navigated</codeph></stentry><stentry>panel to page</stentry><stentry><codeph>{ topicId, title }</codeph>: the panel shows a topic. Passed to <parmname>onNavigate</parmname>.</stentry></strow>
+        <strow><stentry><codeph>opend:close</codeph></stentry><stentry>panel to page</stentry><stentry>The reader closed the panel from inside it.</stentry></strow>
+        <strow><stentry><codeph>opend:error</codeph></stentry><stentry>panel to page</stentry><stentry><codeph>{ message }</codeph>: the token exchange failed.</stentry></strow>
+      </simpletable>
+      <p>The panel only talks to the page when the page's origin is in the allowed origins: the widget passes
+        its own origin to the panel's URL as <parmname>host</parmname>, and the server checks it. Opened
+        anywhere else, the panel runs standalone and sends no messages.</p>
+    </section>
+  </refbody>
+</reference>

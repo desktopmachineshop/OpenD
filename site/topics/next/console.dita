@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="console" feature="early-access" audience="admin">
+  <title>Operator console (coming soon)</title>
+  <shortdesc>A web UI for operators of <keyword keyref="product-name"/> deployments is in development.</shortdesc>
+  <prolog>
+    <resourceid appname="opend-console" appid="tenants"/>
+    <resourceid appname="opend-console" appid="billing"/>
+  </prolog>
+  <conbody>
+    <note conkeyref="reuse/coming-soon"/>
+    <p>Today, operators manage a deployment with the <xref keyref="admin-api">admin API</xref> and the
+      <codeph>seed</codeph> command, behind a bearer token. The console will replace the token with staff
+      sign-in. Tenants and billing arrive with multi-tenancy, when one deployment serves several docs
+      sites.</p>
+    <p>The console will open this documentation in its help panel, using the <codeph>opend-console</codeph>
+      keys this site already declares. Until its screens are documented, keys such as
+      <codeph>tenants.detail</codeph> fall back to this page.</p>
+  </conbody>
+</concept>

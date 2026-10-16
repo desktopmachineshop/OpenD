@@ -31,6 +31,18 @@ pnpm opend build templates/docs-starter --out release.json
 
 The preview banner switches between reader contexts and lists any problems. `--ref v1` previews a release branch or tag without checking it out.
 
+## Documentation
+
+OpenD's own documentation is an OpenD docs project in [`site/`](site), built and served by the platform itself: getting started, the authoring guide, context-sensitive help, PDF publications, hosting, and references for every diagnostic code, environment variable and admin API route. Preview it after `pnpm build`:
+
+```sh
+pnpm opend preview site                     # staff view, conditions marked
+pnpm opend preview site --as self-hoster    # or admin, author, developer, managed-customer
+pnpm opend validate site --strict
+```
+
+`/pdf/admin-guide.pdf` and `/pdf/author-guide.pdf` print the two publications for the current reader. To publish it on an OpenD server, register this repository with `"docsPath": "site"`. `packages/cli/test/site.test.ts` builds it, requires zero problems, renders every page and publication for each preview reader, and fails when a reference topic falls behind the code.
+
 ## How applicability works
 
 Any map entry, topic or element can carry DITA filtering attributes:

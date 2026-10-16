@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE task PUBLIC "-//OASIS//DTD DITA Task//EN" "task.dtd">
+<task id="upgrades" product="core" audience="admin">
+  <title>Upgrade OpenD</title>
+  <shortdesc>Run the new image's migrations, then replace the web service and the worker. Both are
+    stateless, so an upgrade is a redeploy.</shortdesc>
+  <taskbody>
+    <context>
+      <p>Images are published to <codeph><keyword keyref="image-name"/></codeph>: <codeph>edge</codeph> and
+        <codeph>sha-&lt;commit&gt;</codeph> from <codeph>main</codeph>, and <codeph>1.2.3</codeph>,
+        <codeph>1.2</codeph> and <codeph>latest</codeph> from release tags. Pin a version in production.</p>
+    </context>
+    <steps>
+      <step>
+        <cmd>Back up the database.</cmd>
+        <info><p>See <xref href="backups.dita"/>.</p></info>
+      </step>
+      <step>
+        <cmd>Read the release notes for changes to settings.</cmd>
+      </step>
+      <step>
+        <cmd>Run the migrations with the new image.</cmd>
+        <choices>
+          <choice>Docker Compose: <codeph>git pull</codeph>, then
+            <codeph>docker compose -f deploy/docker-compose.yml up -d --build</codeph>. The
+            <codeph>migrate</codeph> service runs before the app and the worker start.</choice>
+          <choice>Railway: deploy as usual; the web service's pre-deploy command runs
+            <codeph>node dist/bin.js migrate</codeph>.</choice>
+          <choice>Elsewhere: run <codeph>opend-server migrate</codeph> once before starting the new
+            version.</choice>
+        </choices>
+        <info>
+          <p>Migrations are applied in order and recorded in <codeph>schema_migrations</codeph>. An advisory
+            lock makes concurrent runs safe, and a migration that has already run is skipped.</p>
+        </info>
+      </step>
+      <step>
+        <cmd>Replace the web service and the worker.</cmd>
+      </step>
+      <step>
+        <cmd>Check <filepath>/healthz</filepath> and the start-up log line of each service.</cmd>
+      </step>
+    </steps>
+    <result>
+      <p>Published releases keep working: the release snapshot format is versioned, and the docs are not
+        rebuilt by an upgrade. To pick up rendering improvements in the build itself, push or trigger a build
+        of each release ref.</p>
+    </result>
+  </taskbody>
+</task>

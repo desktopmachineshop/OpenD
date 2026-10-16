@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE topic PUBLIC "-//OASIS//DTD DITA Topic//EN" "topic.dtd">
+<!-- Reusable chunks. Not in any map, so never published on its own; topics pull
+     these in with conkeyref="reuse/<id>" (or conref="../../reuse/common.dita#common/<id>"). -->
+<topic id="common">
+  <title>Reusable content</title>
+  <body>
+    <p id="node-prereq">You need <keyword keyref="node-version"/>, <keyword keyref="pnpm-version"/>, Git, and a checkout of <xref keyref="repo"/>.</p>
+
+    <note id="fail-closed" type="important">Readers are fail-closed. A value they don't hold, a value
+      that is not declared in <filepath>opend.config.yaml</filepath>, or a release range that does not
+      parse hides the content instead of showing it.</note>
+
+    <note id="restart" type="note">The server reads its settings once, at start-up. After you change
+      a variable, restart (or redeploy) both the web service and the worker.</note>
+
+    <note id="secret" type="tip">Generate secrets with <cmdname>openssl</cmdname>:
+      <codeph>openssl rand -hex 32</codeph> prints 64 random hexadecimal characters.</note>
+
+    <note id="coming-soon" type="note">This is in development and is not part of release
+      <keyword keyref="current-release"/>. This page describes the plan so you know where it is going.</note>
+
+    <p id="same-404">A page the reader cannot see returns the same 404 as a page that does not exist,
+      so guessing URLs reveals nothing.</p>
+
+    <steps>
+      <step id="step-build">
+        <cmd>Build the packages: <codeph>pnpm build</codeph>.</cmd>
+        <info>The CLI runs the compiled output in <filepath>packages/cli/dist</filepath>, so build again
+          after you pull changes.</info>
+      </step>
+      <step id="step-validate">
+        <cmd>Validate the project: <codeph>pnpm opend validate site</codeph>.</cmd>
+        <stepresult>The last line reads <systemoutput>0 error(s), 0 warning(s)</systemoutput>.</stepresult>
+      </step>
+    </steps>
+  </body>
+</topic>

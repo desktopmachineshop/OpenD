@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE task PUBLIC "-//OASIS//DTD DITA Task//EN" "task.dtd">
+<task id="resourceid" product="embed" audience="author">
+  <title>Tag topics with context keys</title>
+  <shortdesc>Declare which screen of which app a topic helps with, using DITA's standard
+    <codeph>resourceid</codeph> element, in the topic or on its map entry.</shortdesc>
+  <taskbody>
+    <steps>
+      <step>
+        <cmd>Pick a key for each screen. Keys are words separated by dots, from general to specific.</cmd>
+        <info>
+          <p>For example <codeph>tenants</codeph> and <codeph>tenants.detail</codeph>. Dots matter: a key
+            falls back to its parents, so <codeph>tenants.detail</codeph> opens the <codeph>tenants</codeph>
+            topic until a more specific one exists. Keys use letters, digits, <codeph>_</codeph> and
+            <codeph>-</codeph> between the dots.</p>
+        </info>
+      </step>
+      <step>
+        <cmd>Add a <codeph>resourceid</codeph> to the topic's <codeph>prolog</codeph>, naming the app and the
+          key.</cmd>
+        <stepxmp>
+          <codeblock><![CDATA[<prolog>
+  <resourceid appname="opend-console" appid="tenants"/>
+  <resourceid appname="opend-console" appid="billing"/>
+</prolog>]]></codeblock>
+        </stepxmp>
+        <info>
+          <p>A topic can answer several keys, and several apps. <codeph>appname</codeph> is the app name
+            your widget passes; <codeph>appid</codeph> is the key.</p>
+        </info>
+      </step>
+      <step>
+        <cmd>Or put it on the map entry, in its <codeph>topicmeta</codeph>. Map entries are checked before
+          topics.</cmd>
+        <stepxmp>
+          <codeblock><![CDATA[<topicref href="../topics/hosting/admin-api.dita">
+  <topicmeta><resourceid appname="opend-console" appid="builds"/></topicmeta>
+</topicref>]]></codeblock>
+        </stepxmp>
+      </step>
+      <step>
+        <cmd>Optional: point one key at different topics for different readers.</cmd>
+        <stepxmp>
+          <codeblock><![CDATA[<topicref href="../topics/notes/release-1.dita" release="1">
+  <topicmeta><resourceid appname="console" appid="whats-new"/></topicmeta>
+</topicref>
+<topicref href="../topics/notes/release-2.dita" release="2">
+  <topicmeta><resourceid appname="console" appid="whats-new"/></topicmeta>
+</topicref>]]></codeblock>
+        </stepxmp>
+        <info>
+          <p>Conditions on the <codeph>resourceid</codeph>, on the elements around it and on the map entry
+            all apply. Each reader gets the first target whose conditions pass and whose topic they can see.
+            Two <i>unconditional</i> targets for one key are an error, <codeph>duplicate-context</codeph>,
+            because the second could never be shown.</p>
+        </info>
+      </step>
+      <step>
+        <cmd>Optional: put a <codeph>resourceid</codeph> inside a nested topic to open the page at that
+          section.</cmd>
+      </step>
+    </steps>
+    <result>
+      <p>A <codeph>resourceid</codeph> without both <codeph>appname</codeph> and <codeph>appid</codeph> is an
+        error, <codeph>invalid-resourceid</codeph>. Keys on topics the build-time filter removes are dropped.
+        For example, this site tags its admin API reference sections with the <codeph>opend-console</codeph>
+        keys <codeph>repos</codeph>, <codeph>builds</codeph>, <codeph>orgs</codeph>,
+        <codeph>readers</codeph> and <codeph>audit</codeph>.</p>
+    </result>
+  </taskbody>
+</task>

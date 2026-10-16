@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE reference PUBLIC "-//OASIS//DTD DITA Reference//EN" "reference.dtd">
+<reference id="help-contexts" product="embed" audience="author developer">
+  <title>help-contexts.yaml reference</title>
+  <shortdesc>Maps each app's routes to context keys, so an app can open help by sending its current
+    path, and sets the key to use when nothing more specific matches.</shortdesc>
+  <refbody>
+    <section id="format">
+      <title>Format</title>
+      <p>The file lives at the docs root. Part of this site's own file:</p>
+      <codeblock>apps:
+  opend-console:
+    default: overview
+    routes:
+      /: overview
+      /tenants: tenants
+      /tenants/:tenant: tenants.detail
+      /tenants/:tenant/**: tenants.detail
+      /billing/**: billing
+      /editor/**: editor
+      /editor/:repo/conflicts: editor.conflicts</codeblock>
+      <properties relcolwidth="2* 5*">
+        <prophead><proptypehd>Field</proptypehd><propdeschd>Meaning</propdeschd></prophead>
+        <property><proptype><parmname>apps.&lt;name&gt;</parmname></proptype><propdesc>One entry per app, named as in <codeph>resourceid appname</codeph> and in the widget's <parmname>app</parmname> option. Letters, digits, <codeph>_</codeph> and <codeph>-</codeph>.</propdesc></property>
+        <property><proptype><parmname>default</parmname></proptype><propdesc>Optional. The key used when the requested key, and every parent of it, has nothing this reader can see.</propdesc></property>
+        <property><proptype><parmname>routes</parmname></proptype><propdesc>Route pattern to key, in any order. Optional.</propdesc></property>
+      </properties>
+    </section>
+
+    <section id="patterns">
+      <title>Route patterns</title>
+      <simpletable relcolwidth="2* 4* 3*">
+        <sthead><stentry>Segment</stentry><stentry>Matches</stentry><stentry>Example</stentry></sthead>
+        <strow><stentry><codeph>tenants</codeph></stentry><stentry>that word, ignoring case</stentry><stentry><codeph>/tenants</codeph></stentry></strow>
+        <strow><stentry><codeph>:name</codeph></stentry><stentry>any one segment</stentry><stentry><codeph>/tenants/:tenant</codeph></stentry></strow>
+        <strow><stentry><codeph>*</codeph></stentry><stentry>any one segment</stentry><stentry><codeph>/files/*</codeph></stentry></strow>
+        <strow><stentry><codeph>**</codeph></stentry><stentry>zero or more segments; last segment only</stentry><stentry><codeph>/billing/**</codeph></stentry></strow>
+      </simpletable>
+      <ul>
+        <li>Every pattern starts with <codeph>/</codeph>.</li>
+        <li>Query strings, fragments, empty segments and trailing slashes in the path are ignored, and
+          percent-encoded segments are decoded, so <codeph>/Tenants/acme/?tab=users</codeph> matches
+          <codeph>/tenants/:tenant</codeph>.</li>
+        <li>A segment containing <codeph>*</codeph>, <codeph>:</codeph>, <codeph>?</codeph> or
+          <codeph>#</codeph> other than as above is invalid, and so is <codeph>**</codeph> before the last
+          segment. Both are <codeph>invalid-help-contexts</codeph> errors.</li>
+      </ul>
+    </section>
+
+    <section id="specificity">
+      <title>Which route wins</title>
+      <p>When several patterns match a path, the most specific wins:</p>
+      <ol>
+        <li>the one with more literal segments;</li>
+        <li>then one without <codeph>**</codeph>;</li>
+        <li>then the longer pattern;</li>
+        <li>then the one earlier in the file.</li>
+      </ol>
+      <p>So for <codeph>/editor/docs/conflicts</codeph>, <codeph>/editor/:repo/conflicts</codeph> (two
+        literals) beats <codeph>/editor/**</codeph> (one literal). For <codeph>/tenants/acme</codeph>,
+        <codeph>/tenants/:tenant</codeph> beats <codeph>/tenants/:tenant/**</codeph>, which has the same
+        literals but a <codeph>**</codeph>.</p>
+    </section>
+
+    <section id="checks">
+      <title>Checks</title>
+      <p>Every route and default must name a key that some topic declares with <codeph>resourceid</codeph>,
+        or a key with such a parent: <codeph>tenants.detail</codeph> is fine while only
+        <codeph>tenants</codeph> exists. Anything else is an <codeph>unknown-context</codeph> error. A path
+        that matches no route opens the default.</p>
+    </section>
+  </refbody>
+</reference>

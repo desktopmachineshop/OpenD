@@ -1,0 +1,202 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE reference PUBLIC "-//OASIS//DTD DITA Reference//EN" "reference.dtd">
+<reference id="dita-subset" audience="author">
+  <title>Supported DITA subset</title>
+  <shortdesc><keyword keyref="product-name"/> parses a documented subset of DITA 1.3 itself, in
+    TypeScript, with no Java toolchain. Every element it supports is listed here.</shortdesc>
+  <refbody>
+    <section id="how-elements-are-matched">
+      <title>How elements are matched</title>
+      <p>Elements are matched by name. DTDs are not fetched or applied, so a <codeph>DOCTYPE</codeph>
+        line is fine but has no effect, and <codeph>@class</codeph> specialisation is not used. Common
+        HTML character entities such as <codeph>&amp;nbsp;</codeph>, <codeph>&amp;mdash;</codeph>,
+        <codeph>&amp;rarr;</codeph> and <codeph>&amp;trade;</codeph> are understood without a DTD.</p>
+      <p>An element outside the subset still renders, as a plain block, and validation reports it as an
+        <codeph>unsupported-element</codeph> warning.</p>
+    </section>
+
+    <section id="topic-elements">
+      <title>Topic elements</title>
+      <p>The table lists every element allowed in topics, its group, and the HTML it renders as. It
+        mirrors <codeph>SUPPORTED_ELEMENTS</codeph> in <filepath>packages/dita/src/elements.ts</filepath>,
+        and a test fails if the two drift apart.</p>
+      <simpletable id="elements" relcolwidth="2* 2* 4*">
+        <sthead><stentry>Element</stentry><stentry>Group</stentry><stentry>Renders as</stentry></sthead>
+        <strow><stentry><codeph>topic</codeph></stentry><stentry>topic</stentry><stentry>article, or section when nested</stentry></strow>
+        <strow><stentry><codeph>concept</codeph></stentry><stentry>topic</stentry><stentry>article, or section when nested</stentry></strow>
+        <strow><stentry><codeph>task</codeph></stentry><stentry>topic</stentry><stentry>article, or section when nested</stentry></strow>
+        <strow><stentry><codeph>reference</codeph></stentry><stentry>topic</stentry><stentry>article, or section when nested</stentry></strow>
+        <strow><stentry><codeph>glossentry</codeph></stentry><stentry>topic</stentry><stentry>article, or section when nested</stentry></strow>
+        <strow><stentry><codeph>troubleshooting</codeph></stentry><stentry>topic</stentry><stentry>article, or section when nested</stentry></strow>
+        <strow><stentry><codeph>draft-comment</codeph></stentry><stentry>removed</stentry><stentry>removed by the build</stentry></strow>
+        <strow><stentry><codeph>required-cleanup</codeph></stentry><stentry>removed</stentry><stentry>removed by the build</stentry></strow>
+        <strow><stentry><codeph>prolog</codeph></stentry><stentry>metadata</stentry><stentry>kept, not rendered</stentry></strow>
+        <strow><stentry><codeph>titlealts</codeph></stentry><stentry>metadata</stentry><stentry>kept, not rendered</stentry></strow>
+        <strow><stentry><codeph>navtitle</codeph></stentry><stentry>metadata</stentry><stentry>kept, not rendered</stentry></strow>
+        <strow><stentry><codeph>searchtitle</codeph></stentry><stentry>metadata</stentry><stentry>kept, not rendered</stentry></strow>
+        <strow><stentry><codeph>indexterm</codeph></stentry><stentry>metadata</stentry><stentry>kept, not rendered</stentry></strow>
+        <strow><stentry><codeph>data</codeph></stentry><stentry>metadata</stentry><stentry>kept, not rendered</stentry></strow>
+        <strow><stentry><codeph>data-about</codeph></stentry><stentry>metadata</stentry><stentry>kept, not rendered</stentry></strow>
+        <strow><stentry><codeph>foreign</codeph></stentry><stentry>metadata</stentry><stentry>kept, not rendered</stentry></strow>
+        <strow><stentry><codeph>unknown</codeph></stentry><stentry>metadata</stentry><stentry>kept, not rendered</stentry></strow>
+        <strow><stentry><codeph>colspec</codeph></stentry><stentry>metadata</stentry><stentry>kept, not rendered</stentry></strow>
+        <strow><stentry><codeph>resourceid</codeph></stentry><stentry>metadata</stentry><stentry>kept, not rendered</stentry></strow>
+        <strow><stentry><codeph>dita</codeph></stentry><stentry>structure</stentry><stentry>children only</stentry></strow>
+        <strow><stentry><codeph>title</codeph></stentry><stentry>structure</stentry><stentry>heading, figcaption or caption by context</stentry></strow>
+        <strow><stentry><codeph>shortdesc</codeph></stentry><stentry>structure</stentry><stentry><codeph>p</codeph></stentry></strow>
+        <strow><stentry><codeph>abstract</codeph></stentry><stentry>structure</stentry><stentry><codeph>div</codeph></stentry></strow>
+        <strow><stentry><codeph>body</codeph></stentry><stentry>structure</stentry><stentry><codeph>div</codeph></stentry></strow>
+        <strow><stentry><codeph>conbody</codeph></stentry><stentry>structure</stentry><stentry><codeph>div</codeph></stentry></strow>
+        <strow><stentry><codeph>taskbody</codeph></stentry><stentry>structure</stentry><stentry><codeph>div</codeph></stentry></strow>
+        <strow><stentry><codeph>refbody</codeph></stentry><stentry>structure</stentry><stentry><codeph>div</codeph></stentry></strow>
+        <strow><stentry><codeph>troublebody</codeph></stentry><stentry>structure</stentry><stentry><codeph>div</codeph></stentry></strow>
+        <strow><stentry><codeph>glossterm</codeph></stentry><stentry>structure</stentry><stentry><codeph>h1</codeph></stentry></strow>
+        <strow><stentry><codeph>glossdef</codeph></stentry><stentry>structure</stentry><stentry><codeph>p</codeph></stentry></strow>
+        <strow><stentry><codeph>glossBody</codeph></stentry><stentry>structure</stentry><stentry><codeph>div</codeph></stentry></strow>
+        <strow><stentry><codeph>section</codeph></stentry><stentry>structure</stentry><stentry><codeph>section</codeph></stentry></strow>
+        <strow><stentry><codeph>example</codeph></stentry><stentry>structure</stentry><stentry><codeph>section</codeph></stentry></strow>
+        <strow><stentry><codeph>bodydiv</codeph></stentry><stentry>structure</stentry><stentry><codeph>div</codeph></stentry></strow>
+        <strow><stentry><codeph>sectiondiv</codeph></stentry><stentry>structure</stentry><stentry><codeph>div</codeph></stentry></strow>
+        <strow><stentry><codeph>div</codeph></stentry><stentry>structure</stentry><stentry><codeph>div</codeph></stentry></strow>
+        <strow><stentry><codeph>related-links</codeph></stentry><stentry>structure</stentry><stentry>nav "Related information"</stentry></strow>
+        <strow><stentry><codeph>link</codeph></stentry><stentry>structure</stentry><stentry>li with a link</stentry></strow>
+        <strow><stentry><codeph>linktext</codeph></stentry><stentry>structure</stentry><stentry><codeph>span</codeph></stentry></strow>
+        <strow><stentry><codeph>linkpool</codeph></stentry><stentry>structure</stentry><stentry><codeph>div</codeph></stentry></strow>
+        <strow><stentry><codeph>linklist</codeph></stentry><stentry>structure</stentry><stentry><codeph>div</codeph></stentry></strow>
+        <strow><stentry><codeph>desc</codeph></stentry><stentry>structure</stentry><stentry><codeph>span</codeph></stentry></strow>
+        <strow><stentry><codeph>p</codeph></stentry><stentry>blocks</stentry><stentry><codeph>p</codeph></stentry></strow>
+        <strow><stentry><codeph>ul</codeph></stentry><stentry>blocks</stentry><stentry><codeph>ul</codeph></stentry></strow>
+        <strow><stentry><codeph>ol</codeph></stentry><stentry>blocks</stentry><stentry><codeph>ol</codeph></stentry></strow>
+        <strow><stentry><codeph>li</codeph></stentry><stentry>blocks</stentry><stentry><codeph>li</codeph></stentry></strow>
+        <strow><stentry><codeph>sl</codeph></stentry><stentry>blocks</stentry><stentry><codeph>ul</codeph></stentry></strow>
+        <strow><stentry><codeph>sli</codeph></stentry><stentry>blocks</stentry><stentry><codeph>li</codeph></stentry></strow>
+        <strow><stentry><codeph>dl</codeph></stentry><stentry>blocks</stentry><stentry><codeph>dl</codeph></stentry></strow>
+        <strow><stentry><codeph>dlhead</codeph></stentry><stentry>blocks</stentry><stentry><codeph>div</codeph></stentry></strow>
+        <strow><stentry><codeph>dthd</codeph></stentry><stentry>blocks</stentry><stentry><codeph>dt</codeph></stentry></strow>
+        <strow><stentry><codeph>ddhd</codeph></stentry><stentry>blocks</stentry><stentry><codeph>dd</codeph></stentry></strow>
+        <strow><stentry><codeph>dlentry</codeph></stentry><stentry>blocks</stentry><stentry><codeph>div</codeph></stentry></strow>
+        <strow><stentry><codeph>dt</codeph></stentry><stentry>blocks</stentry><stentry><codeph>dt</codeph></stentry></strow>
+        <strow><stentry><codeph>dd</codeph></stentry><stentry>blocks</stentry><stentry><codeph>dd</codeph></stentry></strow>
+        <strow><stentry><codeph>note</codeph></stentry><stentry>blocks</stentry><stentry>aside with a label</stentry></strow>
+        <strow><stentry><codeph>codeblock</codeph></stentry><stentry>blocks</stentry><stentry>pre &gt; code</stentry></strow>
+        <strow><stentry><codeph>pre</codeph></stentry><stentry>blocks</stentry><stentry><codeph>pre</codeph></stentry></strow>
+        <strow><stentry><codeph>lines</codeph></stentry><stentry>blocks</stentry><stentry><codeph>div</codeph></stentry></strow>
+        <strow><stentry><codeph>lq</codeph></stentry><stentry>blocks</stentry><stentry><codeph>blockquote</codeph></stentry></strow>
+        <strow><stentry><codeph>fig</codeph></stentry><stentry>blocks</stentry><stentry><codeph>figure</codeph></stentry></strow>
+        <strow><stentry><codeph>image</codeph></stentry><stentry>blocks</stentry><stentry><codeph>img</codeph></stentry></strow>
+        <strow><stentry><codeph>alt</codeph></stentry><stentry>blocks</stentry><stentry><codeph>span</codeph></stentry></strow>
+        <strow><stentry><codeph>table</codeph></stentry><stentry>blocks</stentry><stentry><codeph>table</codeph></stentry></strow>
+        <strow><stentry><codeph>tgroup</codeph></stentry><stentry>blocks</stentry><stentry>children only</stentry></strow>
+        <strow><stentry><codeph>thead</codeph></stentry><stentry>blocks</stentry><stentry><codeph>thead</codeph></stentry></strow>
+        <strow><stentry><codeph>tbody</codeph></stentry><stentry>blocks</stentry><stentry><codeph>tbody</codeph></stentry></strow>
+        <strow><stentry><codeph>row</codeph></stentry><stentry>blocks</stentry><stentry><codeph>tr</codeph></stentry></strow>
+        <strow><stentry><codeph>entry</codeph></stentry><stentry>blocks</stentry><stentry>td, or th in a header</stentry></strow>
+        <strow><stentry><codeph>simpletable</codeph></stentry><stentry>blocks</stentry><stentry><codeph>table</codeph></stentry></strow>
+        <strow><stentry><codeph>sthead</codeph></stentry><stentry>blocks</stentry><stentry>thead row</stentry></strow>
+        <strow><stentry><codeph>strow</codeph></stentry><stentry>blocks</stentry><stentry><codeph>tr</codeph></stentry></strow>
+        <strow><stentry><codeph>stentry</codeph></stentry><stentry>blocks</stentry><stentry>td, or th in a header</stentry></strow>
+        <strow><stentry><codeph>properties</codeph></stentry><stentry>blocks</stentry><stentry><codeph>table</codeph></stentry></strow>
+        <strow><stentry><codeph>prophead</codeph></stentry><stentry>blocks</stentry><stentry>thead row</stentry></strow>
+        <strow><stentry><codeph>proptypehd</codeph></stentry><stentry>blocks</stentry><stentry><codeph>th</codeph></stentry></strow>
+        <strow><stentry><codeph>propvaluehd</codeph></stentry><stentry>blocks</stentry><stentry><codeph>th</codeph></stentry></strow>
+        <strow><stentry><codeph>propdeschd</codeph></stentry><stentry>blocks</stentry><stentry><codeph>th</codeph></stentry></strow>
+        <strow><stentry><codeph>property</codeph></stentry><stentry>blocks</stentry><stentry><codeph>tr</codeph></stentry></strow>
+        <strow><stentry><codeph>proptype</codeph></stentry><stentry>blocks</stentry><stentry><codeph>td</codeph></stentry></strow>
+        <strow><stentry><codeph>propvalue</codeph></stentry><stentry>blocks</stentry><stentry><codeph>td</codeph></stentry></strow>
+        <strow><stentry><codeph>propdesc</codeph></stentry><stentry>blocks</stentry><stentry><codeph>td</codeph></stentry></strow>
+        <strow><stentry><codeph>refsyn</codeph></stentry><stentry>blocks</stentry><stentry><codeph>section</codeph></stentry></strow>
+        <strow><stentry><codeph>prereq</codeph></stentry><stentry>task</stentry><stentry><codeph>section</codeph></stentry></strow>
+        <strow><stentry><codeph>context</codeph></stentry><stentry>task</stentry><stentry><codeph>section</codeph></stentry></strow>
+        <strow><stentry><codeph>steps</codeph></stentry><stentry>task</stentry><stentry><codeph>ol</codeph></stentry></strow>
+        <strow><stentry><codeph>steps-unordered</codeph></stentry><stentry>task</stentry><stentry><codeph>ul</codeph></stentry></strow>
+        <strow><stentry><codeph>steps-informal</codeph></stentry><stentry>task</stentry><stentry><codeph>div</codeph></stentry></strow>
+        <strow><stentry><codeph>step</codeph></stentry><stentry>task</stentry><stentry><codeph>li</codeph></stentry></strow>
+        <strow><stentry><codeph>cmd</codeph></stentry><stentry>task</stentry><stentry><codeph>span</codeph></stentry></strow>
+        <strow><stentry><codeph>info</codeph></stentry><stentry>task</stentry><stentry><codeph>div</codeph></stentry></strow>
+        <strow><stentry><codeph>substeps</codeph></stentry><stentry>task</stentry><stentry><codeph>ol</codeph></stentry></strow>
+        <strow><stentry><codeph>substep</codeph></stentry><stentry>task</stentry><stentry><codeph>li</codeph></stentry></strow>
+        <strow><stentry><codeph>stepxmp</codeph></stentry><stentry>task</stentry><stentry><codeph>div</codeph></stentry></strow>
+        <strow><stentry><codeph>stepresult</codeph></stentry><stentry>task</stentry><stentry><codeph>div</codeph></stentry></strow>
+        <strow><stentry><codeph>tutorialinfo</codeph></stentry><stentry>task</stentry><stentry><codeph>div</codeph></stentry></strow>
+        <strow><stentry><codeph>choices</codeph></stentry><stentry>task</stentry><stentry><codeph>ul</codeph></stentry></strow>
+        <strow><stentry><codeph>choice</codeph></stentry><stentry>task</stentry><stentry><codeph>li</codeph></stentry></strow>
+        <strow><stentry><codeph>result</codeph></stentry><stentry>task</stentry><stentry><codeph>section</codeph></stentry></strow>
+        <strow><stentry><codeph>postreq</codeph></stentry><stentry>task</stentry><stentry><codeph>section</codeph></stentry></strow>
+        <strow><stentry><codeph>tasktroubleshooting</codeph></stentry><stentry>task</stentry><stentry><codeph>section</codeph></stentry></strow>
+        <strow><stentry><codeph>condition</codeph></stentry><stentry>troubleshooting</stentry><stentry><codeph>section</codeph></stentry></strow>
+        <strow><stentry><codeph>troubleSolution</codeph></stentry><stentry>troubleshooting</stentry><stentry><codeph>div</codeph></stentry></strow>
+        <strow><stentry><codeph>cause</codeph></stentry><stentry>troubleshooting</stentry><stentry><codeph>section</codeph></stentry></strow>
+        <strow><stentry><codeph>remedy</codeph></stentry><stentry>troubleshooting</stentry><stentry><codeph>section</codeph></stentry></strow>
+        <strow><stentry><codeph>ph</codeph></stentry><stentry>inline</stentry><stentry><codeph>span</codeph></stentry></strow>
+        <strow><stentry><codeph>b</codeph></stentry><stentry>inline</stentry><stentry><codeph>b</codeph></stentry></strow>
+        <strow><stentry><codeph>i</codeph></stentry><stentry>inline</stentry><stentry><codeph>i</codeph></stentry></strow>
+        <strow><stentry><codeph>u</codeph></stentry><stentry>inline</stentry><stentry><codeph>u</codeph></stentry></strow>
+        <strow><stentry><codeph>sup</codeph></stentry><stentry>inline</stentry><stentry><codeph>sup</codeph></stentry></strow>
+        <strow><stentry><codeph>sub</codeph></stentry><stentry>inline</stentry><stentry><codeph>sub</codeph></stentry></strow>
+        <strow><stentry><codeph>tt</codeph></stentry><stentry>inline</stentry><stentry><codeph>code</codeph></stentry></strow>
+        <strow><stentry><codeph>line-through</codeph></stentry><stentry>inline</stentry><stentry><codeph>s</codeph></stentry></strow>
+        <strow><stentry><codeph>overline</codeph></stentry><stentry>inline</stentry><stentry><codeph>span</codeph></stentry></strow>
+        <strow><stentry><codeph>keyword</codeph></stentry><stentry>inline</stentry><stentry><codeph>span</codeph></stentry></strow>
+        <strow><stentry><codeph>term</codeph></stentry><stentry>inline</stentry><stentry><codeph>em</codeph></stentry></strow>
+        <strow><stentry><codeph>q</codeph></stentry><stentry>inline</stentry><stentry><codeph>q</codeph></stentry></strow>
+        <strow><stentry><codeph>xref</codeph></stentry><stentry>inline</stentry><stentry>a, or plain text when hidden</stentry></strow>
+        <strow><stentry><codeph>codeph</codeph></stentry><stentry>inline</stentry><stentry><codeph>code</codeph></stentry></strow>
+        <strow><stentry><codeph>filepath</codeph></stentry><stentry>inline</stentry><stentry><codeph>code</codeph></stentry></strow>
+        <strow><stentry><codeph>cmdname</codeph></stentry><stentry>inline</stentry><stentry><codeph>code</codeph></stentry></strow>
+        <strow><stentry><codeph>varname</codeph></stentry><stentry>inline</stentry><stentry><codeph>var</codeph></stentry></strow>
+        <strow><stentry><codeph>userinput</codeph></stentry><stentry>inline</stentry><stentry><codeph>kbd</codeph></stentry></strow>
+        <strow><stentry><codeph>systemoutput</codeph></stentry><stentry>inline</stentry><stentry><codeph>samp</codeph></stentry></strow>
+        <strow><stentry><codeph>uicontrol</codeph></stentry><stentry>inline</stentry><stentry><codeph>span</codeph></stentry></strow>
+        <strow><stentry><codeph>wintitle</codeph></stentry><stentry>inline</stentry><stentry><codeph>span</codeph></stentry></strow>
+        <strow><stentry><codeph>menucascade</codeph></stentry><stentry>inline</stentry><stentry>span with &gt; separators</stentry></strow>
+        <strow><stentry><codeph>option</codeph></stentry><stentry>inline</stentry><stentry><codeph>code</codeph></stentry></strow>
+        <strow><stentry><codeph>parmname</codeph></stentry><stentry>inline</stentry><stentry><codeph>code</codeph></stentry></strow>
+        <strow><stentry><codeph>apiname</codeph></stentry><stentry>inline</stentry><stentry><codeph>code</codeph></stentry></strow>
+        <strow><stentry><codeph>msgph</codeph></stentry><stentry>inline</stentry><stentry><codeph>samp</codeph></stentry></strow>
+        <strow><stentry><codeph>synph</codeph></stentry><stentry>inline</stentry><stentry><codeph>code</codeph></stentry></strow>
+        <strow><stentry><codeph>text</codeph></stentry><stentry>inline</stentry><stentry><codeph>span</codeph></stentry></strow>
+        <strow><stentry><codeph>tm</codeph></stentry><stentry>inline</stentry><stentry>span with a ™, ® or ℠ mark</stentry></strow>
+        <strow><stentry><codeph>cite</codeph></stentry><stentry>inline</stentry><stentry><codeph>cite</codeph></stentry></strow>
+        <strow><stentry><codeph>fn</codeph></stentry><stentry>inline</stentry><stentry>span in parentheses</stentry></strow>
+        <strow><stentry><codeph>abbreviated-form</codeph></stentry><stentry>inline</stentry><stentry><codeph>span</codeph></stentry></strow>
+      </simpletable>
+    </section>
+
+    <section id="map-elements">
+      <title>Map and bookmap elements</title>
+      <p>Maps may contain <codeph>map</codeph>, <codeph>bookmap</codeph>, <codeph>title</codeph>,
+        <codeph>topicmeta</codeph>, <codeph>navtitle</codeph>, <codeph>linktext</codeph>,
+        <codeph>shortdesc</codeph>, <codeph>keywords</codeph>, <codeph>keyword</codeph>,
+        <codeph>searchtitle</codeph>, <codeph>data</codeph>, <codeph>topicref</codeph>,
+        <codeph>topichead</codeph>, <codeph>topicgroup</codeph>, <codeph>keydef</codeph>,
+        <codeph>mapref</codeph>, <codeph>ditavalref</codeph>, <codeph>anchor</codeph>,
+        <codeph>anchorref</codeph>, <codeph>navref</codeph>, <codeph>chapter</codeph>, <codeph>part</codeph>,
+        <codeph>appendix</codeph>, <codeph>appendices</codeph>, <codeph>frontmatter</codeph>,
+        <codeph>backmatter</codeph>, <codeph>notices</codeph>, <codeph>booktitle</codeph>,
+        <codeph>mainbooktitle</codeph>, <codeph>booktitlealt</codeph>, <codeph>bookmeta</codeph>,
+        <codeph>booklists</codeph>, <codeph>toc</codeph>, <codeph>indexlist</codeph>,
+        <codeph>glossarylist</codeph>, <codeph>tablelist</codeph>, <codeph>figurelist</codeph>,
+        <codeph>reltable</codeph>, <codeph>relheader</codeph>, <codeph>relcolspec</codeph>,
+        <codeph>relrow</codeph>, <codeph>relcell</codeph>, <codeph>glossref</codeph> and
+        <codeph>resourceid</codeph>.</p>
+      <p>Of these, navigation is built from <codeph>topicref</codeph>, <codeph>topichead</codeph>,
+        <codeph>topicgroup</codeph>, <codeph>mapref</codeph>, <codeph>chapter</codeph>,
+        <codeph>part</codeph>, <codeph>appendix</codeph>, <codeph>frontmatter</codeph> and
+        <codeph>backmatter</codeph>; keys come from any element with <codeph>keys</codeph>. Relationship
+        tables, <codeph>anchor</codeph>, <codeph>navref</codeph>, <codeph>ditavalref</codeph> and the book
+        lists are accepted and ignored. See <xref href="topics-and-maps.dita"/>.</p>
+    </section>
+
+    <section id="not-supported">
+      <title>Not supported yet</title>
+      <ul>
+        <li>DTD processing and <codeph>@class</codeph> specialisation.</li>
+        <li><codeph>conrefend</codeph> ranges and <codeph>conaction</codeph>. They produce an
+          <codeph>unsupported-conref</codeph> warning, and only the start element is pulled.</li>
+        <li>Relationship tables, key scopes and branch filtering with <codeph>ditavalref</codeph>.</li>
+        <li>Topic references to external or non-DITA resources (<codeph>unsupported-topicref</codeph>).</li>
+        <li>DITAVAL flagging styles: <codeph>flag</codeph> includes the content without styling it.</li>
+      </ul>
+    </section>
+  </refbody>
+</reference>

@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE task PUBLIC "-//OASIS//DTD DITA Task//EN" "task.dtd">
+<task id="preview" audience="author">
+  <title>Preview as different readers</title>
+  <shortdesc>Serve the docs on your machine, rebuilding on save, and see exactly what each kind of reader
+    gets.</shortdesc>
+  <taskbody>
+    <context>
+      <p>The previewer uses the same build, filter and renderer as hosted delivery. "Preview as" is the
+        real reader filter, not an approximation, so if a paragraph shows for a reader here, it shows for
+        that reader in production.</p>
+    </context>
+    <steps>
+      <step>
+        <cmd>Start the previewer on your docs folder.</cmd>
+        <stepxmp>
+          <codeblock>pnpm opend preview path/to/docs</codeblock>
+        </stepxmp>
+        <stepresult>
+          <p>It prints any problems, then <systemoutput>Serving http://127.0.0.1:4000/ (watching for
+            changes)</systemoutput>. Open that address. Pages reload when you save a file.</p>
+        </stepresult>
+      </step>
+      <step>
+        <cmd>Look at the staff view.</cmd>
+        <info>
+          <p>With no reader options the previewer shows everything that survives the build-time filter, and
+            marks each conditional element with its attributes, such as
+            <codeph>product=embed</codeph>. Every alternative of a conditional key is shown, separated by a
+            bar. Readers never see these markers.</p>
+        </info>
+      </step>
+      <step>
+        <cmd>Switch reader with <uicontrol>Preview as</uicontrol> in the banner at the top of each page.</cmd>
+        <info>
+          <p>The list holds the readers in <filepath>preview-contexts.yaml</filepath>. The choice is kept in
+            a cookie, so it sticks while you browse. The banner also shows the reader's products, features
+            and version, and a summary of any validation problems.</p>
+        </info>
+      </step>
+      <step>
+        <cmd>Or start the previewer as a particular reader.</cmd>
+        <choices>
+          <choice><option>--as admin</option> picks a named reader from
+            <filepath>preview-contexts.yaml</filepath>.</choice>
+          <choice><option>--product core,embed --feature early-access --version 0.1</option> describes a
+            reader on the command line. <option>--version</option> defaults to the project's release.</choice>
+          <choice><option>--all</option> is the staff view, the default.</choice>
+        </choices>
+      </step>
+      <step>
+        <cmd>Optional: preview a release branch or tag without checking it out.</cmd>
+        <stepxmp>
+          <codeblock>pnpm opend preview path/to/docs --ref v1</codeblock>
+        </stepxmp>
+        <info>
+          <p>A git ref is read once and not watched.</p>
+        </info>
+      </step>
+    </steps>
+    <result>
+      <p>Besides the pages, the previewer serves a few helper pages:</p>
+      <dl>
+        <dlentry>
+          <dt><filepath>/_opend/publications</filepath></dt>
+          <dd>Every PDF publication, and whether the current reader can see anything in it.</dd>
+        </dlentry>
+        <dlentry>
+          <dt><filepath>/pdf/&lt;name&gt;.pdf</filepath> and <filepath>/pdf/&lt;name&gt;.html</filepath></dt>
+          <dd>A publication printed for the current reader, and its print HTML.</dd>
+        </dlentry>
+        <dlentry product="embed">
+          <dt><filepath>/_opend/help-lab</filepath></dt>
+          <dd>What every context-sensitive help key and route resolves to. See
+            <xref href="help-lab.dita"/>.</dd>
+        </dlentry>
+        <dlentry>
+          <dt><filepath>/_opend/diagnostics.json</filepath></dt>
+          <dd>The current validation problems as JSON.</dd>
+        </dlentry>
+      </dl>
+    </result>
+    <postreq>
+      <p>To add your own sample readers, see <xref href="../authoring/preview-contexts.dita"/>.</p>
+    </postreq>
+  </taskbody>
+</task>

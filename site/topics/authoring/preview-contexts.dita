@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE reference PUBLIC "-//OASIS//DTD DITA Reference//EN" "reference.dtd">
+<reference id="preview-contexts" audience="author">
+  <title>preview-contexts.yaml reference</title>
+  <shortdesc>Sample readers for the previewer. Each is what the entitlement service would produce for a
+    signed-in reader.</shortdesc>
+  <refbody>
+    <section id="format">
+      <codeblock>contexts:
+  self-hoster:
+    org: acme
+    products: [core]
+    version: '0.1'
+  managed-customer:
+    org: globex
+    products: [hosted, embed]
+    features: []
+    version: '0.1'</codeblock>
+      <properties relcolwidth="2* 2* 5*">
+        <prophead><proptypehd>Field</proptypehd><propvaluehd>Default</propvaluehd><propdeschd>Meaning</propdeschd></prophead>
+        <property><proptype><parmname>org</parmname></proptype><propvalue>none</propvalue><propdesc>Shown in the banner, and on the cover of PDFs printed in the previewer. It does not affect filtering.</propdesc></property>
+        <property><proptype><parmname>products</parmname></proptype><propvalue><codeph>[]</codeph></propvalue><propdesc>Products the reader's organization holds.</propdesc></property>
+        <property><proptype><parmname>features</parmname></proptype><propvalue><codeph>[]</codeph></propvalue><propdesc>Features the reader's organization holds.</propdesc></property>
+        <property><proptype><parmname>version</parmname></proptype><propvalue>required</propvalue><propdesc>The release the reader runs, such as <codeph>0.1</codeph>. Quote it.</propdesc></property>
+      </properties>
+      <p>Each name becomes an entry in the banner's <uicontrol>Preview as</uicontrol> list, and a value for
+        <option>--as</option>. A malformed file is reported as <codeph>invalid-preview-contexts</codeph>.</p>
+    </section>
+    <section id="choosing">
+      <title>Choosing sample readers</title>
+      <p>Cover each combination that changes what readers see: every product, the features that gate whole
+        topics, and each release line you publish. Also include a reader with nothing, to check that the
+        ungated pages still make sense on their own. The previewer only shows these readers; it does not
+        check them against your real organizations.</p>
+    </section>
+  </refbody>
+</reference>

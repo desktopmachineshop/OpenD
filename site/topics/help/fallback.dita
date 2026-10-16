@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="fallback" product="embed" audience="author developer">
+  <title>How a context resolves, and its fallback rules</title>
+  <shortdesc>A help request names an app and either a key or a path. <keyword keyref="product-name"/>
+    tries the key, then its parents, then the app's default, and only ever opens a topic the reader can
+    see.</shortdesc>
+  <conbody>
+    <ol>
+      <li>If the request has a <parmname>key</parmname>, that is the requested key, and any
+        <parmname>path</parmname> is ignored. Otherwise the most specific route matching the
+        <parmname>path</parmname> gives the key. A path that matches no route has no requested key.</li>
+      <li>The requested key is tried, then each parent: <codeph>tenants.detail</codeph>, then
+        <codeph>tenants</codeph>.</li>
+      <li>Then the app's <parmname>default</parmname>, and its parents.</li>
+      <li>For each key, the targets are tried in order, map entries first. A target counts only when all its
+        conditions pass for this reader <i>and</i> its topic is visible to them.</li>
+      <li>The first target that counts is opened. If none does, there is no help for this context: the panel
+        says so and offers search, and the JSON API answers 404.</li>
+    </ol>
+    <p>The result records how it was found: <codeph>key</codeph> (the requested key itself),
+      <codeph>parent</codeph> or <codeph>default</codeph>. The help lab shows it, and the JSON API returns it
+      as <parmname>via</parmname>.</p>
+    <section id="never-reveals">
+      <title>A lookup never reveals a hidden topic</title>
+      <p>Because hidden targets are skipped, a host app cannot learn about a topic by asking for its key: a
+        reader without the topic simply gets the fallback, exactly as if the key pointed nowhere. The same
+        holds when only part of a key's targets are hidden, which is how one key can open different topics
+        for different releases.</p>
+      <p>In this site, the <codeph>opend-console</codeph> keys for the web editor point at an early-access
+        topic. Readers without the <codeph>early-access</codeph> feature fall back to the overview.</p>
+    </section>
+  </conbody>
+</concept>

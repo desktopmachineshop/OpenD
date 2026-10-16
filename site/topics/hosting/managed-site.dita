@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE task PUBLIC "-//OASIS//DTD DITA Task//EN" "task.dtd">
+<task id="managed-site" product="hosted" audience="author admin">
+  <title>Publish to a docs site someone else operates</title>
+  <shortdesc>When another team or a provider runs the <keyword keyref="product-name"/> server, connecting
+    your docs repository takes a few details and one webhook.</shortdesc>
+  <taskbody>
+    <steps>
+      <step>
+        <cmd>Send the operator your repository details.</cmd>
+        <choices>
+          <choice>The repository's full name and clone URL, such as <codeph>acme/docs</codeph> and
+            <codeph>https://github.com/acme/docs.git</codeph>.</choice>
+          <choice>The branches and tags that publish, such as <codeph>main</codeph> and
+            <codeph>v*</codeph>.</choice>
+          <choice>The folder inside the repository that holds <filepath>opend.config.yaml</filepath>, if it is
+            not the root.</choice>
+          <choice>Whether the repository is private. Private repositories need the operator's GitHub App
+            installed on them.</choice>
+        </choices>
+      </step>
+      <step>
+        <cmd>Add the webhook the operator gives you, or install their GitHub App.</cmd>
+        <info>
+          <p>The webhook sends push events, as JSON, to the site's <filepath>/webhooks/github</filepath> with a
+            secret the operator shares with you.</p>
+        </info>
+      </step>
+      <step>
+        <cmd>Tell the operator which organizations should read the docs, with their products, features and
+          release, and who their readers are.</cmd>
+      </step>
+      <step>
+        <cmd>Push.</cmd>
+        <stepresult>
+          <p>With the GitHub App installed, the commit shows an <codeph>opend/build</codeph> status: pending,
+            then <systemoutput>Published 0.1</systemoutput>, or a failure naming the first errors.</p>
+        </stepresult>
+      </step>
+    </steps>
+    <result>
+      <p>A push that fails validation never goes live; the previous version stays up. Run
+        <cmdname>opend validate</cmdname> locally or in CI to catch problems first, and ask
+        <ph keyref="help-contact"/> for the full list of a failed build's diagnostics.</p>
+    </result>
+  </taskbody>
+</task>

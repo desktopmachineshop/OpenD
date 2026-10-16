@@ -1,0 +1,29 @@
+# Context-sensitive help for host apps that embed these docs.
+# Topics declare keys with <resourceid appname="opend-console" appid="tenants"/>.
+# opend-console is OpenD's own operator console and web editor. Keys fall back to
+# their parents (tenants.detail -> tenants), then to the default, and never to a
+# topic the reader cannot see.
+apps:
+  opend-console:
+    default: overview
+    routes:
+      /: overview
+      /whats-new: whats-new
+      # Operator console
+      /tenants: tenants
+      /tenants/:tenant: tenants.detail
+      /tenants/:tenant/**: tenants.detail
+      /billing/**: billing
+      /repos/**: repos
+      /builds: builds
+      /builds/:build: builds
+      /orgs: orgs
+      /orgs/:org/entitlements: orgs.entitlements
+      /orgs/:org/**: orgs
+      /readers/**: readers
+      /audit: audit
+      # Web editor
+      /editor/**: editor
+      /editor/:repo/save: editor.save
+      /editor/:repo/publish: editor.publish
+      /editor/:repo/conflicts: editor.conflicts
