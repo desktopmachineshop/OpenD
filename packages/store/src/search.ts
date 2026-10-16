@@ -146,18 +146,27 @@ export interface SearchCandidate {
 
 /**
  * Topics that match the query on the segments behind `visibleKeys` alone, best
- * first. Words in segments behind other conditions neither match nor rank. The
- * caller must still check each candidate against the reader's view.
+ * first. Words in segments behind other conditions neither match nor rank.
+ * With `topicIds`, only those topics are considered, so topics the reader
+ * cannot see (for example behind a map condition) never take up the limit.
+ * The caller must still check each candidate against the reader's view.
  */
 export async function searchCandidates(
   db: Db,
-  input: { releaseId: number; query: SearchQuery; visibleKeys: string[]; limit: number },
+  input: {
+    releaseId: number;
+    query: SearchQuery;
+    visibleKeys: string[];
+    topicIds?: string[];
+    limit: number;
+  },
 ): Promise<SearchCandidate[]> {
   const { rows } = await db.query<SearchCandidate>(
     `with q as (select ${tsquerySql(2, 3)} as q),
      cand as (
        select t.topic_id from search_topics t, q
        where t.release_id = $1 and numnode(q.q) > 0 and t.tsv @@ q.q
+         and ($6::text[] is null or t.topic_id = any($6::text[]))
      ),
      vis as (
        select s.topic_id, opend_tsvector_agg(s.tsv order by s.seq) as tsv
@@ -168,7 +177,14 @@ export async function searchCandidates(
      select vis.topic_id as "topicId", ts_rank(vis.tsv, q.q)::float8 as rank
      from vis, q where vis.tsv @@ q.q
      order by rank desc, vis.topic_id limit $5`,
-    [input.releaseId, input.query.text, input.query.prefix, input.visibleKeys, input.limit],
+    [
+      input.releaseId,
+      input.query.text,
+      input.query.prefix,
+      input.visibleKeys,
+      input.limit,
+      input.topicIds ?? null,
+    ],
   );
   return rows;
 }

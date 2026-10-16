@@ -15,7 +15,7 @@ import {
 } from '@opend/store';
 import type { ReaderRelease } from './delivery.js';
 
-/** Over-fetch from the index, since some candidates may fail the view re-check. */
+/** Over-fetch from the index, since a candidate can still fail the view re-check. */
 const CANDIDATE_FACTOR = 3;
 
 /** `…text…` with ellipses where the snippet does not reach the ends of `source`. */
@@ -53,6 +53,7 @@ export async function searchRelease(
     releaseId: release.stored.id,
     query: parsed,
     visibleKeys,
+    topicIds: view.topicIds(),
     limit: limit * CANDIDATE_FACTOR,
   });
 
