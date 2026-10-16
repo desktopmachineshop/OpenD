@@ -3,3 +3,5 @@ dist/
 *.tsbuildinfo
 .opend/
 coverage/
+deploy/.env
+deploy/seed/seed.yaml

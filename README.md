@@ -2,7 +2,12 @@
 
 A docs platform where **"which release applies" and "who may see this" are one rule**. Authors write DITA in a Git repository. The build compiles it into a release snapshot that keeps every element's applicability, and each reader is served only what their release and entitlements allow.
 
-This repository holds the first increment: the shared build and filter core, plus a local previewer. The hosted pieces (content store, webhook build, delivery service, entitlement service, web editor, PDF) come later and reuse these packages unchanged.
+This repository holds:
+
+- **Stage 1:** the shared build and filter core, and a local previewer.
+- **Stage 2:** the hosted path. A push fires a GitHub webhook, a worker builds and validates the docs, and signed-in readers get pages filtered by their org's entitlements.
+
+The web editor, PDF, search and multi-tenancy come later and reuse the same packages.
 
 ## Quick start
 
@@ -55,8 +60,41 @@ See [docs/adr/0003-applicability.md](docs/adr/0003-applicability.md) for the det
 | [`@opend/validate`](packages/validate)       | Every check, shared by CI, the CLI and the previewer                                                |
 | [`@opend/render-html`](packages/render-html) | Filtered view to HTML pages and navigation                                                          |
 | [`@opend/cli`](packages/cli)                 | `opend validate`, `opend build`, `opend preview`                                                    |
+| [`@opend/store`](packages/store)             | Postgres schema and migrations, build queue, releases, orgs, readers and entitlements; blob store   |
+| [`@opend/worker`](packages/worker)           | Fetches a pushed commit, builds, validates, then publishes or reports the failure                   |
+| [`@opend/server`](packages/server)           | `opend-server`: GitHub webhook, OIDC reader sign-in, filtered delivery, admin API                   |
 
 `templates/docs-starter` is the template repository teams start from. It contains sample topics, a map and a bookmap, reusable chunks, a brand theme, preview contexts and a validation workflow.
+
+## Hosting
+
+One image runs every role (`serve`, `worker`, `migrate`, `seed`), configured only by environment variables. The smallest install is the app, the worker and Postgres:
+
+```sh
+cp deploy/.env.example deploy/.env                 # set SESSION_SECRET, webhook secret, OIDC, admin token
+cp deploy/seed/seed.example.yaml deploy/seed/seed.yaml
+docker compose -f deploy/docker-compose.yml up -d --build
+docker compose -f deploy/docker-compose.yml run --rm migrate seed /seed/seed.yaml
+```
+
+Then:
+
+1. Point a GitHub webhook (push events, JSON, your secret) at `${PUBLIC_URL}/webhooks/github`.
+2. Register `${PUBLIC_URL}/auth/callback` as the redirect URI with your OIDC provider.
+3. Readers sign in, and each is served the live release for their version's line (1.x or 2.x) through the same filter as the previewer.
+4. A push that fails validation never goes live. It shows as a failed `opend/build` status on the commit, and its diagnostics are available from `GET /admin/api/builds/:id`.
+
+To try it without an identity provider, set `NODE_ENV=development` and `OPEND_DEV_LOGIN=1` and sign in at `/auth/dev` as any seeded reader. The server refuses the development login in production.
+
+| Admin API (`Authorization: Bearer $OPEND_ADMIN_TOKEN`)                                               |                                                     |
+| ---------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| `GET/POST /admin/api/repos`, `POST /admin/api/repos/:id/builds`                                      | Register docs repos; rebuild a commit               |
+| `GET /admin/api/repos/:id/releases`, `GET /admin/api/builds[/:id]`                                   | Live releases; builds and their diagnostics         |
+| `GET/POST /admin/api/orgs`, `PUT /admin/api/orgs/:slug/entitlements`, `DELETE /admin/api/orgs/:slug` | Orgs and entitlements                               |
+| `GET/POST /admin/api/readers`, `DELETE /admin/api/readers/:id`                                       | Readers, matched to OIDC sign-ins by verified email |
+| `GET /admin/api/audit`                                                                               | Audit log                                           |
+
+See [ADR 0004](docs/adr/0004-hosted-architecture.md) for how it fits together.
 
 ## Development
 
@@ -67,13 +105,16 @@ pnpm format:check
 pnpm test        # vitest, including the end-to-end leak test over the starter template
 ```
 
-Tests run against TypeScript sources through the `source` export condition, so they need no build step. The CLI (`pnpm opend`) runs the compiled output, so run `pnpm build` first.
+Tests run against TypeScript sources through the `source` export condition, so they need no build step.
+
+The store, worker and server integration tests need Postgres. Set `TEST_DATABASE_URL` (for example `postgres://opend@localhost:5432/opend_test`); each test file creates and drops its own database. Without the variable those tests are skipped locally. In CI a missing variable is an error. The CLI (`pnpm opend`) runs the compiled output, so run `pnpm build` first.
 
 ## Decisions
 
 - [0001 TypeScript on Node](docs/adr/0001-typescript.md)
 - [0002 A DITA subset, parsed in TypeScript](docs/adr/0002-dita-subset.md)
 - [0003 Applicability and fail-closed filtering](docs/adr/0003-applicability.md)
+- [0004 Hosted architecture: push to publish](docs/adr/0004-hosted-architecture.md)
 
 ## Licence
 

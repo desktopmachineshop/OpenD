@@ -8,6 +8,23 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: opend
+          POSTGRES_PASSWORD: opend
+          POSTGRES_DB: opend_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U opend -d opend_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      # Integration tests create a throwaway database per test file next to this one.
+      TEST_DATABASE_URL: postgres://opend:opend@localhost:5432/opend_test
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -22,3 +39,12 @@ jobs:
       - run: pnpm test
       - name: Validate the starter template
         run: pnpm opend validate templates/docs-starter --format github
+
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the hosted image
+        run: docker build -f deploy/Dockerfile -t opend:ci .
+      - name: Smoke-test the image
+        run: docker run --rm opend:ci --help
