@@ -38,9 +38,13 @@
             disk, otherwise any S3-compatible bucket.</dd>
         </dlentry>
       </dl>
+      <p>An optional fifth part, the web editor (<codeph>opend-server editor serve</codeph>), runs on its
+        own host. It lets authors who do not use Git save to their own branch and publish through a pull
+        request, committing through the GitHub App, so content still reaches readers only by a push.<ph
+        product="core"> See <xref href="editor.dita"/>.</ph></p>
       <p product="core">One image runs every role: <codeph>serve</codeph>, <codeph>worker</codeph>,
-        <codeph>migrate</codeph>, <codeph>seed</codeph>, <codeph>reconcile</codeph> and
-        <codeph>reindex</codeph>. It is configured only with environment variables;
+        <codeph>migrate</codeph>, <codeph>seed</codeph>, <codeph>reconcile</codeph>,
+        <codeph>reindex</codeph> and <codeph>editor</codeph>. It is configured only with environment variables;
         see <xref keyref="env-vars">the environment variable reference</xref>.</p>
     </section>
 

@@ -69,6 +69,8 @@ cp deploy/seed/seed.example.yaml deploy/seed/seed.yaml</codeblock>
       <p>To evaluate without an identity provider, set <codeph>NODE_ENV=development</codeph> and
         <codeph>OPEND_DEV_LOGIN=1</codeph>, then sign in at <filepath>/auth/dev</filepath> as any seeded
         reader. Never do this with real content.</p>
+      <p>The web editor is an optional Compose profile, <codeph>editor</codeph>. See
+        <xref href="editor.dita"/>.</p>
     </result>
   </taskbody>
 </task>
