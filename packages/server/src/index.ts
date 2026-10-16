@@ -15,3 +15,6 @@ export * from './entitlement-sync.js';
 export * from './reconcile-command.js';
 export * from './search.js';
 export * from './reindex-command.js';
+export * from './analytics.js';
+export * from './analytics-purge.js';
+export * from './feedback.js';

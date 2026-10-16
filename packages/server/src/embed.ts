@@ -13,11 +13,22 @@ import {
   type EmbedOptions,
 } from '@opend/render-html';
 import { findReaderByEmail, getReaderAccess, type ReaderAccess } from '@opend/store';
+import { FEEDBACK_MARKER, feedbackHtml } from './analytics.js';
 import { currentAccess, setEmbedSession } from './auth.js';
 import type { AppContext } from './context.js';
 import { readerRelease, type ReaderRelease } from './delivery.js';
 import { EmbedTokenError, verifyEmbedToken } from './embed-token.js';
 import { searchRelease } from './search.js';
+
+/** Headers for help-panel pages: only the configured host apps may frame them. */
+export function embedFrameHeaders(origins: readonly string[]): Record<string, string> {
+  return {
+    'cache-control': 'private, no-store',
+    'x-content-type-options': 'nosniff',
+    'referrer-policy': 'strict-origin',
+    'content-security-policy': `default-src 'none'; script-src 'self'; img-src 'self' https: data:; style-src 'self' 'unsafe-inline'; connect-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors ${origins.join(' ')}`,
+  };
+}
 
 /**
  * Embedded help for host apps: the panel pages a host frames, the widget and
@@ -33,13 +44,7 @@ export function registerEmbed(app: FastifyInstance, ctx: AppContext): void {
   /** Verified bearer tokens → reader id, until shortly before they expire. */
   const tokens = new LRUCache<string, { readerId: number }>({ max: 5000, ttl: 60_000 });
 
-  const frameHeaders = {
-    'cache-control': 'private, no-store',
-    'x-content-type-options': 'nosniff',
-    'referrer-policy': 'strict-origin',
-    // Only the configured host apps may frame the panel.
-    'content-security-policy': `default-src 'none'; script-src 'self'; img-src 'self' https: data:; style-src 'self' 'unsafe-inline'; connect-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors ${[...allowed].join(' ')}`,
-  };
+  const frameHeaders = embedFrameHeaders([...allowed]);
 
   /** Resolves a token to a reader whose org matches the claim. */
   const readerForToken = async (
@@ -158,12 +163,24 @@ export function registerEmbed(app: FastifyInstance, ctx: AppContext): void {
       release.view,
       path,
       params,
-      embedOptions(request, release.view),
+      { ...embedOptions(request, release.view), topicEnd: FEEDBACK_MARKER },
       hits,
     );
     if (result.location)
       return reply.headers(frameHeaders).redirect(result.location, result.status);
-    return send(result.status, result.html);
+    const event = { surface: 'embed', orgSlug: access.orgSlug, releaseLine: release.line } as const;
+    let html = result.html;
+    if (result.topicId) {
+      ctx.analytics.view(request, { ...event, topicId: result.topicId });
+      html = html.replace(FEEDBACK_MARKER, feedbackHtml(request, ctx, result.topicId, 'embed'));
+    }
+    if (result.search)
+      ctx.analytics.search(request, {
+        ...event,
+        query: result.search.query,
+        resultCount: result.search.hits,
+      });
+    return send(result.status, html);
   };
   app.get('/embed/context', panel);
   app.get('/embed/search', panel);
@@ -241,6 +258,18 @@ export function registerEmbed(app: FastifyInstance, ctx: AppContext): void {
     };
   };
 
+  const apiView = (
+    request: FastifyRequest,
+    r: { access: ReaderAccess; release: ReaderRelease },
+    topicId: string,
+  ) =>
+    ctx.analytics.view(request, {
+      surface: 'api',
+      orgSlug: r.access.orgSlug,
+      releaseLine: r.release.line,
+      topicId,
+    });
+
   app.get('/api/v1/help/context', async (request, reply) => {
     const r = await apiReader(request, reply);
     if (!r) return reply;
@@ -256,7 +285,9 @@ export function registerEmbed(app: FastifyInstance, ctx: AppContext): void {
         via: resolved.via,
         fragment: resolved.fragment ?? null,
       });
-    return body ? reply.send(body) : reply.code(404).send({ error: 'no help for this context' });
+    if (!body) return reply.code(404).send({ error: 'no help for this context' });
+    apiView(request, r, body.topicId);
+    return reply.send(body);
   });
 
   app.get('/api/v1/help/topics/*', async (request, reply) => {
@@ -264,13 +295,23 @@ export function registerEmbed(app: FastifyInstance, ctx: AppContext): void {
     if (!r) return reply;
     const id = (request.params as { '*': string })['*'];
     const body = topicJson(r.release.view, id);
-    return body ? reply.send(body) : reply.code(404).send({ error: 'not found' });
+    if (!body) return reply.code(404).send({ error: 'not found' });
+    apiView(request, r, id);
+    return reply.send(body);
   });
 
   app.get('/api/v1/help/search', async (request, reply) => {
     const r = await apiReader(request, reply);
     if (!r) return reply;
     const q = (request.query as { q?: string }).q ?? '';
-    return reply.send({ query: q, hits: await searchRelease(ctx.pool, r.release, q) });
+    const hits = await searchRelease(ctx.pool, r.release, q);
+    ctx.analytics.search(request, {
+      surface: 'api',
+      orgSlug: r.access.orgSlug,
+      releaseLine: r.release.line,
+      query: q,
+      resultCount: hits.length,
+    });
+    return reply.send({ query: q, hits });
   });
 }

@@ -34,6 +34,7 @@ import {
   type Repo,
   type StoredRelease,
 } from '@opend/store';
+import { FEEDBACK_MARKER, feedbackHtml } from './analytics.js';
 import { currentAccess, redirectToLogin } from './auth.js';
 import type { AppContext } from './context.js';
 import { USER_BAR_MARKER, messagePage, userBar } from './pages.js';
@@ -70,6 +71,8 @@ export interface ReaderRelease {
   view: ReleaseView;
   /** `releaseId|entitlementKey`: everything rendered from this view is cached under it. */
   key: string;
+  /** The reader's release line, e.g. `2`. */
+  line: string;
   reader: ReaderContext;
 }
 
@@ -126,7 +129,7 @@ export async function readerRelease(
     view = viewRelease(stored.snapshot, [readerPolicy(reader)]);
     ctx.caches.views.set(key, view);
   }
-  return { stored, view, key, reader };
+  return { stored, view, key, line, reader };
 }
 
 /** The reader's view of one publication, or `null` when the release has none from `file`. */
@@ -162,7 +165,7 @@ export async function resolveReader(
   ctx: AppContext,
   request: FastifyRequest,
   reply: FastifyReply,
-): Promise<{ email: string; release: ReaderRelease } | null> {
+): Promise<{ email: string; orgSlug: string; release: ReaderRelease } | null> {
   const access = await currentAccess(request, ctx);
   if (!access) {
     await redirectToLogin(request, reply);
@@ -187,7 +190,7 @@ export async function resolveReader(
       .send(messagePage('Not published', release));
     return null;
   }
-  return { email: access.reader.email, release };
+  return { email: access.reader.email, orgSlug: access.orgSlug, release };
 }
 
 const visibleAssetsCache = new WeakMap<ReleaseView, Set<string>>();
@@ -212,6 +215,7 @@ export function registerDelivery(app: FastifyInstance, ctx: AppContext): void {
   const pageOptions = (release: ReaderRelease): PageOptions => {
     const options: PageOptions = {
       banner: USER_BAR_MARKER,
+      topicEnd: FEEDBACK_MARKER,
       publications: readerPublications(ctx, release).map((p) => ({
         title: p.title || publicationSlug(p.file),
         href: publicationHref(p),
@@ -223,12 +227,18 @@ export function registerDelivery(app: FastifyInstance, ctx: AppContext): void {
   const resolve = (request: FastifyRequest, reply: FastifyReply) =>
     resolveReader(ctx, request, reply);
 
-  const sendPage = (reply: FastifyReply, status: number, html: string, email: string) =>
+  const sendPage = (
+    reply: FastifyReply,
+    status: number,
+    html: string,
+    email: string,
+    feedback = '',
+  ) =>
     reply
       .code(status)
       .headers(PAGE_HEADERS)
       .type('text/html; charset=utf-8')
-      .send(html.replace(USER_BAR_MARKER, userBar(email)));
+      .send(html.replace(USER_BAR_MARKER, userBar(email)).replace(FEEDBACK_MARKER, feedback));
 
   app.get('/', async (request, reply) => {
     const r = await resolve(request, reply);
@@ -277,7 +287,16 @@ export function registerDelivery(app: FastifyInstance, ctx: AppContext): void {
         html = renderPage(view, topicId, pageOptions(r.release)) ?? '';
         ctx.caches.pages.set(cacheKey, html);
       }
-      if (html) return sendPage(reply, 200, html, r.email);
+      if (html) {
+        ctx.analytics.view(request, {
+          surface: 'site',
+          orgSlug: r.orgSlug,
+          releaseLine: r.release.line,
+          topicId,
+        });
+        const feedback = feedbackHtml(request, ctx, topicId, 'site');
+        return sendPage(reply, 200, html, r.email, feedback);
+      }
     }
     // Missing and hidden pages look the same.
     return sendPage(reply, 404, renderNotFound(view, pageOptions(r.release)), r.email);

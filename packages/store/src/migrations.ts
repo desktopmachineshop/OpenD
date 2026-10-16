@@ -253,4 +253,41 @@ create aggregate opend_tsvector_agg (tsvector) (
 );
 `,
   },
+  {
+    // Self-contained (and numbered past 004) so it applies in any order with other migrations.
+    id: '005_analytics',
+    sql: `
+-- Docs analytics. Deliberately no reader id, email or IP address: only the org,
+-- what was looked at and where. Purged after OPEND_ANALYTICS_RETENTION_DAYS.
+create table if not exists analytics_events (
+  id bigserial primary key,
+  at timestamptz not null default now(),
+  kind text not null check (kind in ('view', 'search')),
+  surface text not null check (surface in ('site', 'embed', 'api')),
+  org_slug text not null,
+  release_line text not null,
+  -- views: the topic shown
+  topic_id text,
+  -- searches: the normalised query and how many hits it returned
+  query text check (char_length(query) <= 200),
+  result_count int
+);
+create index if not exists analytics_events_at on analytics_events (at);
+create index if not exists analytics_events_kind_at on analytics_events (kind, at);
+
+-- "Was this page helpful?" answers. The comment is untrusted reader text.
+create table if not exists analytics_feedback (
+  id bigserial primary key,
+  at timestamptz not null default now(),
+  surface text not null check (surface in ('site', 'embed')),
+  org_slug text not null,
+  release_line text not null,
+  topic_id text not null,
+  helpful boolean not null,
+  comment text check (char_length(comment) <= 1000)
+);
+create index if not exists analytics_feedback_at on analytics_feedback (at);
+create index if not exists analytics_feedback_topic_at on analytics_feedback (topic_id, at);
+`,
+  },
 ];

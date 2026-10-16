@@ -2,6 +2,7 @@ import { timingSafeEqual } from 'node:crypto';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import {
+  analyticsSummary,
   audit,
   deleteOrg,
   deleteReader,
@@ -9,6 +10,7 @@ import {
   getJob,
   getRepo,
   listAudit,
+  listFeedback,
   listJobs,
   listLiveReleases,
   listOrgs,
@@ -57,6 +59,27 @@ const repoSchema = z.object({
     )
     .optional(),
 });
+const analyticsQuery = z.object({
+  days: z.coerce.number().int().min(1).max(3650).default(30),
+  limit: z.coerce.number().int().min(1).max(1000).default(20),
+  org: slug.optional(),
+});
+const feedbackQuery = analyticsQuery.extend({
+  topic: z.string().min(1).optional(),
+  comments: z
+    .enum(['0', '1', 'true', 'false'])
+    .optional()
+    .transform((v) => v === '1' || v === 'true'),
+  limit: z.coerce.number().int().min(1).max(10_000).default(100),
+});
+
+/** One CSV field: quoted, and defused so spreadsheets do not run it as a formula. */
+export function csvField(value: unknown): string {
+  let text = value instanceof Date ? value.toISOString() : String(value ?? '');
+  if (/^[=+\-@\t\r]/.test(text)) text = `'${text}`;
+  return `"${text.replaceAll('"', '""')}"`;
+}
+
 const buildSchema = z.object({
   ref: z.string().min(1),
   sha: z.string().regex(/^[0-9a-f]{40}$/, 'a full commit sha'),
@@ -197,6 +220,60 @@ export function registerAdmin(app: FastifyInstance, ctx: AppContext): void {
       });
 
       scope.get('/audit', async () => listAudit(ctx.pool));
+
+      // Analytics: read-only, and still readable after OPEND_ANALYTICS=0 stops recording.
+      const feedbackFilter = (q: z.infer<typeof feedbackQuery>) => ({
+        days: q.days,
+        limit: q.limit,
+        withComment: q.comments,
+        ...(q.org ? { orgSlug: q.org } : {}),
+        ...(q.topic ? { topicId: q.topic } : {}),
+      });
+      scope.get('/analytics/summary', async (request, reply) => {
+        const q = parse(analyticsQuery, request.query, reply);
+        if (!q) return reply;
+        const summary = await analyticsSummary(ctx.pool, {
+          days: q.days,
+          limit: q.limit,
+          ...(q.org ? { orgSlug: q.org } : {}),
+        });
+        return { enabled: ctx.analytics.enabled, ...summary };
+      });
+      scope.get('/analytics/feedback', async (request, reply) => {
+        const q = parse(feedbackQuery, request.query, reply);
+        if (!q) return reply;
+        return listFeedback(ctx.pool, feedbackFilter(q));
+      });
+      scope.get('/analytics/feedback.csv', async (request, reply) => {
+        const q = parse(feedbackQuery, request.query, reply);
+        if (!q) return reply;
+        const rows = await listFeedback(ctx.pool, feedbackFilter(q));
+        const header = ['at', 'topic', 'helpful', 'comment', 'surface', 'org', 'release_line'];
+        const lines = [
+          header.join(','),
+          ...rows.map((r) =>
+            [
+              r.at,
+              r.topicId,
+              r.helpful ? 'yes' : 'no',
+              r.comment,
+              r.surface,
+              r.orgSlug,
+              r.releaseLine,
+            ]
+              .map(csvField)
+              .join(','),
+          ),
+        ];
+        return reply
+          .headers({
+            'content-disposition': 'attachment; filename="opend-feedback.csv"',
+            'x-content-type-options': 'nosniff',
+            'cache-control': 'no-store',
+          })
+          .type('text/csv; charset=utf-8')
+          .send(`${lines.join('\r\n')}\r\n`);
+      });
     },
     { prefix: '/admin/api' },
   );

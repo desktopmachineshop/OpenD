@@ -11,6 +11,8 @@ export interface PageOptions extends RenderOptions {
   banner?: string;
   /** Trusted HTML inserted at the end of the body, e.g. the live-reload script. */
   bodyEnd?: string;
+  /** Trusted HTML after the article on topic pages only, e.g. the feedback form. */
+  topicEnd?: string;
   /** "Download PDF" links in the header, for publications the reader can see. */
   publications?: { title: string; href: string }[];
 }
@@ -100,7 +102,8 @@ export function renderPage(
 ): string | null {
   const topic = view.topic(topicId);
   if (!topic) return null;
-  return shell(view, topic.title, renderTopic(view, topic, options), topicId, options);
+  const main = renderTopic(view, topic, options) + (options.topicEnd ?? '');
+  return shell(view, topic.title, main, topicId, options);
 }
 
 /** Landing page listing the reader's topics. */

@@ -81,6 +81,16 @@
       </properties>
     </section>
 
+    <section id="analytics">
+      <title>Analytics and feedback</title>
+      <p>See <xref href="analytics.dita">Docs analytics and reader feedback</xref> for what is recorded.</p>
+      <properties relcolwidth="3* 2* 6*">
+        <prophead><proptypehd>Variable</proptypehd><propvaluehd>Default</propvaluehd><propdeschd>Meaning and rules</propdeschd></prophead>
+        <property id="OPEND_ANALYTICS"><proptype><codeph>OPEND_ANALYTICS</codeph></proptype><propvalue>on</propvalue><propdesc>On unless set to <codeph>0</codeph>, <codeph>false</codeph>, <codeph>off</codeph> or <codeph>no</codeph>. Off records no page views, searches or feedback and hides the "Was this page helpful?" form. The analytics admin routes still answer with what was recorded before.</propdesc></property>
+        <property id="OPEND_ANALYTICS_RETENTION_DAYS"><proptype><codeph>OPEND_ANALYTICS_RETENTION_DAYS</codeph></proptype><propvalue><codeph>180</codeph></propvalue><propdesc>Days to keep analytics rows: a whole number from 1 to 3650. The worker deletes older rows when it starts and every six hours after, even with analytics off. <codeph>opend-server purge-analytics</codeph> does it on demand.</propdesc></property>
+      </properties>
+    </section>
+
     <section id="pdf">
       <title>PDF printing</title>
       <p>Read by the PDF renderer when it first starts Chromium.</p>

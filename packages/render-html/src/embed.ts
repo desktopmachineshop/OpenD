@@ -41,6 +41,8 @@ export interface EmbedOptions extends RenderOptions {
   /** Host app name, carried through links so contexts and search keep working. */
   app?: string;
   themeHref?: string;
+  /** Trusted HTML after the article on topic panels only, e.g. the feedback form. */
+  topicEnd?: string;
 }
 
 function embedBase(o: EmbedOptions): string {
@@ -145,7 +147,7 @@ export function renderEmbed(
 ${neighbours ? `<h2>In this section</h2><ul>${neighbours}</ul>` : ''}
 <a href="${escapeHtml(full)}" target="_blank" rel="noopener">Open in full docs ↗</a>
 </nav>`;
-  return shell(topic.title, article + links, o, {
+  return shell(topic.title, article + (o.topicEnd ?? '') + links, o, {
     'topic-id': topicId,
     'topic-title': topic.title,
   });
@@ -204,6 +206,10 @@ export interface EmbedResult {
    * `resourceid` in a nested topic): the panel opens the topic at that anchor.
    */
   location?: string;
+  /** The topic shown, when the panel shows one (for analytics). */
+  topicId?: string;
+  /** The search that ran, when the panel shows search results (for analytics). */
+  search?: { query: string; hits: number };
 }
 
 /**
@@ -241,7 +247,7 @@ export function handleEmbedRequest(
     }
     if (resolved) {
       const html = renderEmbed(view, resolved.topicId, o);
-      if (html) return { status: 200, html };
+      if (html) return { status: 200, html, topicId: resolved.topicId };
     }
     return {
       status: 404,
@@ -254,14 +260,19 @@ export function handleEmbedRequest(
   }
   if (path === `${base}/search`) {
     const q = params.get('q') ?? '';
-    return { status: 200, html: renderEmbedSearch(view, q, searchHits ?? searchView(view, q), o) };
+    const hits = searchHits ?? searchView(view, q);
+    return {
+      status: 200,
+      html: renderEmbedSearch(view, q, hits, o),
+      search: { query: q, hits: hits.length },
+    };
   }
   const m = new RegExp(`^${base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/topics/(.+)\\.html$`).exec(
     path,
   );
   if (m) {
     const html = renderEmbed(view, m[1]!, o);
-    if (html) return { status: 200, html };
+    if (html) return { status: 200, html, topicId: m[1]! };
   }
   // Missing and hidden topics look the same.
   return {
