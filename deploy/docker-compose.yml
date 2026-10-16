@@ -1,5 +1,5 @@
 # Smallest install: the app, the build worker and Postgres.
-#   cp deploy/.env.example deploy/.env   # then edit it
+#   node deploy/setup.mjs                # or: cp deploy/.env.example deploy/.env, then edit it
 #   docker compose -f deploy/docker-compose.yml up -d --build
 #   docker compose -f deploy/docker-compose.yml run --rm migrate seed /seed/seed.yaml
 
@@ -55,6 +55,17 @@ services:
   worker:
     <<: *opend
     command: ['worker']
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  # Entitlement reconcile against ENTITLEMENT_SOURCE_URL. Not started by `up`;
+  # run it from cron:  docker compose -f deploy/docker-compose.yml --profile reconcile run --rm reconcile
+  reconcile:
+    <<: *opend
+    command: ['reconcile']
+    profiles: ['reconcile']
+    restart: 'no'
     depends_on:
       migrate:
         condition: service_completed_successfully

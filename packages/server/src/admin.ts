@@ -23,7 +23,9 @@ import {
 import type { AppContext } from './context.js';
 
 const ACTOR = 'admin-token';
-const slug = z.string().regex(/^[a-z0-9][a-z0-9-]{0,62}$/, 'lowercase letters, digits and dashes');
+export const slug = z
+  .string()
+  .regex(/^[a-z0-9][a-z0-9-]{0,62}$/, 'lowercase letters, digits and dashes');
 const token = z.string().regex(/^[A-Za-z0-9_.:-]+$/);
 
 export const entitlementsSchema = z.object({
@@ -60,14 +62,14 @@ const buildSchema = z.object({
   sha: z.string().regex(/^[0-9a-f]{40}$/, 'a full commit sha'),
 });
 
-function authorized(request: FastifyRequest, expected: string): boolean {
+export function authorized(request: FastifyRequest, expected: string): boolean {
   const header = request.headers.authorization ?? '';
   const given = Buffer.from(header.startsWith('Bearer ') ? header.slice(7) : '');
   const want = Buffer.from(expected);
   return given.length === want.length && timingSafeEqual(given, want);
 }
 
-function parse<T>(schema: z.ZodType<T>, body: unknown, reply: FastifyReply): T | null {
+export function parse<T>(schema: z.ZodType<T>, body: unknown, reply: FastifyReply): T | null {
   const result = schema.safeParse(body);
   if (result.success) return result.data;
   void reply.code(400).send({

@@ -1,5 +1,10 @@
 import type { BlobStoreConfig } from '@opend/store';
 import { z } from 'zod';
+import {
+  selfHostingConfig,
+  selfHostingEnv,
+  type SelfHostingConfig,
+} from './self-hosting-config.js';
 
 /** `https://app.example.com` or `http://localhost:5173`: scheme, host and port only. */
 function isOrigin(value: string): boolean {
@@ -68,6 +73,7 @@ const envSchema = z
           'OPEND_EMBED_ORIGINS must be comma-separated origins such as https://app.example.com',
       }),
     NODE_ENV: z.string().default('development'),
+    ...selfHostingEnv,
   })
   .refine((e) => !(e.OPEND_DEV_LOGIN && e.NODE_ENV === 'production'), {
     message: 'OPEND_DEV_LOGIN must not be enabled when NODE_ENV=production',
@@ -115,10 +121,15 @@ export interface ServerConfig {
   siteRepo?: string;
   /** Embedded help in host apps: the token secret and the origins allowed to frame it. */
   embed?: { secret: string; origins: string[] };
+  /** Polling for webhook-less installs, and entitlement sync from billing or a CRM. */
+  selfHosting?: SelfHostingConfig;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
-  const parsed = envSchema.safeParse(env);
+  // `KEY=` in an env file (as in .env.example) arrives as an empty string: treat it as unset.
+  const parsed = envSchema.safeParse(
+    Object.fromEntries(Object.entries(env).filter(([, v]) => v !== '')),
+  );
   if (!parsed.success) {
     const problems = parsed.error.issues
       .map((i) => `  ${i.path.join('.')}: ${i.message}`)
@@ -135,6 +146,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     blobs: { kind: 'fs', dir: e.BLOB_DIR },
     devLogin: e.OPEND_DEV_LOGIN,
     production: e.NODE_ENV === 'production',
+    selfHosting: selfHostingConfig(e),
   };
   if (e.S3_BUCKET && e.S3_ENDPOINT && e.S3_ACCESS_KEY_ID && e.S3_SECRET_ACCESS_KEY) {
     config.blobs = {

@@ -9,3 +9,5 @@ export * from './blobs.js';
 export * from './s3.js';
 export * from './blob-config.js';
 export * from './testing.js';
+export * from './polling.js';
+export * from './entitlement-sync.js';
