@@ -1,5 +1,6 @@
 import type { CompiledRelease, Diagnostic } from '@opend/model';
 import { CHANNELS, notify, withTransaction, type Db, type Pool } from './db.js';
+import { writeSearchIndex, type SearchIndexInput } from './search.js';
 
 export interface PublishInput {
   jobId: number;
@@ -9,6 +10,8 @@ export interface PublishInput {
   releaseLine: string;
   snapshot: CompiledRelease;
   diagnostics: Diagnostic[];
+  /** Written in the same transaction, so a live release never lacks the index it was built with. */
+  searchIndex?: SearchIndexInput;
 }
 
 export interface PublishResult {
@@ -39,6 +42,7 @@ export async function publishRelease(pool: Pool, input: PublishInput): Promise<P
       ],
     );
     const releaseId = rows[0]!.id;
+    if (input.searchIndex) await writeSearchIndex(client, releaseId, input.searchIndex);
     const swap = await client.query(
       `insert into live_releases (repo_id, release_line, release_id) values ($1, $2, $3)
        on conflict (repo_id, release_line) do update
@@ -110,4 +114,10 @@ export async function getRelease(db: Db, releaseId: number): Promise<StoredRelea
     [releaseId],
   );
   return rows[0] ?? null;
+}
+
+/** Ids of every stored release, oldest first. */
+export async function listReleaseIds(db: Db): Promise<number[]> {
+  const { rows } = await db.query<{ id: number }>('select id from releases order by id');
+  return rows.map((r) => r.id);
 }

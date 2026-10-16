@@ -3,6 +3,7 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { importSPKI, jwtVerify } from 'jose';
+import { SEARCH_INDEX_FORMAT } from '@opend/filter';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   FsBlobStore,
@@ -12,6 +13,7 @@ import {
   getJob,
   getLiveReleaseId,
   getReleaseSnapshot,
+  getSearchIndex,
   listLiveReleases,
   testDatabaseUrl,
   upsertRepo,
@@ -22,6 +24,7 @@ import {
   createDocsRepo,
   fetchSource,
   processNext,
+  reindexRelease,
   summarize,
   type DocsRepo,
   type StatusReporter,
@@ -163,6 +166,20 @@ describe.skipIf(!url)('runJob', () => {
     const snapshot = await getReleaseSnapshot(db.pool, releaseId!);
     expect(Object.keys(snapshot!.topics)).toHaveLength(8);
     expect((await getJob(db.pool, job.id))?.status).toBe('succeeded');
+    // Indexed for search in the publish transaction, and rebuildable later.
+    const topicRows = async () =>
+      (
+        await db.pool.query<{ n: number }>(
+          'select count(*)::int as n from search_topics where release_id = $1',
+          [releaseId],
+        )
+      ).rows[0]!.n;
+    expect((await getSearchIndex(db.pool, releaseId!))?.format).toBe(SEARCH_INDEX_FORMAT);
+    expect(await topicRows()).toBe(8);
+    await db.pool.query('delete from search_indexes');
+    expect(await reindexRelease(db.pool, releaseId!)).toMatchObject({ releaseId, topics: 8 });
+    expect(await topicRows()).toBe(8);
+    expect(await reindexRelease(db.pool, releaseId! + 1000)).toBeNull();
     const blobs = new FsBlobStore(blobDir);
     expect((await blobs.get(assetKey(repo.id, sha, 'images/logo.svg')))?.toString()).toContain(
       '<svg',

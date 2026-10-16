@@ -13,3 +13,5 @@ export * from './pdf.js';
 export * from './self-hosting-config.js';
 export * from './entitlement-sync.js';
 export * from './reconcile-command.js';
+export * from './search.js';
+export * from './reindex-command.js';

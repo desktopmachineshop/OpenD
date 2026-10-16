@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { LRUCache } from 'lru-cache';
 import { displayText, firstChild } from '@opend/model';
-import { resolveContext, searchView, type ReleaseView } from '@opend/filter';
+import { resolveContext, type ReleaseView } from '@opend/filter';
 import { frameScript, widgetScript } from '@opend/embed';
 import {
   handleEmbedRequest,
@@ -17,6 +17,7 @@ import { currentAccess, setEmbedSession } from './auth.js';
 import type { AppContext } from './context.js';
 import { readerRelease, type ReaderRelease } from './delivery.js';
 import { EmbedTokenError, verifyEmbedToken } from './embed-token.js';
+import { searchRelease } from './search.js';
 
 /**
  * Embedded help for host apps: the panel pages a host frames, the widget and
@@ -149,11 +150,16 @@ export function registerEmbed(app: FastifyInstance, ctx: AppContext): void {
     const release = await readerRelease(ctx, access.context);
     if (typeof release === 'string')
       return send(404, renderEmbedMessage('Not published', release, embedOptions(request, null)));
+    const hits =
+      path === '/embed/search'
+        ? await searchRelease(ctx.pool, release, params.get('q') ?? '')
+        : undefined;
     const result = handleEmbedRequest(
       release.view,
       path,
       params,
       embedOptions(request, release.view),
+      hits,
     );
     if (result.location)
       return reply.headers(frameHeaders).redirect(result.location, result.status);
@@ -265,6 +271,6 @@ export function registerEmbed(app: FastifyInstance, ctx: AppContext): void {
     const r = await apiReader(request, reply);
     if (!r) return reply;
     const q = (request.query as { q?: string }).q ?? '';
-    return reply.send({ query: q, hits: searchView(r.release.view, q) });
+    return reply.send({ query: q, hits: await searchRelease(ctx.pool, r.release, q) });
   });
 }

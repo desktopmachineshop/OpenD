@@ -24,7 +24,7 @@ OpenV's help is compiled into its SPA, is the same for every user, and cannot be
 **One panel renderer.** `handleEmbedRequest` in `@opend/render-html` serves the panel for both the previewer and hosted delivery: `/embed/context`, `/embed/topics/<id>.html`, `/embed/search`.
 
 - **Panel content:** a compact topic view whose links stay in the panel, "In this section", search, and "Open in full docs".
-- **Search** (`searchView`) covers only the reader's visible topics, so neither results nor snippets leak.
+- **Search** (`searchView`) covers only the reader's visible topics, so neither results nor snippets leak. Hosted delivery now searches with Postgres under the same rule; see [ADR 0008](0008-search.md).
 
 **Widget and protocol.** `@opend/embed` provides:
 

@@ -213,12 +213,17 @@ export interface EmbedResult {
  *   /embed/context?app=&key=|path=   the help for a host-app context
  *   /embed/topics/<id>.html          a topic in the panel
  *   /embed/search?q=                 search the reader's visible topics
+ *
+ * `searchHits`, when given, are the results for `/embed/search` instead of the
+ * in-memory `searchView` (hosted delivery searches with Postgres first). They
+ * must come from the same view.
  */
 export function handleEmbedRequest(
   view: ReleaseView,
   path: string,
   params: URLSearchParams,
   o: EmbedOptions,
+  searchHits?: SearchHit[],
 ): EmbedResult {
   const base = embedBase(o);
   if (path === `${base}/context`) {
@@ -249,7 +254,7 @@ export function handleEmbedRequest(
   }
   if (path === `${base}/search`) {
     const q = params.get('q') ?? '';
-    return { status: 200, html: renderEmbedSearch(view, q, searchView(view, q), o) };
+    return { status: 200, html: renderEmbedSearch(view, q, searchHits ?? searchView(view, q), o) };
   }
   const m = new RegExp(`^${base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/topics/(.+)\\.html$`).exec(
     path,
