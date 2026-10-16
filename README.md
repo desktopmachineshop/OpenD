@@ -62,6 +62,7 @@ See [docs/adr/0003-applicability.md](docs/adr/0003-applicability.md) for the det
 | [`@opend/cli`](packages/cli)                 | `opend validate`, `opend build`, `opend preview`                                                    |
 | [`@opend/store`](packages/store)             | Postgres schema and migrations, build queue, releases, orgs, readers and entitlements; blob store   |
 | [`@opend/worker`](packages/worker)           | Fetches a pushed commit, builds, validates, then publishes or reports the failure                   |
+| [`@opend/embed`](packages/embed)             | Help widget (`OpenDHelp`, `<opend-help-button>`) and in-frame script for host apps                  |
 | [`@opend/server`](packages/server)           | `opend-server`: GitHub webhook, OIDC reader sign-in, filtered delivery, admin API                   |
 
 `templates/docs-starter` is the template repository teams start from. It contains sample topics, a map and a bookmap, reusable chunks, a brand theme, preview contexts and a validation workflow.
@@ -96,6 +97,66 @@ To try it without an identity provider, set `NODE_ENV=development` and `OPEND_DE
 
 See [ADR 0004](docs/adr/0004-hosted-architecture.md) for how it fits together.
 
+## Embedding help in your app
+
+Host apps can show OpenD help in an in-app panel that opens on the help for the current screen (like OpenV's help sidebar), filtered for the signed-in user.
+
+**1. Tag topics with context keys.** Keys are dot-separated so they fall back to their parents:
+
+```xml
+<prolog><resourceid appname="console" appid="settings.sso"/></prolog>
+```
+
+**2. Map routes to keys (optional).** Add `help-contexts.yaml` to the docs repo:
+
+```yaml
+apps:
+  console:
+    default: overview
+    routes:
+      /settings/sso: settings.sso
+      /devices/:id/pair: devices.gadget
+      /setup/**: setup.install
+```
+
+**3. Enable embedding on the server:** `OPEND_EMBED_SECRET` (32+ characters) and `OPEND_EMBED_ORIGINS` (the host apps' origins).
+
+**4. Mint tokens in your backend** for your signed-in user. Use HS256 with the shared secret, a 10-minute maximum lifetime, and the docs URL as audience:
+
+```js
+import { SignJWT } from 'jose';
+const token = await new SignJWT({ email: user.email, org: user.openDOrg })
+  .setProtectedHeader({ alg: 'HS256' })
+  .setAudience('https://docs.example.com')
+  .setIssuedAt()
+  .setExpirationTime('5m')
+  .sign(new TextEncoder().encode(process.env.OPEND_EMBED_SECRET));
+```
+
+**5. Add the widget** to your app:
+
+```html
+<script src="https://docs.example.com/embed/opend-help.js"></script>
+<opend-help-button></opend-help-button>
+<script>
+  OpenDHelp.init({
+    docsUrl: 'https://docs.example.com',
+    app: 'console',
+    getToken: () => fetch('/api/opend-token').then((r) => r.text()),
+  });
+  // On every route change:
+  OpenDHelp.setContext({ path: location.pathname }); // or { key: 'settings.sso' }
+</script>
+```
+
+`OpenDHelp.open()`, `close()` and `toggle()` drive the panel, and `<opend-help-button key="...">` opens a specific context.
+
+**Rendering help yourself.** Apps that render help natively can call `GET /api/v1/help/context?app=console&path=/settings/sso` (also `/topics/<id>` and `/search?q=`) with `Authorization: Bearer <token>`.
+
+**Checking locally.** `opend preview` serves the same panel. Open `/_opend/help-lab` to see what every key and route resolves to for each preview reader, and click through it in the real widget.
+
+See [examples/embed-host](examples/embed-host) for a runnable host app and [ADR 0005](docs/adr/0005-embedded-help.md) for the design.
+
 ## Development
 
 ```sh
@@ -115,6 +176,7 @@ The store, worker and server integration tests need Postgres. Set `TEST_DATABASE
 - [0002 A DITA subset, parsed in TypeScript](docs/adr/0002-dita-subset.md)
 - [0003 Applicability and fail-closed filtering](docs/adr/0003-applicability.md)
 - [0004 Hosted architecture: push to publish](docs/adr/0004-hosted-architecture.md)
+- [0005 Embedded, context-aware help](docs/adr/0005-embedded-help.md)
 
 ## Licence
 
