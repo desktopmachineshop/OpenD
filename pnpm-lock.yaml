@@ -50,6 +50,9 @@ importers:
       '@opend/build':
         specifier: workspace:*
         version: link:../build
+      '@opend/embed':
+        specifier: workspace:*
+        version: link:../embed
       '@opend/filter':
         specifier: workspace:*
         version: link:../filter
@@ -81,6 +84,8 @@ importers:
         specifier: ^6.0.0
         version: 6.0.0
 
+  packages/embed: {}
+
   packages/filter:
     dependencies:
       '@opend/model':
@@ -104,6 +109,10 @@ importers:
       '@opend/model':
         specifier: workspace:*
         version: link:../model
+    devDependencies:
+      '@opend/build':
+        specifier: workspace:*
+        version: link:../build
 
   packages/server:
     dependencies:

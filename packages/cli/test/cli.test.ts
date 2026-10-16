@@ -127,6 +127,27 @@ describe('preview server', () => {
     expect(staff).toContain('data-applies="release=..1.9"');
   });
 
+  it('serves embedded help for the preview reader, and the help lab', async () => {
+    const sso = await (await get('/embed/context?app=console&key=settings.sso')).text();
+    expect(sso).toContain('Configure the hub'); // v1-basic has no SSO: falls back to the parent key
+    expect(sso).not.toContain('single sign-on');
+    const self = base;
+    const framed = await (
+      await get(`/embed/topics/topics/install.html?host=${encodeURIComponent(self)}`)
+    ).text();
+    expect(framed).toContain(`data-host-origin="${self}"`);
+    const foreign = await (
+      await get('/embed/topics/topics/install.html?host=https%3A%2F%2Fevil.example')
+    ).text();
+    expect(foreign).not.toContain('data-host-origin');
+    const widget = await get('/embed/opend-help.js');
+    expect(widget.headers.get('content-type')).toContain('javascript');
+    expect(await widget.text()).toContain('OpenDHelp');
+    const lab = await (await get('/_opend/help-lab?path=/devices/1/pair')).text();
+    expect(lab).toContain('<code>settings.sso</code>');
+    expect(lab).toContain('(via default: overview)');
+  });
+
   it('reports diagnostics as JSON', async () => {
     const res = await get('/_opend/diagnostics.json');
     expect(await res.json()).toEqual([]);

@@ -22,11 +22,17 @@ export interface RenderOptions {
    * and show every alternative of a conditional key. Never use for readers.
    */
   showConditions?: boolean;
+  /**
+   * URL for a link to a topic. Defaults to the site page (`pageHref`); the
+   * embedded help panel keeps links inside the panel instead.
+   */
+  topicHref?: (topicId: string) => string;
 }
 
 interface Ctx {
   view: ReleaseView;
   base: string;
+  topicHref: (topicId: string) => string;
   showConditions: boolean;
   /** Nesting depth of topics, for heading levels. */
   depth: number;
@@ -62,6 +68,7 @@ export function renderTopic(
   const ctx: Ctx = {
     view,
     base: options.base ?? '/',
+    topicHref: options.topicHref ?? ((id) => pageHref(id, options.base ?? '/')),
     showConditions: options.showConditions ?? false,
     depth: 0,
     inThead: false,
@@ -253,7 +260,7 @@ function linkTarget(
     const topic = ctx.view.topic(id);
     if (!topic) return null;
     return {
-      href: pageHref(id, ctx.base) + (fragment ? `#${encodeURIComponent(fragment)}` : ''),
+      href: ctx.topicHref(id) + (fragment ? `#${encodeURIComponent(fragment)}` : ''),
       defaultText: topic.title,
     };
   }

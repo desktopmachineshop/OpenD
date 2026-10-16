@@ -15,11 +15,12 @@
     "dist"
   ],
   "dependencies": {
-    "@opend/model": "workspace:*",
-    "@opend/filter": "workspace:*",
     "@opend/build": "workspace:*",
-    "@opend/validate": "workspace:*",
+    "@opend/embed": "workspace:*",
+    "@opend/filter": "workspace:*",
+    "@opend/model": "workspace:*",
     "@opend/render-html": "workspace:*",
+    "@opend/validate": "workspace:*",
     "commander": "^15.0.0",
     "yaml": "^2.9.1"
   },
