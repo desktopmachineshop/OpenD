@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE task PUBLIC "-//OASIS//DTD DITA Task//EN" "task.dtd">
+<task id="install">
+  <title>Install the <keyword keyref="product-name"/></title>
+  <shortdesc>Install the hub software on a supported server.</shortdesc>
+  <taskbody>
+    <prereq>
+      <p>You need a server running a supported operating system.</p>
+      <note conref="../reuse/common.dita#common/power-warning"/>
+    </prereq>
+    <steps>
+      <step>
+        <cmd>Download the installer from <xref keyref="support-site"/>.</cmd>
+      </step>
+      <step release="..1.9">
+        <cmd>Run the legacy installer <filepath>install.sh</filepath> as root.</cmd>
+      </step>
+      <step release="2.0..">
+        <cmd>Run the setup wizard and choose <uicontrol>Standard install</uicontrol>.</cmd>
+        <info>The setup wizard replaced the shell installer in release 2.0.</info>
+      </step>
+      <step product="gadget">
+        <cmd>Pair the Gadget after installing. See <xref href="gadget-pairing.dita"/>.</cmd>
+      </step>
+      <step conref="../reuse/common.dita#common/step-restart"/>
+    </steps>
+    <result>
+      <p>The hub is installed. Continue with <xref href="configure.dita"/>.</p>
+    </result>
+  </taskbody>
+</task>

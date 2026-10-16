@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE topic PUBLIC "-//OASIS//DTD DITA Topic//EN" "topic.dtd">
+<!-- Reusable chunks. This topic is never published on its own: it is not in any map. -->
+<topic id="common">
+  <title>Reusable content</title>
+  <body>
+    <note id="power-warning" type="warning">Disconnect the unit from power before you open the case.</note>
+    <p id="support-contact">If you need help, visit <xref keyref="support-site"/>.</p>
+    <steps>
+      <step id="step-restart">
+        <cmd>Restart the <keyword keyref="product-name"/> service.</cmd>
+        <stepresult>The status light turns green.</stepresult>
+      </step>
+    </steps>
+  </body>
+</topic>

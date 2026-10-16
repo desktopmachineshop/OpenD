@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE bookmap PUBLIC "-//OASIS//DTD DITA BookMap//EN" "bookmap.dtd">
+<bookmap>
+  <booktitle>
+    <mainbooktitle>Widget Platform Administrator Guide</mainbooktitle>
+  </booktitle>
+  <keydef keys="product-name">
+    <topicmeta><keywords><keyword>Widget Platform</keyword></keywords></topicmeta>
+  </keydef>
+  <keydef keys="edition">
+    <topicmeta><keywords><keyword>Standard Edition</keyword></keywords></topicmeta>
+  </keydef>
+  <keydef keys="support-site" href="https://support.example.com" scope="external">
+    <topicmeta><linktext>the support site</linktext></topicmeta>
+  </keydef>
+  <keydef keys="common" href="../reuse/common.dita"/>
+  <chapter href="../topics/install.dita"/>
+  <chapter href="../topics/configure-sso.dita" feature="sso"/>
+  <chapter href="../topics/audit-log.dita" feature="audit-log" release="2.0.."/>
+</bookmap>

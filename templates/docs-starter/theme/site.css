@@ -1,0 +1,22 @@
+/* Brand theme for the docs site. Override any of the variables below. */
+:root {
+  --opend-accent: #2f6fde;
+  --opend-text: #1d2433;
+  --opend-muted: #5b6475;
+  --opend-surface: #ffffff;
+  --opend-surface-alt: #f4f6fa;
+  --opend-border: #dfe3ea;
+  --opend-font: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --opend-mono: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --opend-accent: #7aa7ff;
+    --opend-text: #e6e9ef;
+    --opend-muted: #a3abba;
+    --opend-surface: #14171d;
+    --opend-surface-alt: #1d2129;
+    --opend-border: #2c313b;
+  }
+}

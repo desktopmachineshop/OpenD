@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE task PUBLIC "-//OASIS//DTD DITA Task//EN" "task.dtd">
+<task id="configure">
+  <title>Configure the hub</title>
+  <shortdesc>Set the hub's name and network settings.</shortdesc>
+  <taskbody>
+    <steps>
+      <step>
+        <cmd>Open <menucascade><uicontrol>Settings</uicontrol><uicontrol>Network</uicontrol></menucascade>.</cmd>
+      </step>
+      <step>
+        <cmd>Enter the hub name and save.</cmd>
+        <stepxmp>
+          <codeblock>hub.name = "warehouse-1"
+hub.port = 8443</codeblock>
+        </stepxmp>
+      </step>
+      <step conkeyref="common/step-restart"/>
+    </steps>
+  </taskbody>
+</task>

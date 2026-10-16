@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="overview">
+  <title><keyword keyref="product-name"/> overview</title>
+  <shortdesc>What the <keyword keyref="product-name"/> does and which parts of it you can use.</shortdesc>
+  <conbody>
+    <p><image href="../images/logo.svg"><alt>Widget Platform logo</alt></image></p>
+    <p>You are reading the documentation for <ph keyref="edition"/>.</p>
+    <p>The <keyword keyref="product-name"/> collects readings from your widgets and shows them on one dashboard.</p>
+    <p product="gadget">Your licence includes the Gadget companion device. See <xref href="gadget-pairing.dita"/>.</p>
+    <p feature="sso">Single sign-on is available for your organization.</p>
+    <p audience="internal">INTERNAL: escalation contacts are listed on the staff wiki.</p>
+    <section id="next-steps">
+      <title>Next steps</title>
+      <ul>
+        <li><xref href="install.dita"/></li>
+        <li feature="sso"><xref href="configure-sso.dita"/></li>
+      </ul>
+      <p conref="../reuse/common.dita#common/support-contact"/>
+    </section>
+  </conbody>
+</concept>
