@@ -69,7 +69,7 @@ See [docs/adr/0003-applicability.md](docs/adr/0003-applicability.md) for the det
 
 ## Hosting
 
-One image runs every role (`serve`, `worker`, `migrate`, `seed`), configured only by environment variables. The smallest install is the app, the worker and Postgres:
+One image runs every role (`serve`, `worker`, `migrate`, `seed`, `reconcile`), configured only by environment variables. The smallest install is the app, the worker and Postgres. `node deploy/setup.mjs` does all of this for you (see [Self-hosting setup](#self-hosting-setup)). To do it by hand:
 
 ```sh
 cp deploy/.env.example deploy/.env                 # set SESSION_SECRET, webhook secret, OIDC, admin token
@@ -96,6 +96,91 @@ To try it without an identity provider, set `NODE_ENV=development` and `OPEND_DE
 | `GET /admin/api/audit`                                                                               | Audit log                                           |
 
 See [ADR 0004](docs/adr/0004-hosted-architecture.md) for how it fits together.
+
+## Self-hosting setup
+
+On a machine with Docker and Node 22, run this from a checkout of this repository:
+
+```sh
+node deploy/setup.mjs
+```
+
+It needs no `pnpm install`. It:
+
+1. Checks for Node 22.12+, Docker, Docker Compose and a running Docker daemon.
+2. Writes `deploy/.env` (mode 600) with generated secrets: `SESSION_SECRET`, `OPEND_ADMIN_TOKEN`, `POSTGRES_PASSWORD` and `GITHUB_WEBHOOK_SECRET`, plus `OPEND_EMBED_SECRET` when you give embed origins. It never changes a value that is already set, so running it again is safe.
+3. Creates a private GitHub App through GitHub's [App Manifest flow](https://docs.github.com/en/apps/sharing-github-apps/registering-a-github-app-from-a-manifest). The app gets push events, read access to contents and write access to commit statuses, and its webhook points at `${PUBLIC_URL}/webhooks/github`. You confirm the app on GitHub, which redirects back to a local callback. The callback checks a one-time `state`, then stores the app id, private key and webhook secret in `deploy/.env`. Setup then prints the app's installation link. For GitHub Enterprise Server, pass `--github-url https://github.example.com`.
+4. Writes `deploy/seed/seed.yaml` with your first org, reader and docs repo.
+5. Starts Compose, which runs migrations on start. It waits for `/healthz`, then loads the seed. With `--no-start`, it prints the commands instead.
+
+For scripted installs, run `node deploy/setup.mjs --non-interactive --public-url https://docs.example.com --github-app --github-org acme --org-slug acme --reader-email ann@acme.example --repo acme/docs`. Run `--help` to list every flag. Even in this mode, a person must click **Create** in a browser to make the GitHub App. If setup runs on a remote host, forward the callback port first with `ssh -L 8765:localhost:8765 host`, then pass `--callback-port 8765`.
+
+[docs/self-hosting.md](docs/self-hosting.md) covers SSO, a reverse proxy with TLS, backups, upgrades, hardening and troubleshooting.
+
+## Polling mode
+
+GitHub cannot reach a server behind a firewall or on `localhost`. For those installs, set `POLL_INTERVAL_SECONDS` to 10 or more. Unset or 0 turns polling off.
+
+With polling on, the `opend-server worker` process runs `git ls-remote` against each registered repo's `sourceUrl` on that interval. For private repos it sends the GitHub App installation token as a header, never in the URL. For each branch or tag that matches the repo's `releaseRefs`, it queues a build if no job exists yet for the head sha.
+
+- The `polled_refs` table remembers the last sha seen for each repo and ref. Several worker replicas can poll at once, and each new sha is still queued only once.
+- The poller skips any sha that a webhook already queued, so webhooks and polling can run side by side.
+- On the first poll, tags are queued before branches. A moving branch such as `main` then gets the newest job, so it wins its release line over an older tag.
+
+When `PUBLIC_URL` is a private address, setup turns polling on (every 60 seconds) and creates the GitHub App with its webhook inactive.
+
+## Entitlement sync
+
+Customer and licence data can come from billing or a CRM, instead of per-org admin API calls. There are three paths, and they share one engine. The engine:
+
+- compares the desired state with the database and applies the difference in one transaction;
+- writes one `entitlements.sync` audit entry with created, updated and removed counts;
+- sends a `NOTIFY`, so every replica drops its reader cache and a removed reader loses access at once.
+
+| Path                                                                        | Use                                                                                                              |
+| --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `PUT /admin/api/entitlements/sync` (admin token)                            | A full snapshot: `{ orgs: [{ slug, name, entitlements?, readers: [emails] }], mode?, dryRun?, confirmReplace? }` |
+| `POST /webhooks/entitlements` (signed with `ENTITLEMENT_WEBHOOK_SECRET`)    | Pushes from a CRM: `{ type: "events", events: [...] }` or `{ type: "snapshot", mode?, orgs }`                    |
+| `opend-server reconcile [--from <url>] [--mode merge\|replace] [--dry-run]` | Nightly pull of `ENTITLEMENT_SOURCE_URL` (bearer `ENTITLEMENT_SOURCE_TOKEN`), in `ENTITLEMENT_SYNC_MODE`         |
+
+**Modes:**
+
+- `merge`, the default, only creates and updates.
+- `replace` also removes the orgs and readers that the snapshot leaves out. The admin API requires `confirmReplace: true` for it. `reconcile` refuses to replace from an export with no orgs unless you pass `--allow-empty`.
+- `dryRun: true`, or `--dry-run`, returns the changes and writes nothing.
+
+**Snapshot fields:**
+
+- Leave out `entitlements` to keep an org's current entitlements. Set it to `null` to revoke them.
+- Readers are matched by email, ignoring case. A reader listed under a different org is moved to that org.
+
+**Webhook requests:**
+
+- `X-OpenD-Timestamp` carries the time in Unix seconds. It must be within 5 minutes of the server's clock.
+- `X-OpenD-Signature` is `sha256=` followed by the hex HMAC-SHA256 of `<timestamp>.<raw body>`.
+- `Idempotency-Key` is required. A repeated key returns `{"status":"duplicate"}` and changes nothing. A delivery that fails validation (422) does not record its key, so the CRM can fix the data and retry with the same key.
+
+**Webhook events:**
+
+- `org.upsert` takes `{ org: { slug, name, entitlements?, readers? } }`. With `exactReaders: true`, it also removes the org's readers that it does not list.
+- `org.delete` takes `{ slug }`.
+- `reader.add` takes `{ org, email, name? }`.
+- `reader.remove` takes `{ email }`.
+
+A signed request from a shell:
+
+```sh
+body='{"type":"events","events":[{"type":"reader.add","org":"acme","email":"new@acme.example"}]}'
+ts=$(date +%s)
+sig=$(printf '%s.%s' "$ts" "$body" | openssl dgst -sha256 -hmac "$ENTITLEMENT_WEBHOOK_SECRET" -hex | sed 's/^.* //')
+curl -X POST "$PUBLIC_URL/webhooks/entitlements" -H 'content-type: application/json' \
+  -H "X-OpenD-Timestamp: $ts" -H "X-OpenD-Signature: sha256=$sig" -H "Idempotency-Key: crm-123" -d "$body"
+```
+
+**Running `reconcile` nightly:**
+
+- **Railway:** add a service from the same image. Set its start command to `node dist/bin.js reconcile` and its cron schedule to, for example, `0 3 * * *` (UTC). Give it the same database and `ENTITLEMENT_*` variables as the other services. Railway cron services must exit when done, and the command does.
+- **Compose:** the `reconcile` service is in the `reconcile` profile, so `up` does not start it. Run it from the host's crontab: `0 3 * * * docker compose -f /srv/opend/deploy/docker-compose.yml --profile reconcile run --rm reconcile`.
 
 ## Embedding help in your app
 
