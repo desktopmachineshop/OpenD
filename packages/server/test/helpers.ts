@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { FastifyInstance, LightMyRequestResponse } from 'fastify';
+import type { PdfRenderer } from '@opend/pdf';
 import { FsBlobStore, createTestDatabase, type TestDatabase } from '@opend/store';
 import type { OidcProvider } from '../src/index.js';
 import { createApp, type OpendApp, type ServerConfig } from '../src/index.js';
@@ -19,7 +20,7 @@ export interface Harness extends OpendApp {
 
 export async function startHarness(
   url: string,
-  options: { oidc?: OidcProvider | null; config?: Partial<ServerConfig> } = {},
+  options: { oidc?: OidcProvider | null; config?: Partial<ServerConfig>; pdf?: PdfRenderer } = {},
 ): Promise<Harness> {
   const db = await createTestDatabase(url);
   const blobDir = mkdtempSync(join(tmpdir(), 'opend-server-blobs-'));
@@ -42,6 +43,7 @@ export async function startHarness(
     log: () => {},
   };
   if (options.oidc !== undefined) deps.oidc = options.oidc;
+  if (options.pdf) deps.pdf = options.pdf;
   const opend = await createApp(config, deps);
   await opend.app.ready();
   return {

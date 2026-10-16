@@ -1,8 +1,8 @@
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { ReaderContext } from '@opend/model';
-import { readerPolicy, resolveContext, viewRelease } from '@opend/filter';
-import { renderIndex, renderNotFound, renderPage } from '@opend/render-html';
+import { readerPolicy, resolveContext, viewPublication, viewRelease } from '@opend/filter';
+import { renderIndex, renderNotFound, renderPage, renderPublication } from '@opend/render-html';
 import { loadProject } from '../src/index.js';
 import { MARKERS } from './markers.js';
 
@@ -19,6 +19,31 @@ describe('no content leaks to readers who are not entitled to it', async () => {
 
   it('has preview contexts to test', () => {
     expect(readers.length).toBeGreaterThanOrEqual(5);
+  });
+
+  // The admin guide bookmap holds only some topics. Markers in its staff view
+  // (every alternative of every condition) must follow their rule in each
+  // reader's PDF; every other marker must never appear there.
+  const ADMIN_GUIDE = 'maps/admin-guide.bookmap';
+  const printOf = (view: Parameters<typeof renderPublication>[0]) =>
+    renderPublication(view, {
+      site: viewRelease(release, project.build.buildPolicies),
+      siteBase: 'https://docs.example.com/',
+      assets: async () => Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>'),
+    });
+  const staffPrint = await printOf(
+    viewPublication(release, ADMIN_GUIDE, project.build.buildPolicies, { resolveChoices: false })!,
+  );
+  const inPublication = MARKERS.filter(([phrase]) => staffPrint.includes(phrase));
+
+  it('finds gated markers in the admin guide', () => {
+    expect(inPublication.map(([p]) => p)).toEqual(
+      expect.arrayContaining([
+        'Run the legacy installer',
+        'Configure single sign-on',
+        'Audit log events',
+      ]),
+    );
   });
 
   describe.each(readers)('%s', (_name, context) => {
@@ -63,6 +88,25 @@ describe('no content leaks to readers who are not entitled to it', async () => {
         major ?? ''
       ];
       expect(whatsNew).toBe(expected ?? 'topics/overview');
+    });
+
+    describe('admin guide PDF', async () => {
+      const print = await printOf(
+        viewPublication(release, ADMIN_GUIDE, [
+          ...project.build.buildPolicies,
+          readerPolicy(context),
+        ])!,
+      );
+      it.each(MARKERS)('%s', (phrase, rule) => {
+        const relevant = inPublication.some(([p]) => p === phrase);
+        expect(print.includes(phrase)).toBe(relevant && rule(context));
+      });
+      it('never exposes filtering attributes or build internals', () => {
+        expect(print).not.toMatch(
+          /data-applies=|opend-target=|opend-asset=|<opend-cond|<opend-choice/,
+        );
+        expect(print).not.toMatch(/\b(product|feature|release|audience)="/);
+      });
     });
 
     it('serves only pages reachable from its navigation', () => {

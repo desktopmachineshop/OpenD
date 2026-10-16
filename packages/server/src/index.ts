@@ -9,3 +9,4 @@ export * from './seed.js';
 export * from './app.js';
 export * from './embed-token.js';
 export * from './embed.js';
+export * from './pdf.js';

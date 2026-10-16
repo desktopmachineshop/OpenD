@@ -23,6 +23,9 @@
       "path": "packages/render-html"
     },
     {
+      "path": "packages/pdf"
+    },
+    {
       "path": "packages/cli"
     },
     {

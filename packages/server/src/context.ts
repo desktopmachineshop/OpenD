@@ -1,5 +1,6 @@
 import { LRUCache } from 'lru-cache';
-import type { ReleaseView } from '@opend/filter';
+import type { PublicationView, ReleaseView } from '@opend/filter';
+import type { PdfRenderer } from '@opend/pdf';
 import type { BlobStore, Pool, ReaderAccess, Repo, StoredRelease } from '@opend/store';
 import type { Log } from '@opend/worker';
 import type { ServerConfig } from './config.js';
@@ -26,12 +27,15 @@ export class Caches {
   readonly views = new LRUCache<string, ReleaseView>({ max: 200 });
   /** `releaseId|entitlementKey|topicId` → rendered page. */
   readonly pages = new LRUCache<string, string>({ max: 2000 });
+  /** `releaseId|entitlementKey|publicationFile` → filtered publication view. */
+  readonly publications = new LRUCache<string, { view: PublicationView | null }>({ max: 200 });
 
   releaseChanged(): void {
     this.site = null;
     this.live.clear();
     this.views.clear();
     this.pages.clear();
+    this.publications.clear();
   }
 
   entitlementsChanged(): void {
@@ -46,4 +50,6 @@ export interface AppContext {
   log: Log;
   caches: Caches;
   oidc: OidcProvider | null;
+  /** Prints publications. Generated PDFs are cached in `blobs`. */
+  pdf: PdfRenderer;
 }

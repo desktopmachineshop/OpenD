@@ -1,7 +1,9 @@
 import {
+  CONFIG_FILE,
   RELEASE_ATTRIBUTE,
   TARGET_ATTR,
   isFilterAttribute,
+  publicationSlug,
   sortDiagnostics,
   walk,
   type CompiledRelease,
@@ -154,6 +156,21 @@ function checkRelease(result: BuildResult, release: CompiledRelease, out: Diagno
         });
       }
     });
+  }
+
+  // Publications are served at /pdf/<file name>.pdf, so file names must be unique.
+  const slugs = new Map<string, string>();
+  for (const publication of release.publications) {
+    const slug = publicationSlug(publication.file);
+    const first = slugs.get(slug);
+    if (first === undefined) slugs.set(slug, publication.file);
+    else
+      out.push({
+        severity: 'error',
+        code: 'duplicate-publication',
+        message: `publication ${publication.file} has the same file name as ${first}, so only one can be downloaded as ${slug}.pdf`,
+        file: CONFIG_FILE,
+      });
   }
 
   // Topic files that no map references and no published topic reuses are usually forgotten.

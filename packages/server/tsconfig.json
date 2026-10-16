@@ -16,6 +16,9 @@
       "path": "../render-html"
     },
     {
+      "path": "../pdf"
+    },
+    {
       "path": "../store"
     },
     {

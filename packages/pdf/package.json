@@ -1,0 +1,20 @@
+{
+  "name": "@opend/pdf",
+  "version": "0.1.0",
+  "description": "Prints self-contained HTML to PDF with headless Chromium",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "playwright-core": "1.56.1"
+  }
+}

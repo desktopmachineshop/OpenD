@@ -11,6 +11,8 @@ export interface PageOptions extends RenderOptions {
   banner?: string;
   /** Trusted HTML inserted at the end of the body, e.g. the live-reload script. */
   bodyEnd?: string;
+  /** "Download PDF" links in the header, for publications the reader can see. */
+  publications?: { title: string; href: string }[];
 }
 
 /** Renders the navigation tree for a view. */
@@ -46,6 +48,16 @@ export function renderNav(
   return inner ? `<ul>${inner}</ul>` : '';
 }
 
+function publicationLinks(options: PageOptions): string {
+  const links = (options.publications ?? [])
+    .map(
+      (p) =>
+        `<a class="site-pdf" href="${escapeHtml(p.href)}" title="Download PDF">${escapeHtml(p.title)} (PDF)</a>`,
+    )
+    .join('');
+  return links ? `<nav class="site-pdfs" aria-label="Download PDF">${links}</nav>` : '';
+}
+
 function shell(
   view: ReleaseView,
   title: string,
@@ -69,7 +81,7 @@ ${theme}
 </head>
 <body>
 ${options.banner ?? ''}
-<header class="site-header"><a class="site-title" href="${escapeHtml(base)}">${escapeHtml(release.title)}</a><span class="site-release">Release ${escapeHtml(release.release)}</span></header>
+<header class="site-header"><a class="site-title" href="${escapeHtml(base)}">${escapeHtml(release.title)}</a><span class="site-release">Release ${escapeHtml(release.release)}</span>${publicationLinks(options)}</header>
 <div class="layout">
 <nav class="toc" aria-label="Contents">${renderNav(view, currentId, options)}</nav>
 <main>${main}</main>

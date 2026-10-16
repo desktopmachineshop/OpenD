@@ -45,6 +45,24 @@ export interface Publication {
   nav: NavEntry[];
 }
 
+/**
+ * URL name of a publication: its map's file name without directory or
+ * extension, e.g. `admin-guide` for `maps/admin-guide.bookmap`.
+ */
+export function publicationSlug(file: string): string {
+  const name = file.split('/').pop() ?? file;
+  const dot = name.lastIndexOf('.');
+  return dot > 0 ? name.slice(0, dot) : name;
+}
+
+/** The first publication with this slug, or `undefined`. */
+export function findPublication(
+  publications: readonly Publication[],
+  slug: string,
+): Publication | undefined {
+  return publications.find((p) => publicationSlug(p.file) === slug);
+}
+
 /** Where a context key points: a topic, and the conditions under which it applies. */
 export interface ContextTarget {
   topicId: string;
