@@ -118,7 +118,11 @@ export interface ServerConfig {
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
-  const parsed = envSchema.safeParse(env);
+  // An empty variable counts as unset, as `KEY=` in an env file or an
+  // unresolved reference variable on Railway produces one.
+  const parsed = envSchema.safeParse(
+    Object.fromEntries(Object.entries(env).filter(([, value]) => value !== '')),
+  );
   if (!parsed.success) {
     const problems = parsed.error.issues
       .map((i) => `  ${i.path.join('.')}: ${i.message}`)
