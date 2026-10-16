@@ -33,6 +33,8 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # Chromium for the embedded-help widget test (skipped when no browser is installed).
+      - run: pnpm exec playwright-core install --with-deps chromium
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm format:check

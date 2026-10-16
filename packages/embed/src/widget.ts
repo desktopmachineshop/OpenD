@@ -112,7 +112,10 @@ export function installWidget(win: Window & { OpenDHelp?: OpenDHelpApi }): void 
       build();
       load();
       if (!open) {
-        returnFocus = doc.activeElement as HTMLElement | null;
+        // Look through shadow roots: focus may be on a button inside <opend-help-button>.
+        let active = doc.activeElement;
+        while (active?.shadowRoot?.activeElement) active = active.shadowRoot.activeElement;
+        returnFocus = active as HTMLElement | null;
         open = true;
         panel!.classList.add('open');
         frame!.focus();
