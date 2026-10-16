@@ -67,3 +67,12 @@ export function versionInRange(version: readonly number[], range: ReleaseRange):
   if (range.to && comparePrefix(version, range.to) > 0) return false;
   return true;
 }
+
+/**
+ * The release line a version belongs to: its major number. Readers are served
+ * the live release of their line, so `1.4` readers keep the 1.x docs after 2.0.
+ */
+export function releaseLine(version: string): string | null {
+  const v = parseVersion(version);
+  return v ? String(v[0]) : null;
+}

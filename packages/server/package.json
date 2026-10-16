@@ -1,0 +1,37 @@
+{
+  "name": "@opend/server",
+  "version": "0.1.0",
+  "description": "Hosted OpenD: GitHub webhook, reader sign-in, filtered delivery and admin API",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@fastify/cookie": "^11.1.3",
+    "@opend/filter": "workspace:*",
+    "@opend/model": "workspace:*",
+    "@opend/render-html": "workspace:*",
+    "@opend/store": "workspace:*",
+    "@opend/worker": "workspace:*",
+    "commander": "^15.0.0",
+    "fastify": "^5.12.7",
+    "lru-cache": "^11.5.3",
+    "openid-client": "^6.8.8",
+    "yaml": "^2.9.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "jose": "^6.2.12"
+  },
+  "bin": {
+    "opend-server": "./dist/bin.js"
+  }
+}

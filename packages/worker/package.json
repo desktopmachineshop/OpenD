@@ -1,0 +1,24 @@
+{
+  "name": "@opend/worker",
+  "version": "0.1.0",
+  "description": "Build worker: fetches a commit, builds and validates it, and publishes or reports the failure",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@opend/build": "workspace:*",
+    "@opend/model": "workspace:*",
+    "@opend/store": "workspace:*",
+    "@opend/validate": "workspace:*",
+    "jose": "^6.2.12"
+  }
+}
