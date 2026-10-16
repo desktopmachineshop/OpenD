@@ -1,0 +1,6 @@
+dist
+pnpm-lock.yaml
+*.dita
+*.ditamap
+*.bookmap
+*.ditaval

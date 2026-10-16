@@ -1,0 +1,30 @@
+{
+  "name": "opend",
+  "private": true,
+  "description": "Docs platform where release and entitlement are one applicability rule",
+  "license": "MIT",
+  "type": "module",
+  "packageManager": "pnpm@10.28.0",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b",
+    "test": "vitest run",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "opend": "node packages/cli/dist/bin.js",
+    "clean": "rm -rf packages/*/dist packages/*/tsconfig.tsbuildinfo"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^22.20.5",
+    "eslint": "^10.13.0",
+    "prettier": "^3.9.10",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.71.2",
+    "vitest": "^5.0.5"
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "name": "@opend/cli",
+  "version": "0.1.0",
+  "description": "OpenD command line: build, validate and local preview",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@opend/model": "workspace:*",
+    "@opend/filter": "workspace:*",
+    "@opend/build": "workspace:*",
+    "@opend/validate": "workspace:*",
+    "@opend/render-html": "workspace:*",
+    "commander": "^15.0.0",
+    "yaml": "^2.9.1"
+  },
+  "bin": {
+    "opend": "./dist/bin.js"
+  }
+}
