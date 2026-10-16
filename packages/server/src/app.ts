@@ -10,6 +10,7 @@ import { Caches, type AppContext } from './context.js';
 import { registerDelivery } from './delivery.js';
 import { registerEmbed } from './embed.js';
 import { registerPdf } from './pdf.js';
+import { registerEntitlementSync } from './entitlement-sync.js';
 import { createOidcProvider, type OidcProvider } from './oidc.js';
 import { registerWebhook } from './webhook.js';
 
@@ -88,6 +89,7 @@ export async function createApp(config: ServerConfig, deps: AppDeps): Promise<Op
   registerWebhook(app, ctx);
   registerAuth(app, ctx);
   registerAdmin(app, ctx);
+  registerEntitlementSync(app, ctx);
   registerEmbed(app, ctx);
   registerPdf(app, ctx);
   registerDelivery(app, ctx);
