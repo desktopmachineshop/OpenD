@@ -47,6 +47,6 @@ Stage 1 built the shared build, filter and renderer. The hosted platform has to 
 ## Consequences
 
 - **Replicas:** several app replicas share nothing but Postgres and the blob store. Each keeps its own memory cache, cleared by `NOTIFY` and bounded by TTLs.
-- **Blob storage:** the blob store is a local folder for now, which limits Compose to one host. An S3-compatible `BlobStore` is the next step for Railway and for multiple hosts.
+- **Blob storage:** the blob store is either a local folder (`BLOB_DIR`) or any S3-compatible bucket (`S3_BUCKET` and friends), so it is no longer limited to one host. The folder suits a single-host Compose install; a bucket lets the app and the worker run as separate services, as on Railway, and app replicas run on several hosts.
 - **Tenancy:** there is one docs site per deployment (`OPEND_SITE_REPO` when several repos are registered). Multi-tenancy with row-level security is a later stage, and the schema leaves room for a tenant id.
 - **Tests:** the push-to-publish test reuses the stage 1 leak markers over HTTP, so the hosted path must keep the same no-leak guarantees.

@@ -30,7 +30,7 @@ export async function startHarness(
     host: '127.0.0.1',
     sessionSecret: 'test-session-secret-0123456789abcdef',
     webhookSecret: WEBHOOK_SECRET,
-    blobDir,
+    blobs: { kind: 'fs', dir: blobDir },
     adminToken: ADMIN_TOKEN,
     devLogin: true,
     production: false,

@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
-/** Storage for build artifacts such as images. Local folder now; S3-compatible later. */
+/** Storage for build artifacts such as images: a local folder or an S3-compatible bucket. */
 export interface BlobStore {
   put(key: string, data: Buffer): Promise<void>;
   /** `null` when the key does not exist. */
