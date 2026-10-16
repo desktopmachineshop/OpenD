@@ -45,6 +45,34 @@ export interface Publication {
   nav: NavEntry[];
 }
 
+/** Where a context key points: a topic, and the conditions under which it applies. */
+export interface ContextTarget {
+  topicId: string;
+  /** Element or nested topic id within the page. */
+  fragment?: string;
+  /**
+   * Filtering attributes of the `resourceid` and its ancestors (map topicrefs or
+   * topic elements), outermost first. All must pass for the target to apply.
+   */
+  conditions: Condition[];
+}
+
+export interface HelpRoute {
+  /** Host-app route pattern, e.g. `/projects/:id/settings/**`. */
+  pattern: string;
+  key: string;
+}
+
+/** Context-sensitive help for one host application. */
+export interface HelpApp {
+  /** Context key → candidate targets in precedence order (map first, then topics). */
+  keys: Record<string, ContextTarget[]>;
+  /** Route patterns from `help-contexts.yaml`, in file order. */
+  routes: HelpRoute[];
+  /** Key used when nothing more specific resolves. */
+  default?: string;
+}
+
 export const RELEASE_SCHEMA_VERSION = 1;
 
 /**
@@ -71,5 +99,10 @@ export interface CompiledRelease {
   chunkUsage: Record<string, string[]>;
   /** Docs-root-relative paths of images and other files the content references. */
   assets: string[];
+  /**
+   * Context-sensitive help by host app name, from DITA `resourceid` elements
+   * and `help-contexts.yaml`. Absent in snapshots built before stage 3.
+   */
+  contexts?: Record<string, HelpApp>;
   theme?: string;
 }

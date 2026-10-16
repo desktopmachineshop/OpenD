@@ -193,7 +193,7 @@ describe.skipIf(!url)('runJob', () => {
     const failed = await getJob(db.pool, job.id);
     expect(failed).toMatchObject({
       status: 'failed',
-      error: '1 error: topics/install.dita:28 broken-link',
+      error: '1 error: topics/install.dita:31 broken-link',
     });
     expect(failed!.diagnostics[0]).toMatchObject({
       code: 'broken-link',
@@ -201,7 +201,7 @@ describe.skipIf(!url)('runJob', () => {
     });
     expect(await getLiveReleaseId(db.pool, repo.id, '2')).toBe(before);
     expect(reported[1]).toBe(
-      `${sha.slice(0, 7)} failure 1 error: topics/install.dita:28 broken-link`,
+      `${sha.slice(0, 7)} failure 1 error: topics/install.dita:31 broken-link`,
     );
   });
 

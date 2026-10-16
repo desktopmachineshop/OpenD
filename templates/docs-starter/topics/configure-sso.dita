@@ -3,6 +3,9 @@
 <task id="configure-sso" feature="sso">
   <title>Configure single sign-on</title>
   <shortdesc>Let your users sign in with your identity provider.</shortdesc>
+  <prolog>
+    <resourceid appname="console" appid="settings.sso"/>
+  </prolog>
   <taskbody>
     <steps>
       <step><cmd>Open <menucascade><uicontrol>Settings</uicontrol><uicontrol>Sign-in</uicontrol></menucascade>.</cmd></step>

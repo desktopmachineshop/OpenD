@@ -3,6 +3,7 @@ import {
   firstChild,
   type CompiledRelease,
   type CompiledTopic,
+  type Condition,
   type NavEntry,
 } from '@opend/model';
 import { filterTree, isIncluded, type FilterPolicy, type FilterTreeOptions } from './policy.js';
@@ -25,6 +26,8 @@ export interface ReleaseView {
   topic(topicId: string): CompiledTopic | null;
   /** Ids of every visible topic, in navigation order. */
   topicIds(): string[];
+  /** Whether every condition passes for this reader (for content outside topics, such as context targets). */
+  includes(conditions: readonly Condition[]): boolean;
 }
 
 export function filterNav(
@@ -94,5 +97,6 @@ export function viewRelease(
     isVisible: (id) => topic(id) !== null,
     topic,
     topicIds: () => ordered.filter((id) => topic(id) !== null),
+    includes: (conditions) => conditions.every((c) => isIncluded(c, policies)),
   };
 }

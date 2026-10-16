@@ -3,6 +3,9 @@
 <task id="configure">
   <title>Configure the hub</title>
   <shortdesc>Set the hub's name and network settings.</shortdesc>
+  <prolog>
+    <resourceid appname="console" appid="settings"/>
+  </prolog>
   <taskbody>
     <steps>
       <step>

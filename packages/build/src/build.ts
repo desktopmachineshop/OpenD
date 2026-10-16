@@ -1,6 +1,7 @@
 import { parse as parseYaml } from 'yaml';
 import {
   CONFIG_FILE,
+  HELP_CONTEXTS_FILE,
   RELEASE_SCHEMA_VERSION,
   displayText,
   firstChild,
@@ -24,6 +25,7 @@ import {
   type Keyspace,
   type MapModel,
 } from '@opend/dita';
+import { buildContexts } from './contexts.js';
 import type { SourceTree } from './source.js';
 
 export interface BuildResult {
@@ -228,6 +230,14 @@ export function buildRelease(tree: SourceTree, options: BuildOptions = {}): Buil
     ),
     assets: [...assets].sort(),
   };
+  const contexts = buildContexts(
+    // Keys for topics excluded at build time (e.g. audience="internal") are dropped.
+    site.resourceIds.filter((r) => r.topicId in topics),
+    [...site.topicFiles.keys()].map((f) => topics[topicPageId(f)]).filter((t) => t !== undefined),
+    tree.texts.get(HELP_CONTEXTS_FILE),
+    diagnostics,
+  );
+  if (Object.keys(contexts).length) release.contexts = contexts;
   if (tree.ref) release.sourceRef = tree.ref;
   if (config.theme) release.theme = config.theme;
 
