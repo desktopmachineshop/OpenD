@@ -41,7 +41,7 @@
       <properties relcolwidth="2* 5*">
         <prophead><proptypehd>Field</proptypehd><propdeschd>Meaning</propdeschd></prophead>
         <property><proptype><parmname>key</parmname>, <parmname>via</parmname></proptype><propdesc>The key that matched, and how: <codeph>key</codeph>, <codeph>parent</codeph> or <codeph>default</codeph>.</propdesc></property>
-        <property><proptype><parmname>fragment</parmname></proptype><propdesc>The element or nested topic to scroll to, or <codeph>null</codeph>.</propdesc></property>
+        <property><proptype><parmname>fragment</parmname></proptype><propdesc>The element or nested topic to scroll to, or <codeph>null</codeph>. It is <codeph>null</codeph> when that element is filtered out for this reader, so it never names a section they cannot see.</propdesc></property>
         <property><proptype><parmname>topicId</parmname></proptype><propdesc>The topic's page id, for <filepath>/api/v1/help/topics/</filepath>.</propdesc></property>
         <property><proptype><parmname>title</parmname>, <parmname>shortdesc</parmname></proptype><propdesc>Plain text, filtered for the reader.</propdesc></property>
         <property><proptype><parmname>html</parmname></proptype><propdesc>The topic as an HTML <codeph>article</codeph>, filtered for the reader, with absolute links to the docs site. Sanitize or sandbox it like any HTML you did not write.</propdesc></property>

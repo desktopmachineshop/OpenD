@@ -54,13 +54,24 @@ describe('route patterns', () => {
 });
 
 describe('resolveContext', () => {
-  const topic = (id: string, attrs: Record<string, string> = {}): CompiledTopic => ({
+  const topic = (
+    id: string,
+    attrs: Record<string, string> = {},
+    sections: Record<string, string>[] = [],
+  ): CompiledTopic => ({
     id,
     file: `${id}.dita`,
     ditaId: id,
     type: 'topic',
     title: id,
-    body: element('topic', { id, ...attrs }, [element('title', {}, [text(id)])]),
+    body: element('topic', { id, ...attrs }, [
+      element('title', {}, [text(id)]),
+      element(
+        'body',
+        {},
+        sections.map((a) => element('section', a, [text(a.id ?? '')])),
+      ),
+    ]),
   });
   const release: CompiledRelease = {
     schemaVersion: 1,
@@ -78,8 +89,8 @@ describe('resolveContext', () => {
     publications: [],
     topics: {
       overview: topic('overview'),
-      settings: topic('settings'),
-      sso: topic('sso', { feature: 'sso' }),
+      settings: topic('settings', {}, [{ id: 'audit-retention', feature: 'audit-log' }]),
+      sso: topic('sso', { feature: 'sso' }, [{ id: 'setup' }]),
       gadget: topic('gadget', { product: 'gadget' }),
       notes1: topic('notes1'),
       notes2: topic('notes2'),
@@ -97,6 +108,10 @@ describe('resolveContext', () => {
         keys: {
           overview: [{ topicId: 'overview', conditions: [] }],
           settings: [{ topicId: 'settings', conditions: [] }],
+          'settings.retention': [
+            { topicId: 'settings', fragment: 'audit-retention', conditions: [] },
+          ],
+          'settings.missing': [{ topicId: 'settings', fragment: 'no-such-id', conditions: [] }],
           'settings.sso': [{ topicId: 'sso', fragment: 'setup', conditions: [] }],
           'devices.gadget': [{ topicId: 'gadget', conditions: [] }],
           'whats-new': [
@@ -150,6 +165,27 @@ describe('resolveContext', () => {
   it('picks the target whose conditions pass for this reader', () => {
     expect(resolveContext(basicV1, { app: 'console', key: 'whats-new' })?.topicId).toBe('notes1');
     expect(resolveContext(pro, { app: 'console', key: 'whats-new' })?.topicId).toBe('notes2');
+  });
+
+  it('keeps a fragment only when the reader sees an element with that id', () => {
+    const audit = view(['widget'], ['audit-log'], '2.1');
+    expect(resolveContext(audit, { app: 'console', key: 'settings.retention' })).toEqual({
+      topicId: 'settings',
+      fragment: 'audit-retention',
+      key: 'settings.retention',
+      via: 'key',
+    });
+    // The section is filtered out for this reader, so its id must not leak.
+    expect(resolveContext(pro, { app: 'console', key: 'settings.retention' })).toEqual({
+      topicId: 'settings',
+      key: 'settings.retention',
+      via: 'key',
+    });
+    expect(resolveContext(audit, { app: 'console', key: 'settings.missing' })).toEqual({
+      topicId: 'settings',
+      key: 'settings.missing',
+      via: 'key',
+    });
   });
 
   it('treats Object.prototype names as unknown apps and keys', () => {
