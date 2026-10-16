@@ -134,13 +134,18 @@ function routesOf(app: HelpApp): CompiledRoute[] {
  * so a context lookup can never reveal a hidden topic: it falls back instead.
  */
 export function resolveContext(view: ReleaseView, request: ContextRequest): ResolvedContext | null {
-  const app = view.release.contexts?.[request.app];
+  // Own properties only: the app and key come from the request, and names such
+  // as `__proto__` or `toString` must read as unknown, not as Object.prototype.
+  const contexts = view.release.contexts;
+  const app = contexts && Object.hasOwn(contexts, request.app) ? contexts[request.app] : undefined;
   if (!app) return null;
   const requested =
     request.key ?? (request.path !== undefined ? matchRoute(routesOf(app), request.path) : null);
 
   const tryKey = (key: string): ContextTarget | undefined =>
-    (app.keys[key] ?? []).find((t) => view.includes(t.conditions) && view.isVisible(t.topicId));
+    (Object.hasOwn(app.keys, key) ? app.keys[key]! : []).find(
+      (t) => view.includes(t.conditions) && view.isVisible(t.topicId),
+    );
 
   const attempts: [string, ResolvedContext['via']][] = [];
   if (requested)

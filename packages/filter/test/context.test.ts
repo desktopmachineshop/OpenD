@@ -152,6 +152,19 @@ describe('resolveContext', () => {
     expect(resolveContext(pro, { app: 'console', key: 'whats-new' })?.topicId).toBe('notes2');
   });
 
+  it('treats Object.prototype names as unknown apps and keys', () => {
+    for (const app of ['__proto__', 'constructor', 'toString', 'hasOwnProperty']) {
+      expect(resolveContext(pro, { app, key: 'overview' }), app).toBeNull();
+    }
+    for (const key of ['__proto__', 'constructor', 'toString', 'valueOf.x']) {
+      expect(resolveContext(pro, { app: 'console', key }), key).toEqual({
+        topicId: 'overview',
+        key: 'overview',
+        via: 'default',
+      });
+    }
+  });
+
   it('returns null for unknown apps, or when nothing is visible', () => {
     expect(resolveContext(pro, { app: 'other', key: 'overview' })).toBeNull();
     const noDefault = {
