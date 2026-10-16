@@ -1,0 +1,36 @@
+{
+  "name": "@opend/editor",
+  "version": "0.1.0",
+  "description": "Web editor: DITA source editing, draft preview, and save/publish through a GitHub App",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@fastify/cookie": "^11.1.3",
+    "@opend/build": "workspace:*",
+    "@opend/dita": "workspace:*",
+    "@opend/filter": "workspace:*",
+    "@opend/model": "workspace:*",
+    "@opend/render-html": "workspace:*",
+    "@opend/store": "workspace:*",
+    "@opend/validate": "workspace:*",
+    "@opend/worker": "workspace:*",
+    "commander": "^15.0.0",
+    "fastify": "^5.12.7",
+    "lru-cache": "^11.5.3",
+    "openid-client": "^6.8.8",
+    "zod": "^4.6.7"
+  },
+  "bin": {
+    "opend-editor": "./dist/bin.js"
+  }
+}

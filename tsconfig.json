@@ -35,6 +35,9 @@
       "path": "packages/worker"
     },
     {
+      "path": "packages/editor"
+    },
+    {
       "path": "packages/server"
     }
   ]
