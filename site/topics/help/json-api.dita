@@ -34,7 +34,7 @@
   "title": "Operator console (coming soon)",
   "shortdesc": "…",
   "html": "&lt;article class=\"concept topic\" id=\"console\"&gt;…&lt;/article&gt;",
-  "related": [{ "topicId": "topics/next/editor", "title": "Web editor (coming soon)" }],
+  "related": [],
   "fullUrl": "https://docs.example.com/topics/next/console.html",
   "embedUrl": "https://docs.example.com/embed/topics/topics/next/console.html"
 }</codeblock>

@@ -39,6 +39,21 @@
           S3-compatible blob storage, published images, and a Railway runbook.</li>
       </ul>
     </section>
+    <section id="editor">
+      <title>Web editor</title>
+      <ul>
+        <li>A browser editor on its own host, for authors who do not use Git. Developers sign in with
+          GitHub; other authors with company OIDC, once an administrator adds them with
+          <codeph>opend-server editor add-user</codeph>.</li>
+        <li>DITA source editing with a live preview of unsaved text, validation problems listed next to the
+          source, new topics from templates, and preview as an org.</li>
+        <li>Saves are commits to the author's own branch, crediting them. Publishing opens one pull request,
+          shows what the branch rules still require, and merges when nothing blocks it.</li>
+        <li>The main branch is merged in on every page open and save. Authors resolve conflicts by keeping
+          their version, the current one, or editing by hand; structural conflicts go to a developer.</li>
+      </ul>
+      <p>See <xref href="../editor/editor.dita"/>.</p>
+    </section>
     <section id="embed">
       <title>Context-sensitive help</title>
       <ul>
@@ -64,7 +79,9 @@
           and branch filtering. See <xref href="../authoring/dita-subset.dita"/>.</li>
         <li>The contents list in PDFs has no page numbers.</li>
         <li>One docs site and one embed secret per deployment.</li>
-        <li>No web editor or operator console yet.</li>
+        <li>The web editor edits DITA source; there is no visual editor yet. It edits one repository per
+          deployment.</li>
+        <li>No operator console yet.</li>
       </ul>
     </section>
   </body>
