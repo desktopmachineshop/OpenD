@@ -7,7 +7,7 @@ This repository holds:
 - **Stage 1:** the shared build and filter core, and a local previewer.
 - **Stage 2:** the hosted path. A push fires a GitHub webhook, a worker builds and validates the docs, and signed-in readers get pages filtered by their org's entitlements.
 
-It also renders curated publications (bookmaps) to PDF for each reader, through the same filter. The web editor, site-wide search and multi-tenancy come later and reuse the same packages.
+It also renders curated publications (bookmaps) to PDF for each reader, through the same filter, and has a web editor that gives authors without Git a safe route into the same repository. Site-wide search and multi-tenancy come later and reuse the same packages.
 
 ## Quick start
 
@@ -65,12 +65,13 @@ See [docs/adr/0003-applicability.md](docs/adr/0003-applicability.md) for the det
 | [`@opend/worker`](packages/worker)           | Fetches a pushed commit, builds, validates, then publishes or reports the failure                   |
 | [`@opend/embed`](packages/embed)             | Help widget (`OpenDHelp`, `<opend-help-button>`) and in-frame script for host apps                  |
 | [`@opend/server`](packages/server)           | `opend-server`: GitHub webhook, OIDC reader sign-in, filtered delivery, admin API                   |
+| [`@opend/editor`](packages/editor)           | Web editor: DITA source editing, live preview, save to a branch and publish through the GitHub App  |
 
 `templates/docs-starter` is the template repository teams start from. It contains sample topics, a map and a bookmap, reusable chunks, a brand theme, preview contexts and a validation workflow.
 
 ## Hosting
 
-One image runs every role (`serve`, `worker`, `migrate`, `seed`, `reconcile`), configured only by environment variables. The smallest install is the app, the worker and Postgres. `node deploy/setup.mjs` does all of this for you (see [Self-hosting setup](#self-hosting-setup)). To do it by hand:
+One image runs every role (`serve`, `worker`, `migrate`, `seed`, `reconcile`, and the optional `editor`), configured only by environment variables. The smallest install is the app, the worker and Postgres. `node deploy/setup.mjs` does all of this for you (see [Self-hosting setup](#self-hosting-setup)). To do it by hand:
 
 ```sh
 cp deploy/.env.example deploy/.env                 # set SESSION_SECRET, webhook secret, OIDC, admin token
@@ -187,6 +188,8 @@ curl -X POST "$PUBLIC_URL/webhooks/entitlements" -H 'content-type: application/j
 - **Railway:** add a service from the same image. Set its start command to `node dist/bin.js reconcile` and its cron schedule to, for example, `0 3 * * *` (UTC). Give it the same database and `ENTITLEMENT_*` variables as the other services. Railway cron services must exit when done, and the command does.
 - **Compose:** the `reconcile` service is in the `reconcile` profile, so `up` does not start it. Run it from the host's crontab: `0 3 * * * docker compose -f /srv/opend/deploy/docker-compose.yml --profile reconcile run --rm reconcile`.
 
+The web editor is an optional fourth service on its own host: `docker compose -f deploy/docker-compose.yml --profile editor up -d` runs `opend-server editor serve` on port 3001. See [Web editor](#web-editor).
+
 ## Embedding help in your app
 
 Host apps can show OpenD help in an in-app panel that opens on the help for the current screen (like OpenV's help sidebar), filtered for the signed-in user.
@@ -270,6 +273,41 @@ A publication is a bookmap listed under `publications` in `opend.config.yaml`. E
 
 See [ADR 0006](docs/adr/0006-pdf-rendering.md) for why the renderer is Chromium and how it is contained.
 
+## Web editor
+
+The editor gives authors who do not use Git a safe route into the docs repository. Saving and publishing are separate: authors save to their own working branch as often as they like, and publish when ready through one pull request. The repository stays the single source of truth, and push-to-publish stays the only way content goes live.
+
+**What authors do:**
+
+- **Edit** the DITA source of a topic or map in the browser. Each save is checked for well-formed XML first, and OpenD's validation problems are listed next to the source.
+- **Preview** while typing: the branch is rebuilt in memory with the unsaved text and shown in the staff view, with conditions marked. **Preview as an org** opens the same page with an org's entitlements through a 30-minute, logged link.
+- **Create a topic** from a template (concept, task, reference) and optionally add it to a map.
+- **Save:** every save is a commit to the author's branch `editor/<user-id>/<slug>`, with no pull request. The commit author is the signed-in person, and the message carries a `Co-authored-by` trailer.
+- **Publish:** opens or updates the branch's pull request. The page shows what the base branch's protection rules or rulesets require (reviews, checks) and what still blocks the merge. When nothing does, the editor squash-merges straight away. If changes are requested, the author keeps editing the same branch.
+- **Resolve conflicts:** on every page open and save, `main` is merged into the branch (never rebased). When the same lines changed on both sides, the author sees "your version" and "current version" side by side and keeps one or edits by hand. Deleted files and deleted sections are handed to a developer in the pull request.
+
+**Running it.** The editor is its own service on its own host (`EDITOR_PUBLIC_URL`, never the docs site's host). Editor accounts, sessions and cookies are separate from readers', so a reader session never opens the editor.
+
+```sh
+opend-server editor serve                 # or the standalone `opend-editor serve`
+opend-server editor add-user writer@example.com --name "Wendy Writer"   # company (OIDC) authors
+opend-server editor add-user dev@example.com --github dev-login         # optional for GitHub users
+opend-server editor list-users
+opend-server editor disable-user writer@example.com
+```
+
+| Setting                                                                    |                                                                                                                                                         |
+| -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `EDITOR_PUBLIC_URL`                                                        | The editor's own origin. Register `/auth/github/callback` and `/auth/oidc/callback` under it                                                            |
+| `EDITOR_SESSION_SECRET`                                                    | 32+ characters; not the docs site's `SESSION_SECRET`                                                                                                    |
+| `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`                                  | Required. The App commits and opens pull requests: Contents and Pull requests read and write; Administration, Commit statuses, Checks and Metadata read |
+| `GITHUB_OAUTH_CLIENT_ID`, `GITHUB_OAUTH_CLIENT_SECRET`                     | GitHub sign-in for developers. Anyone with write access to the repository gets in                                                                       |
+| `EDITOR_OIDC_ISSUER`, `EDITOR_OIDC_CLIENT_ID`, `EDITOR_OIDC_CLIENT_SECRET` | Company sign-in for other authors, who must be added with `add-user` (matched by verified email)                                                        |
+| `EDITOR_REPO`, `EDITOR_BASE_BRANCH`                                        | The registered repo to edit (default `OPEND_SITE_REPO`, or the only one) and its base branch (default `main`)                                           |
+| `DATABASE_URL`, `PORT` (default 3001), `GITHUB_API_URL`, `GITHUB_WEB_URL`  | Shared database; GitHub Enterprise Server URLs                                                                                                          |
+
+At least one sign-in method is required. The repository must be registered (seed file or admin API) with its GitHub App `installationId`. See [ADR 0007](docs/adr/0007-web-editor.md) for the design and the open decision on a visual editor.
+
 ## Development
 
 ```sh
@@ -281,7 +319,7 @@ pnpm test        # vitest, including the end-to-end leak test over the starter t
 
 Tests run against TypeScript sources through the `source` export condition, so they need no build step.
 
-The store, worker and server integration tests need Postgres. Set `TEST_DATABASE_URL` (for example `postgres://opend@localhost:5432/opend_test`); each test file creates and drops its own database. Without the variable those tests are skipped locally. In CI a missing variable is an error. The CLI (`pnpm opend`) runs the compiled output, so run `pnpm build` first.
+The store, worker, server and editor integration tests need Postgres. Set `TEST_DATABASE_URL` (for example `postgres://opend@localhost:5432/opend_test`); each test file creates and drops its own database. Without the variable those tests are skipped locally. In CI a missing variable is an error. The CLI (`pnpm opend`) runs the compiled output, so run `pnpm build` first.
 
 ## Decisions
 
@@ -291,6 +329,7 @@ The store, worker and server integration tests need Postgres. Set `TEST_DATABASE
 - [0004 Hosted architecture: push to publish](docs/adr/0004-hosted-architecture.md)
 - [0005 Embedded, context-aware help](docs/adr/0005-embedded-help.md)
 - [0006 PDF publications printed by headless Chromium](docs/adr/0006-pdf-rendering.md)
+- [0007 Web editor: save to a branch, publish through a pull request](docs/adr/0007-web-editor.md)
 
 ## Licence
 
