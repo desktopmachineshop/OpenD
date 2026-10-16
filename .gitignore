@@ -5,3 +5,4 @@ dist/
 coverage/
 deploy/.env
 deploy/seed/seed.yaml
+.claude/worktrees/
