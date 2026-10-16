@@ -149,6 +149,33 @@ describe('preview server', () => {
     expect(lab).toContain('(via default: overview)');
   });
 
+  it('searches the preview reader’s view from the header search box', async () => {
+    const page = await (await get('/topics/install.html')).text();
+    expect(page).toContain(
+      '<form class="site-search" role="search" method="get" action="/search">',
+    );
+    const res = await get('/search?q=installer');
+    expect(res.status).toBe(200);
+    const v1 = await res.text();
+    expect(v1).toContain('<a href="/topics/install.html">');
+    expect(v1).toContain('value="installer"');
+    const wizard = await (await get('/search?q=wizard')).text();
+    expect(wizard).toContain('No topics match <q>wizard</q>.');
+    const pro = await (await get('/search?q=wizard', { cookie: 'opend-as=v2-pro' })).text();
+    expect(pro).toContain('<a href="/topics/install.html">');
+    // Hidden content never matches, even for the staff-only escalation topic.
+    expect(await (await get('/search?q=escalation')).text()).toContain('No topics match');
+    const xss = await (await get('/search?q=%3Cscript%3Ealert(1)%3C%2Fscript%3E')).text();
+    expect(xss).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
+    expect(xss).not.toContain('<script>alert(1)');
+    expect(await (await get('/search')).text()).toContain('Enter one or more words');
+    // Switching audience on the search page keeps the query.
+    const as = await get('/search?q=wizard&as=v2-pro');
+    expect(as.status).toBe(303);
+    expect(as.headers.get('location')).toBe('/search?q=wizard');
+    expect(wizard).toContain('<input type="hidden" name="q" value="wizard">');
+  });
+
   it('reports diagnostics as JSON', async () => {
     const res = await get('/_opend/diagnostics.json');
     expect(await res.json()).toEqual([]);

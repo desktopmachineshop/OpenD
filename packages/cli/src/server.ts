@@ -2,7 +2,7 @@ import { watch, type FSWatcher } from 'node:fs';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { posix } from 'node:path';
 import { findPublication, formatDiagnostic, type Diagnostic } from '@opend/model';
-import { viewRelease } from '@opend/filter';
+import { searchView, viewRelease } from '@opend/filter';
 import { readSourceFile } from '@opend/build';
 import { frameScript, widgetScript } from '@opend/embed';
 import { createPdfRenderer, type PdfRenderer } from '@opend/pdf';
@@ -15,6 +15,8 @@ import {
   renderIndex,
   renderNotFound,
   renderPage,
+  renderSearch,
+  siteSearchQuery,
   handleEmbedRequest,
   type EmbedOptions,
   type PageOptions,
@@ -40,6 +42,8 @@ const CONTENT_TYPES: Record<string, string> = {
 };
 
 const AUDIENCE_COOKIE = 'opend-as';
+/** Same as the hosted search page. */
+const PREVIEW_SEARCH_LIMIT = 20;
 const IGNORED_WATCH = /(^|[\\/])(\.git|node_modules|\.opend|dist)([\\/]|$)/;
 
 export interface PreviewOptions {
@@ -110,9 +114,11 @@ export async function startPreview(options: PreviewOptions): Promise<PreviewServ
     // Switching audience from the banner sets a cookie and returns to the page.
     const as = url.searchParams.get('as');
     if (as !== null) {
+      // A search keeps its query, so authors can compare results across audiences.
+      const q = url.searchParams.get('q');
       res.writeHead(303, {
         'set-cookie': `${AUDIENCE_COOKIE}=${encodeURIComponent(as)}; Path=/; SameSite=Lax`,
-        location: url.pathname,
+        location: path === '/search' && q ? `/search?q=${encodeURIComponent(q)}` : url.pathname,
       });
       res.end();
       return;
@@ -159,8 +165,9 @@ export async function startPreview(options: PreviewOptions): Promise<PreviewServ
     });
     const pageOptions: PageOptions = {
       showConditions: audience.kind === 'all',
-      banner: banner(project, audience),
+      banner: banner(project, audience, path === '/search' ? url.searchParams.get('q') : null),
       bodyEnd: options.watch === false ? '' : LIVE_RELOAD,
+      search: { action: '/search' },
       publications: visiblePublications(release, policies).map((p) => ({
         title: p.title || p.file,
         href: publicationHref(p),
@@ -246,6 +253,18 @@ export async function startPreview(options: PreviewOptions): Promise<PreviewServ
       return;
     }
 
+    if (path === '/search') {
+      // No database here: the in-memory search over the same filtered view.
+      const query = siteSearchQuery(url.searchParams.get('q'));
+      const hits = query ? searchView(view, query, PREVIEW_SEARCH_LIMIT) : [];
+      send(
+        res,
+        200,
+        'text/html; charset=utf-8',
+        renderSearch(view, query, hits, { ...pageOptions, limit: PREVIEW_SEARCH_LIMIT }),
+      );
+      return;
+    }
     if (path === '/' || path === '/index.html') {
       const first = view.topicIds()[0];
       if (first) {
@@ -335,7 +354,12 @@ function diagnosticsList(diagnostics: Diagnostic[]): string {
     .join('')}</ul>`;
 }
 
-function banner(project: LoadedProject, audience: PreviewAudience): string {
+/** `searchQuery` is carried through an audience switch on the search page. */
+function banner(
+  project: LoadedProject,
+  audience: PreviewAudience,
+  searchQuery: string | null = null,
+): string {
   const diagnostics = allDiagnostics(project);
   const errors = diagnostics.filter((d) => d.severity === 'error').length;
   const warnings = diagnostics.length - errors;
@@ -358,7 +382,7 @@ function banner(project: LoadedProject, audience: PreviewAudience): string {
 .opend-preview-banner .diag-error{color:#dc2626}.opend-preview-banner .diag-warning{color:var(--opend-warn)}
 </style>
 <strong>Local preview${project.ref ? ` of ${escapeHtml(project.ref)}` : ''}</strong>
-<form method="get"><label>Preview as <select name="as" onchange="this.form.submit()">${choices}</select></label><noscript><button>Apply</button></noscript></form>
+<form method="get">${searchQuery ? `<input type="hidden" name="q" value="${escapeHtml(searchQuery)}">` : ''}<label>Preview as <select name="as" onchange="this.form.submit()">${choices}</select></label><noscript><button>Apply</button></noscript></form>
 <span>${escapeHtml(describeAudience(audience))}</span>
 <a href="/_opend/publications">Publications</a>
 ${summary}
