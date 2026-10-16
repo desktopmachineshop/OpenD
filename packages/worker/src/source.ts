@@ -21,12 +21,13 @@ export async function fetchSource(
   sourceUrl: string,
   sha: string,
   token?: string,
+  tokenHosts?: readonly string[],
 ): Promise<FetchedSource> {
   if (!/^[0-9a-f]{7,64}$/i.test(sha)) throw new Error(`not a commit sha: ${sha}`);
   const dir = await mkdtemp(join(tmpdir(), 'opend-build-'));
   const cleanup = () => rm(dir, { recursive: true, force: true });
   const git = (...args: string[]) =>
-    run('git', [...gitAuthArgs(token), ...args], {
+    run('git', [...gitAuthArgs(sourceUrl, token, tokenHosts), ...args], {
       cwd: dir,
       env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
       maxBuffer: 64 * 1024 * 1024,
@@ -46,12 +47,32 @@ export async function fetchSource(
   }
 }
 
+/** Where installation tokens may be sent when no GitHub Enterprise host is configured. */
+export const DEFAULT_GIT_HOSTS: readonly string[] = ['github.com'];
+
+/** Whether `sourceUrl` is an https URL on one of `hosts` (host, with port if not 443). */
+function onTokenHost(sourceUrl: string, hosts: readonly string[]): boolean {
+  let url: URL;
+  try {
+    url = new URL(sourceUrl);
+  } catch {
+    return false;
+  }
+  return url.protocol === 'https:' && hosts.includes(url.host);
+}
+
 /**
  * Git options that send a GitHub installation token as an HTTP header, so it
- * never appears in a URL or an error message.
+ * never appears in a URL or an error message. The header is only added for an
+ * https source on a GitHub host (`hosts`, see `GitHubApp.gitHosts`), so a
+ * repository registered with any other URL never receives the token.
  */
-export function gitAuthArgs(token?: string): string[] {
-  return token
+export function gitAuthArgs(
+  sourceUrl: string,
+  token?: string,
+  hosts: readonly string[] = DEFAULT_GIT_HOSTS,
+): string[] {
+  return token && onTokenHost(sourceUrl, hosts)
     ? [
         '-c',
         `http.extraHeader=Authorization: Basic ${Buffer.from(`x-access-token:${token}`).toString('base64')}`,
@@ -76,12 +97,23 @@ export interface RemoteRef {
 }
 
 /** The branch and tag heads of a remote. Annotated tags resolve to the commit they point at. */
-export async function listRemoteRefs(sourceUrl: string, token?: string): Promise<RemoteRef[]> {
+export async function listRemoteRefs(
+  sourceUrl: string,
+  token?: string,
+  tokenHosts?: readonly string[],
+): Promise<RemoteRef[]> {
   let stdout: string;
   try {
     ({ stdout } = await run(
       'git',
-      [...gitAuthArgs(token), 'ls-remote', '--heads', '--tags', '--', sourceUrl],
+      [
+        ...gitAuthArgs(sourceUrl, token, tokenHosts),
+        'ls-remote',
+        '--heads',
+        '--tags',
+        '--',
+        sourceUrl,
+      ],
       { env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }, maxBuffer: 64 * 1024 * 1024 },
     ));
   } catch (err) {

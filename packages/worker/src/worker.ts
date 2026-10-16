@@ -143,7 +143,7 @@ async function buildAndPublish(deps: WorkerDeps, repo: Repo, job: BuildJob): Pro
   }
   let source;
   try {
-    source = await fetchSource(repo.sourceUrl, job.sha, token);
+    source = await fetchSource(repo.sourceUrl, job.sha, token, deps.github?.gitHosts);
   } catch (err) {
     throw new RetryableError(err instanceof Error ? err.message : String(err));
   }

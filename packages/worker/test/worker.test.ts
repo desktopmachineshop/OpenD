@@ -23,6 +23,7 @@ import {
   GitHubApp,
   createDocsRepo,
   fetchSource,
+  gitAuthArgs,
   processNext,
   reindexRelease,
   summarize,
@@ -117,6 +118,48 @@ describe('fetchSource', () => {
     await expect(fetchSource(repo.dir, 'deadbeef'.repeat(5), 'secret-token')).rejects.not.toThrow(
       /secret-token/,
     );
+  });
+});
+
+describe('gitAuthArgs', () => {
+  const header = (args: string[]) => args.join(' ').includes('Authorization: Basic');
+
+  it('sends the installation token only to GitHub over https', () => {
+    expect(header(gitAuthArgs('https://github.com/acme/docs.git', 'tok'))).toBe(true);
+    expect(header(gitAuthArgs('https://GitHub.com/acme/docs.git', 'tok'))).toBe(true);
+    expect(gitAuthArgs('https://github.com/acme/docs.git')).toEqual([]);
+    for (const url of [
+      'https://evil.example/acme/docs.git',
+      'https://github.com.evil.example/acme/docs.git',
+      'https://evil.example/github.com/acme/docs.git',
+      'http://github.com/acme/docs.git',
+      'ssh://git@github.com/acme/docs.git',
+      'file:///srv/docs',
+      '/srv/docs',
+      'not a url',
+    ]) {
+      expect(gitAuthArgs(url, 'tok'), url).toEqual([]);
+    }
+  });
+
+  it('sends it to the GitHub Enterprise host instead when one is configured', () => {
+    const ghe = ['ghe.example'];
+    expect(header(gitAuthArgs('https://ghe.example/acme/docs.git', 'tok', ghe))).toBe(true);
+    expect(gitAuthArgs('https://github.com/acme/docs.git', 'tok', ghe)).toEqual([]);
+  });
+
+  it('derives the git host from the API URL', () => {
+    const { privateKey } = generateKeyPairSync('rsa', {
+      modulusLength: 2048,
+      privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+      publicKeyEncoding: { type: 'spki', format: 'pem' },
+    });
+    const hosts = (apiUrl?: string) => new GitHubApp({ appId: '1', privateKey, apiUrl }).gitHosts;
+    expect(hosts()).toEqual(['github.com']);
+    expect(hosts('https://api.github.com/')).toEqual(['github.com']);
+    expect(hosts('https://ghe.example/api/v3/')).toEqual(['ghe.example']);
+    expect(hosts('https://ghe.example:8443/api/v3')).toEqual(['ghe.example:8443']);
+    expect(hosts('https://api.acme.ghe.com')).toEqual(['acme.ghe.com']);
   });
 });
 

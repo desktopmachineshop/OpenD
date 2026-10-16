@@ -58,7 +58,10 @@ export async function pollOnce(deps: PollerDeps): Promise<PollSummary> {
         repo.installationId !== null && deps.github
           ? await deps.github.installationToken(repo.installationId)
           : undefined;
-      const refs = releaseRefsToPoll(await listRefs(repo.sourceUrl, token), repo.releaseRefs);
+      const refs = releaseRefsToPoll(
+        await listRefs(repo.sourceUrl, token, deps.github?.gitHosts),
+        repo.releaseRefs,
+      );
       for (const { ref, sha } of refs) {
         const job = await recordPolledRef(deps.pool, { repoId: repo.id, ref, sha });
         if (!job) continue;
