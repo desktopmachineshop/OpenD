@@ -100,6 +100,8 @@ To try it without an identity provider, set `NODE_ENV=development` and `OPEND_DE
 
 See [ADR 0004](docs/adr/0004-hosted-architecture.md) for how it fits together.
 
+To run on Railway (web, worker, Postgres and a bucket), see [docs/railway.md](docs/railway.md).
+
 ## Embedding help in your app
 
 Host apps can show OpenD help in an in-app panel that opens on the help for the current screen (like OpenV's help sidebar), filtered for the signed-in user.
