@@ -104,4 +104,21 @@ create table audit_log (
 );
 `,
   },
+  {
+    // Self-contained so it applies whether or not 002_editor runs before it.
+    id: '003_polling',
+    sql: `
+-- Last head sha the poller saw for each release ref, for webhook-less installs.
+create table if not exists polled_refs (
+  repo_id bigint not null references repos (id) on delete cascade,
+  ref text not null,
+  sha text not null,
+  -- the job the poller queued for this sha; null when one already existed
+  job_id bigint references build_jobs (id) on delete set null,
+  seen_at timestamptz not null default now(),
+  primary key (repo_id, ref)
+);
+create index if not exists build_jobs_repo_ref_sha on build_jobs (repo_id, ref, sha);
+`,
+  },
 ];

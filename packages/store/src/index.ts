@@ -7,3 +7,5 @@ export * from './readers.js';
 export * from './audit.js';
 export * from './blobs.js';
 export * from './testing.js';
+export * from './polling.js';
+export * from './entitlement-sync.js';
