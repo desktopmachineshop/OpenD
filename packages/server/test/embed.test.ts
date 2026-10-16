@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { SignJWT } from 'jose';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { ReaderContext } from '@opend/model';
 import { FsBlobStore, enqueueJob, testDatabaseUrl, upsertRepo } from '@opend/store';
 import { createDocsRepo, processNext, type DocsRepo } from '@opend/worker';
@@ -34,6 +34,7 @@ describe('verifyEmbedToken', () => {
     ).toEqual({
       email: 'a@b.c',
       org: 'acme',
+      expiresAt: expect.any(Number),
     });
     expect(
       await verifyEmbedToken(await token({ sub: 'a@b.c', org: 'acme' }), SECRET, DOCS),
@@ -177,6 +178,20 @@ describe.skipIf(!url)('embedded help (hosted)', () => {
       expect(cookie).toContain('SameSite=None');
       expect(cookie).toContain('Partitioned');
       sessions[name] = cookiesFrom(res);
+    }
+  });
+
+  it('stops accepting a cached token once it expires', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      const start = Date.now();
+      const t = await token({ email: 'ann@acme.example', org: 'acme' }, { ttl: 20 });
+      expect((await exchange(t)).statusCode).toBe(204);
+      // Past exp and the 30 second clock tolerance, but well inside the cache's own TTL.
+      vi.setSystemTime(start + 55_000);
+      expect((await exchange(t)).statusCode).toBe(401);
+    } finally {
+      vi.useRealTimers();
     }
   });
 
