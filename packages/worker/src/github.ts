@@ -48,8 +48,8 @@ export class GitHubApp implements StatusReporter {
       .sign(this.key);
   }
 
-  private async api(path: string, init: RequestInit & { token: string }): Promise<Response> {
-    const res = await this.fetchImpl(`${this.apiUrl}${path}`, {
+  private send(path: string, init: RequestInit & { token: string }): Promise<Response> {
+    return this.fetchImpl(`${this.apiUrl}${path}`, {
       ...init,
       headers: {
         accept: 'application/vnd.github+json',
@@ -58,6 +58,10 @@ export class GitHubApp implements StatusReporter {
         'content-type': 'application/json',
       },
     });
+  }
+
+  private async api(path: string, init: RequestInit & { token: string }): Promise<Response> {
+    const res = await this.send(path, init);
     if (!res.ok)
       throw new Error(`GitHub API ${init.method ?? 'GET'} ${path} failed: ${res.status}`);
     return res;
@@ -74,6 +78,35 @@ export class GitHubApp implements StatusReporter {
     const body = (await res.json()) as { token: string; expires_at: string };
     this.tokens.set(installationId, { token: body.token, expiresAt: Date.parse(body.expires_at) });
     return body.token;
+  }
+
+  /**
+   * Calls the REST API as an installation. Unlike the other methods, an error
+   * status is returned rather than thrown, so callers can act on 404, 409 or
+   * 422. The body is parsed JSON, or `null` when empty.
+   */
+  async installationRequest(
+    installationId: number,
+    method: string,
+    path: string,
+    body?: unknown,
+  ): Promise<{ status: number; data: unknown }> {
+    const init: RequestInit & { token: string } = {
+      method,
+      token: await this.installationToken(installationId),
+    };
+    if (body !== undefined) init.body = JSON.stringify(body);
+    const res = await this.send(path, init);
+    const text = await res.text();
+    let data: unknown = null;
+    if (text) {
+      try {
+        data = JSON.parse(text);
+      } catch {
+        data = text;
+      }
+    }
+    return { status: res.status, data };
   }
 
   async report(
