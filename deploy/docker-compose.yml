@@ -1,4 +1,6 @@
-# Smallest install: the app, the build worker and Postgres.
+# Smallest install: the app, the build worker and Postgres. The web editor is
+# optional and runs on its own host (EDITOR_PUBLIC_URL); start it with
+#   docker compose -f deploy/docker-compose.yml --profile editor up -d
 #   cp deploy/.env.example deploy/.env   # then edit it
 #   docker compose -f deploy/docker-compose.yml up -d --build
 #   docker compose -f deploy/docker-compose.yml run --rm migrate seed /seed/seed.yaml
@@ -55,6 +57,18 @@ services:
   worker:
     <<: *opend
     command: ['worker']
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  # The web editor for authors: its own host, its own sign-in and cookie, and
+  # commits through the GitHub App. Needs the EDITOR_* and GITHUB_APP_* settings.
+  editor:
+    <<: *opend
+    command: ['editor', 'serve']
+    profiles: ['editor']
+    ports:
+      - '${OPEND_EDITOR_PORT:-3001}:3000'
     depends_on:
       migrate:
         condition: service_completed_successfully
