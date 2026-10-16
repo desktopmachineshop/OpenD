@@ -194,6 +194,26 @@ describe('renderNav and renderPage', () => {
     expect(nav).toBe('<ul><li><a href="/a.html" aria-current="page">Alpha</a></li></ul>');
   });
 
+  it('never shows the navtitle of a hidden topic, even when it has visible children', () => {
+    const nested: CompiledRelease = {
+      ...release([a, g]),
+      nav: [
+        {
+          title: 'Gadget navtitle',
+          topicId: 'g',
+          condition: {},
+          kind: 'topicref',
+          children: [{ title: '', topicId: 'a', condition: {}, kind: 'topicref', children: [] }],
+        },
+      ],
+    };
+    const nav = renderNav(viewRelease(nested, [widgetV1]), 'a');
+    expect(nav).not.toContain('Gadget navtitle');
+    expect(nav).toBe('<ul><li><a href="/a.html" aria-current="page">Alpha</a></li></ul>');
+    // The staff view still shows it, with its child underneath.
+    expect(renderNav(viewRelease(nested, []), 'a')).toContain('Gadget navtitle');
+  });
+
   it('returns null for pages the reader cannot see and escapes the site title', () => {
     const view = viewRelease(rel, [widgetV1]);
     expect(renderPage(view, 'a', { topicEnd: '<!--end-->' })).toContain('</article><!--end-->');

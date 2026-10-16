@@ -49,10 +49,11 @@ export function renderNav(
         if (e.hidden) return '';
         const visible = e.topicId !== undefined && view.isVisible(e.topicId);
         const inner = items(e.children);
-        // Groups, submaps and untitled entries whose topic is hidden: lift the children.
-        if (!e.title && !visible) return inner;
+        // Groups, submaps and entries whose topic is hidden: lift the children.
+        // A hidden topic's navtitle is never shown, as it would reveal the topic.
+        if (!visible && (!e.title || e.topicId !== undefined)) return inner;
         const children = inner ? `<ul>${inner}</ul>` : '';
-        // A heading (or a hidden topic's navtitle) with nothing visible under it is omitted.
+        // A heading with nothing visible under it is omitted.
         if (!visible && !children) return '';
         const label = escapeHtml(e.title);
         const link =
