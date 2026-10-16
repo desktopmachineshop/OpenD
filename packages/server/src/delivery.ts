@@ -23,6 +23,8 @@ import {
   renderIndex,
   renderNotFound,
   renderPage,
+  renderSearch,
+  siteSearchQuery,
   type PageOptions,
 } from '@opend/render-html';
 import {
@@ -38,6 +40,10 @@ import { FEEDBACK_MARKER, feedbackHtml } from './analytics.js';
 import { currentAccess, redirectToLogin } from './auth.js';
 import type { AppContext } from './context.js';
 import { USER_BAR_MARKER, messagePage, userBar } from './pages.js';
+import { searchRelease } from './search.js';
+
+/** Most hits on the site search page. */
+export const SITE_SEARCH_LIMIT = 20;
 
 const CONTENT_TYPES: Record<string, string> = {
   '.css': 'text/css; charset=utf-8',
@@ -216,6 +222,7 @@ export function registerDelivery(app: FastifyInstance, ctx: AppContext): void {
     const options: PageOptions = {
       banner: USER_BAR_MARKER,
       topicEnd: FEEDBACK_MARKER,
+      search: { action: '/search' },
       publications: readerPublications(ctx, release).map((p) => ({
         title: p.title || publicationSlug(p.file),
         href: publicationHref(p),
@@ -272,6 +279,27 @@ export function registerDelivery(app: FastifyInstance, ctx: AppContext): void {
       .headers(ASSET_HEADERS)
       .type(CONTENT_TYPES[posix.extname(path).toLowerCase()] ?? 'application/octet-stream')
       .send(data);
+  });
+
+  // Never cached: the hits depend on the reader's entitlements and the query.
+  app.get('/search', async (request, reply) => {
+    const r = await resolve(request, reply);
+    if (!r) return reply;
+    const query = siteSearchQuery((request.query as { q?: unknown }).q);
+    const hits = query ? await searchRelease(ctx.pool, r.release, query, SITE_SEARCH_LIMIT) : [];
+    if (query)
+      ctx.analytics.search(request, {
+        surface: 'site',
+        orgSlug: r.orgSlug,
+        releaseLine: r.release.line,
+        query,
+        resultCount: hits.length,
+      });
+    const html = renderSearch(r.release.view, query, hits, {
+      ...pageOptions(r.release),
+      limit: SITE_SEARCH_LIMIT,
+    });
+    return sendPage(reply, 200, html, r.email);
   });
 
   app.get('/*', async (request, reply) => {
