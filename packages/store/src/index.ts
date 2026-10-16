@@ -13,3 +13,4 @@ export * from './testing.js';
 export * from './polling.js';
 export * from './entitlement-sync.js';
 export * from './search.js';
+export * from './analytics.js';

@@ -22,6 +22,7 @@ apps:
       /orgs/:org/**: orgs
       /readers/**: readers
       /audit: audit
+      /analytics/**: analytics
       # Web editor
       /editor/**: editor
       /editor/:repo/save: editor.save

@@ -2,8 +2,8 @@
 <!DOCTYPE reference PUBLIC "-//OASIS//DTD DITA Reference//EN" "reference.dtd">
 <reference id="admin-api" product="core" audience="admin">
   <title>Admin API reference</title>
-  <shortdesc>Every route of the admin API: docs repositories, builds, organizations, readers and the audit
-    log.</shortdesc>
+  <shortdesc>Every route of the admin API: docs repositories, builds, organizations, readers, the audit
+    log and docs analytics.</shortdesc>
   <refbody>
     <section id="basics">
       <title>Basics</title>
@@ -107,6 +107,31 @@
       <p>Actions are <codeph>repo.upsert</codeph>, <codeph>build.request</codeph>, <codeph>org.upsert</codeph>,
         <codeph>entitlements.set</codeph>, <codeph>org.delete</codeph>, <codeph>reader.upsert</codeph>,
         <codeph>reader.delete</codeph> and, from the <codeph>seed</codeph> command, <codeph>seed.apply</codeph>.</p>
+    </refbody>
+  </reference>
+
+  <reference id="analytics">
+    <title>Analytics and feedback</title>
+    <prolog><resourceid appname="opend-console" appid="analytics"/></prolog>
+    <refbody>
+      <simpletable relcolwidth="3* 5*">
+        <sthead><stentry>Route</stentry><stentry>What it does</stentry></sthead>
+        <strow><stentry><codeph>GET /admin/api/analytics/summary</codeph></stentry><stentry>Totals, views by surface, top pages, top searches, searches with no results, and the share of "helpful" answers per page, least helpful first. <codeph>enabled</codeph> says whether recording is on.</stentry></strow>
+        <strow><stentry><codeph>GET /admin/api/analytics/feedback</codeph></stentry><stentry>Feedback answers, newest first: <codeph>at</codeph>, <codeph>topicId</codeph>, <codeph>helpful</codeph>, <codeph>comment</codeph>, <codeph>surface</codeph>, <codeph>orgSlug</codeph> and <codeph>releaseLine</codeph>.</stentry></strow>
+        <strow><stentry><codeph>GET /admin/api/analytics/feedback.csv</codeph></stentry><stentry>The same list as a CSV download, for a spreadsheet.</stentry></strow>
+      </simpletable>
+      <properties relcolwidth="2* 2* 5*">
+        <prophead><proptypehd>Query</proptypehd><propvaluehd>Default</propvaluehd><propdeschd>Rules</propdeschd></prophead>
+        <property><proptype><parmname>days</parmname></proptype><propvalue><codeph>30</codeph></propvalue><propdesc>Look back this many days, 1 to 3650.</propdesc></property>
+        <property><proptype><parmname>limit</parmname></proptype><propvalue><codeph>20</codeph>; <codeph>100</codeph> for feedback</propvalue><propdesc>Rows per list: at most 1000 in the summary, 10000 for feedback.</propdesc></property>
+        <property><proptype><parmname>org</parmname></proptype><propvalue>all</propvalue><propdesc>Only this organization's readers, by slug.</propdesc></property>
+        <property><proptype><parmname>topic</parmname></proptype><propvalue>all</propvalue><propdesc>Feedback only: one topic id, such as <codeph>topics/install</codeph>.</propdesc></property>
+        <property><proptype><parmname>comments</parmname></proptype><propvalue><codeph>0</codeph></propvalue><propdesc>Feedback only: <codeph>1</codeph> lists only answers with a comment.</propdesc></property>
+      </properties>
+      <p>Comments are reader text: the JSON returns them as written, and the CSV quotes every field and
+        prefixes values that start with <codeph>=</codeph>, <codeph>+</codeph>, <codeph>-</codeph> or
+        <codeph>@</codeph> with an apostrophe, so a spreadsheet does not run them as formulas. Escape
+        comments before showing them in any web page of your own.</p>
     </refbody>
   </reference>
 </reference>

@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="analytics" product="core" audience="admin">
+  <title>Docs analytics and reader feedback</title>
+  <shortdesc>See which pages readers open, what they search for and fail to find, and which pages they
+    find unhelpful, without recording who they are.</shortdesc>
+  <conbody>
+    <section id="recorded">
+      <title>What is recorded</title>
+      <dl>
+        <dlentry>
+          <dt>Page views</dt>
+          <dd>The topic id, the reader's release line and where it was read: <codeph>site</codeph> (the docs
+            site), <codeph>embed</codeph> (the help panel in a host app) or <codeph>api</codeph> (the JSON
+            help API). Pages a reader cannot see are not counted.</dd>
+        </dlentry>
+        <dlentry>
+          <dt>Searches</dt>
+          <dd>The query, in lower case with spaces tidied, and how many results it found. Email addresses
+            and runs of seven or more digits are replaced with <codeph>[email]</codeph> and
+            <codeph>[number]</codeph> before anything is stored. Empty searches are not counted.</dd>
+        </dlentry>
+        <dlentry>
+          <dt>Feedback</dt>
+          <dd>Whether a page was helpful, and an optional comment of up to 1000 characters.</dd>
+        </dlentry>
+      </dl>
+      <p>Every row also carries the reader's organization slug and the time. No row holds a reader's email,
+        name or id, or an IP address, so the numbers cannot be traced back to a person.</p>
+    </section>
+
+    <section id="opt-out">
+      <title>Readers who opt out</title>
+      <p>When the browser sends <codeph>DNT: 1</codeph> (Do Not Track) or <codeph>Sec-GPC: 1</codeph>
+        (Global Privacy Control), that reader's page views and searches are not recorded. Feedback is
+        still accepted, because the reader sends it on purpose.</p>
+      <p>To turn everything off, set <codeph>OPEND_ANALYTICS=0</codeph>. Nothing is recorded and the feedback
+        form disappears. See <xref keyref="env-vars"/>.</p>
+    </section>
+
+    <section id="feedback-form">
+      <title>The feedback form</title>
+      <p>Every topic page on the site, and every topic in the help panel, ends with <q>Was this page
+        helpful? Yes / No</q>. <uicontrol>No? Tell us what was missing</uicontrol> opens a comment box. The
+        form is plain HTML and works without JavaScript; the reader returns to the same page with a thank-you
+        message.</p>
+      <p>Only signed-in readers see the form. Answers are accepted only from the form on the reader's own
+        page, and only for topics that reader can see; anything else gets the same <q>Page not found</q>
+        answer, so the form cannot be used to find out which hidden topics exist.</p>
+    </section>
+
+    <section id="reports">
+      <title>Reading the numbers</title>
+      <p>Use the admin API (see <xref keyref="admin-api"/>):</p>
+      <ul>
+        <li><codeph>GET /admin/api/analytics/summary?days=30</codeph>: top pages, top searches, searches with
+          no results, and the share of helpful answers per page. Searches with no results show what readers
+          expect to find and cannot; the least helpful pages come first.</li>
+        <li><codeph>GET /admin/api/analytics/feedback?topic=topics/install&amp;days=90</codeph>: the answers
+          and comments for one page, newest first. Add <codeph>comments=1</codeph> for comments only.</li>
+        <li><codeph>GET /admin/api/analytics/feedback.csv</codeph>: the same as a spreadsheet.</li>
+      </ul>
+      <codeblock>curl -H "Authorization: Bearer $OPEND_ADMIN_TOKEN" \
+  "$PUBLIC_URL/admin/api/analytics/summary?days=30&amp;org=acme"</codeblock>
+      <note type="important">Comments are written by readers. Treat them as untrusted text and escape them
+        before showing them in a web page or chat message of your own.</note>
+    </section>
+
+    <section id="retention">
+      <title>How long it is kept</title>
+      <p>Rows older than <codeph>OPEND_ANALYTICS_RETENTION_DAYS</codeph> (default 180) are deleted by the
+        worker when it starts and every six hours after. To purge now, or with a shorter period:</p>
+      <codeblock>opend-server purge-analytics            # uses OPEND_ANALYTICS_RETENTION_DAYS
+opend-server purge-analytics --days 30</codeblock>
+      <p>Analytics rows live in Postgres with everything else, so database backups include them; see
+        <xref href="backups.dita">Back up and restore</xref>.</p>
+    </section>
+  </conbody>
+</concept>

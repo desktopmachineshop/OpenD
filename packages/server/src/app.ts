@@ -4,11 +4,13 @@ import { createPdfRenderer, type PdfRenderer } from '@opend/pdf';
 import { CHANNELS, listen, type BlobStore, type Pool } from '@opend/store';
 import { jsonLog, type Log } from '@opend/worker';
 import { registerAdmin } from './admin.js';
+import { Analytics } from './analytics.js';
 import { registerAuth } from './auth.js';
 import type { ServerConfig } from './config.js';
 import { Caches, type AppContext } from './context.js';
 import { registerDelivery } from './delivery.js';
 import { registerEmbed } from './embed.js';
+import { registerFeedback } from './feedback.js';
 import { registerPdf } from './pdf.js';
 import { registerEntitlementSync } from './entitlement-sync.js';
 import { createOidcProvider, type OidcProvider } from './oidc.js';
@@ -33,11 +35,14 @@ export interface OpendApp {
 
 /** Builds the hosted app. The caller decides whether to `listen()` or `inject()`. */
 export async function createApp(config: ServerConfig, deps: AppDeps): Promise<OpendApp> {
+  const log = deps.log ?? jsonLog;
   const ctx: AppContext = {
     config,
     pool: deps.pool,
     blobs: deps.blobs,
-    log: deps.log ?? jsonLog,
+    log,
+    // Through ctx.log, so a log swapped in later (tests) is the one used.
+    analytics: new Analytics(deps.pool, (entry) => ctx.log(entry), config.analytics),
     caches: new Caches(),
     pdf: deps.pdf ?? createPdfRenderer(),
     oidc:
@@ -92,7 +97,9 @@ export async function createApp(config: ServerConfig, deps: AppDeps): Promise<Op
   registerEntitlementSync(app, ctx);
   registerEmbed(app, ctx);
   registerPdf(app, ctx);
+  registerFeedback(app, ctx);
   registerDelivery(app, ctx);
+  app.addHook('onClose', async () => ctx.analytics.flush());
   // The default renderer is ours to close; an injected one belongs to the caller.
   if (!deps.pdf) app.addHook('onClose', async () => ctx.pdf.close());
 

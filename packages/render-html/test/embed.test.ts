@@ -40,6 +40,38 @@ describe('embedded help pages', async () => {
     expect(html).not.toMatch(/<script>/);
   });
 
+  it('reports the topic shown and the search run, and places topicEnd on topics only', () => {
+    const end = { ...o, topicEnd: '<!--end-->' };
+    const topic = handleEmbedRequest(
+      pro,
+      '/embed/topics/topics/install.html',
+      new URLSearchParams(),
+      end,
+    );
+    expect(topic.topicId).toBe('topics/install');
+    expect(topic.html).toContain('<!--end-->');
+    const ctx = handleEmbedRequest(
+      pro,
+      '/embed/context',
+      new URLSearchParams('app=console&key=settings.sso'),
+      end,
+    );
+    expect(ctx.topicId).toBe('topics/configure-sso');
+    const search = handleEmbedRequest(pro, '/embed/search', new URLSearchParams('q=pair'), end);
+    expect(search.topicId).toBeUndefined();
+    expect(search.search).toEqual({ query: 'pair', hits: expect.any(Number) as number });
+    expect(search.html).not.toContain('<!--end-->');
+    const missing = handleEmbedRequest(
+      v1,
+      '/embed/topics/topics/configure-sso.html',
+      new URLSearchParams(),
+      end,
+    );
+    expect(missing.status).toBe(404);
+    expect(missing.topicId).toBeUndefined();
+    expect(missing.html).not.toContain('<!--end-->');
+  });
+
   it('lists only visible neighbours in the section', () => {
     const titles = (view: typeof v1, id: string) => navNeighbours(view, id).map((e) => e.title);
     expect(titles(pro, 'topics/configure-sso')).toEqual(['Audit log events']);
