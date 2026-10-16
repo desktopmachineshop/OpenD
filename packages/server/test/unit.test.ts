@@ -91,6 +91,19 @@ describe('loadConfig', () => {
     expect(() => loadConfig({ ...base, DATABASE_URL: '' })).toThrow(/DATABASE_URL/);
   });
 
+  it('turns analytics on by default and off with OPEND_ANALYTICS=0', () => {
+    expect(loadConfig(base).analytics).toEqual({ enabled: true, retentionDays: 180 });
+    expect(loadConfig({ ...base, OPEND_ANALYTICS: '' }).analytics?.enabled).toBe(true);
+    for (const off of ['0', 'false', 'off'])
+      expect(loadConfig({ ...base, OPEND_ANALYTICS: off }).analytics?.enabled).toBe(false);
+    expect(
+      loadConfig({ ...base, OPEND_ANALYTICS_RETENTION_DAYS: '30' }).analytics?.retentionDays,
+    ).toBe(30);
+    expect(() => loadConfig({ ...base, OPEND_ANALYTICS_RETENTION_DAYS: '0' })).toThrow(
+      /OPEND_ANALYTICS_RETENTION_DAYS/,
+    );
+  });
+
   it('refuses development sign-in in production', () => {
     expect(() => loadConfig({ ...base, NODE_ENV: 'production', OPEND_DEV_LOGIN: 'true' })).toThrow(
       /OPEND_DEV_LOGIN must not be enabled when NODE_ENV=production/,

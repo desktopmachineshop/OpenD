@@ -1,3 +1,4 @@
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { escapeHtml } from '@opend/render-html';
 import { findReaderForLogin, getReaderAccess, listReaders, type ReaderAccess } from '@opend/store';
@@ -67,6 +68,43 @@ function readSession(request: FastifyRequest, name: string): number | null {
  */
 export function sessionReaderId(request: FastifyRequest): number | null {
   return readSession(request, SESSION_COOKIE) ?? readSession(request, EMBED_COOKIE);
+}
+
+/** The raw value of the cookie `sessionReaderId` accepted, or `null`. */
+function sessionCookieValue(request: FastifyRequest): string | null {
+  for (const name of [SESSION_COOKIE, EMBED_COOKIE])
+    if (readSession(request, name) !== null) return request.cookies[name]!;
+  return null;
+}
+
+/**
+ * CSRF token for reader forms, bound to the exact session cookie (so it
+ * changes with every sign-in and expires with the session). `null` when the
+ * request has no valid session.
+ */
+export function readerCsrfToken(request: FastifyRequest, ctx: AppContext): string | null {
+  const cookie = sessionCookieValue(request);
+  if (cookie === null) return null;
+  return createHmac('sha256', ctx.config.sessionSecret)
+    .update(`reader-csrf:${cookie}`)
+    .digest('base64url');
+}
+
+/**
+ * Reader POSTs must come from our own pages: the Origin (when sent) must be
+ * ours, and the `_csrf` field must match the session. The embed session is a
+ * SameSite=None cookie, so SameSite alone would not stop a cross-site form.
+ */
+export function checkReaderCsrf(request: FastifyRequest, ctx: AppContext): boolean {
+  const origin = request.headers.origin;
+  if (origin && origin !== new URL(ctx.config.publicUrl).origin) return false;
+  const expected = readerCsrfToken(request, ctx);
+  const body = request.body as Record<string, unknown> | undefined;
+  const sent = typeof body?._csrf === 'string' ? body._csrf : '';
+  if (expected === null) return false;
+  const a = Buffer.from(sent);
+  const b = Buffer.from(expected);
+  return a.length === b.length && timingSafeEqual(a, b);
 }
 
 /**

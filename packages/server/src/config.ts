@@ -72,6 +72,12 @@ const envSchema = z
         message:
           'OPEND_EMBED_ORIGINS must be comma-separated origins such as https://app.example.com',
       }),
+    // On unless set to 0/false/off; nothing about a reader is recorded either way.
+    OPEND_ANALYTICS: z
+      .string()
+      .optional()
+      .transform((v) => !['0', 'false', 'off', 'no'].includes((v ?? '').trim().toLowerCase())),
+    OPEND_ANALYTICS_RETENTION_DAYS: z.coerce.number().int().min(1).max(3650).default(180),
     NODE_ENV: z.string().default('development'),
     ...selfHostingEnv,
   })
@@ -103,6 +109,14 @@ const envSchema = z
     },
   );
 
+export interface AnalyticsConfig {
+  enabled: boolean;
+  /** Raw events older than this are purged by the worker. */
+  retentionDays: number;
+}
+
+export const DEFAULT_ANALYTICS: AnalyticsConfig = { enabled: true, retentionDays: 180 };
+
 export interface ServerConfig {
   databaseUrl: string;
   publicUrl: string;
@@ -121,6 +135,11 @@ export interface ServerConfig {
   siteRepo?: string;
   /** Embedded help in host apps: the token secret and the origins allowed to frame it. */
   embed?: { secret: string; origins: string[] };
+  /**
+   * Docs analytics and reader feedback. Absent means on, with the default
+   * retention; `enabled: false` records nothing and hides the feedback form.
+   */
+  analytics?: AnalyticsConfig;
   /** Polling for webhook-less installs, and entitlement sync from billing or a CRM. */
   selfHosting?: SelfHostingConfig;
 }
@@ -147,6 +166,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     devLogin: e.OPEND_DEV_LOGIN,
     production: e.NODE_ENV === 'production',
     selfHosting: selfHostingConfig(e),
+    analytics: { enabled: e.OPEND_ANALYTICS, retentionDays: e.OPEND_ANALYTICS_RETENTION_DAYS },
   };
   if (e.S3_BUCKET && e.S3_ENDPOINT && e.S3_ACCESS_KEY_ID && e.S3_SECRET_ACCESS_KEY) {
     config.blobs = {

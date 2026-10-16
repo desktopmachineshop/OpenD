@@ -3,6 +3,7 @@ import type { PublicationView, ReleaseView } from '@opend/filter';
 import type { PdfRenderer } from '@opend/pdf';
 import type { BlobStore, Pool, ReaderAccess, Repo, StoredRelease } from '@opend/store';
 import type { Log } from '@opend/worker';
+import type { Analytics } from './analytics.js';
 import type { ServerConfig } from './config.js';
 import type { OidcProvider } from './oidc.js';
 
@@ -52,4 +53,6 @@ export interface AppContext {
   oidc: OidcProvider | null;
   /** Prints publications. Generated PDFs are cached in `blobs`. */
   pdf: PdfRenderer;
+  /** Page views and searches, recorded without blocking responses. */
+  analytics: Analytics;
 }

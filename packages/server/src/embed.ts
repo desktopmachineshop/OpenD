@@ -13,6 +13,7 @@ import {
   type EmbedOptions,
 } from '@opend/render-html';
 import { findReaderByEmail, getReaderAccess, type ReaderAccess } from '@opend/store';
+import { FEEDBACK_MARKER, feedbackHtml } from './analytics.js';
 import { currentAccess, setEmbedSession } from './auth.js';
 import type { AppContext } from './context.js';
 import { readerRelease, type ReaderRelease } from './delivery.js';
@@ -149,15 +150,25 @@ export function registerEmbed(app: FastifyInstance, ctx: AppContext): void {
     const release = await readerRelease(ctx, access.context);
     if (typeof release === 'string')
       return send(404, renderEmbedMessage('Not published', release, embedOptions(request, null)));
-    const result = handleEmbedRequest(
-      release.view,
-      path,
-      params,
-      embedOptions(request, release.view),
-    );
+    const result = handleEmbedRequest(release.view, path, params, {
+      ...embedOptions(request, release.view),
+      topicEnd: FEEDBACK_MARKER,
+    });
     if (result.location)
       return reply.headers(frameHeaders).redirect(result.location, result.status);
-    return send(result.status, result.html);
+    const event = { surface: 'embed', orgSlug: access.orgSlug, releaseLine: release.line } as const;
+    let html = result.html;
+    if (result.topicId) {
+      ctx.analytics.view(request, { ...event, topicId: result.topicId });
+      html = html.replace(FEEDBACK_MARKER, feedbackHtml(request, ctx, result.topicId, 'embed'));
+    }
+    if (result.search)
+      ctx.analytics.search(request, {
+        ...event,
+        query: result.search.query,
+        resultCount: result.search.hits,
+      });
+    return send(result.status, html);
   };
   app.get('/embed/context', panel);
   app.get('/embed/search', panel);
@@ -235,6 +246,18 @@ export function registerEmbed(app: FastifyInstance, ctx: AppContext): void {
     };
   };
 
+  const apiView = (
+    request: FastifyRequest,
+    r: { access: ReaderAccess; release: ReaderRelease },
+    topicId: string,
+  ) =>
+    ctx.analytics.view(request, {
+      surface: 'api',
+      orgSlug: r.access.orgSlug,
+      releaseLine: r.release.line,
+      topicId,
+    });
+
   app.get('/api/v1/help/context', async (request, reply) => {
     const r = await apiReader(request, reply);
     if (!r) return reply;
@@ -250,7 +273,9 @@ export function registerEmbed(app: FastifyInstance, ctx: AppContext): void {
         via: resolved.via,
         fragment: resolved.fragment ?? null,
       });
-    return body ? reply.send(body) : reply.code(404).send({ error: 'no help for this context' });
+    if (!body) return reply.code(404).send({ error: 'no help for this context' });
+    apiView(request, r, body.topicId);
+    return reply.send(body);
   });
 
   app.get('/api/v1/help/topics/*', async (request, reply) => {
@@ -258,13 +283,23 @@ export function registerEmbed(app: FastifyInstance, ctx: AppContext): void {
     if (!r) return reply;
     const id = (request.params as { '*': string })['*'];
     const body = topicJson(r.release.view, id);
-    return body ? reply.send(body) : reply.code(404).send({ error: 'not found' });
+    if (!body) return reply.code(404).send({ error: 'not found' });
+    apiView(request, r, id);
+    return reply.send(body);
   });
 
   app.get('/api/v1/help/search', async (request, reply) => {
     const r = await apiReader(request, reply);
     if (!r) return reply;
     const q = (request.query as { q?: string }).q ?? '';
-    return reply.send({ query: q, hits: searchView(r.release.view, q) });
+    const hits = searchView(r.release.view, q);
+    ctx.analytics.search(request, {
+      surface: 'api',
+      orgSlug: r.access.orgSlug,
+      releaseLine: r.release.line,
+      query: q,
+      resultCount: hits.length,
+    });
+    return reply.send({ query: q, hits });
   });
 }

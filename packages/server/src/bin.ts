@@ -2,10 +2,11 @@
 import { readFile } from 'node:fs/promises';
 import { Command } from 'commander';
 import { editorCommand } from '@opend/editor';
-import { createBlobStore, createPool, migrate } from '@opend/store';
+import { createBlobStore, createPool, migrate, purgeAnalytics } from '@opend/store';
 import { GitHubApp, jsonLog, startPoller, startWorker } from '@opend/worker';
+import { startAnalyticsPurge } from './analytics-purge.js';
 import { createApp } from './app.js';
-import { loadConfig } from './config.js';
+import { DEFAULT_ANALYTICS, loadConfig } from './config.js';
 import { runReconcileCommand, type ReconcileCommandOptions } from './reconcile-command.js';
 import { applySeed } from './seed.js';
 
@@ -68,21 +69,42 @@ program
     const pollSeconds = config.selfHosting?.pollIntervalSeconds ?? 0;
     const poller =
       pollSeconds > 0 ? startPoller({ pool, github, intervalMs: pollSeconds * 1000 }) : null;
+    // Retention applies even with analytics off, so old rows still go.
+    const retentionDays = (config.analytics ?? DEFAULT_ANALYTICS).retentionDays;
+    const purge = startAnalyticsPurge({ pool, retentionDays, log: jsonLog });
     jsonLog({
       level: 'info',
       msg: 'worker started',
       github: Boolean(github),
       blobs: config.blobs.kind,
       pollSeconds,
+      analyticsRetentionDays: retentionDays,
     });
     const shutdown = async () => {
       await poller?.stop();
+      await purge.stop();
       await worker.stop();
       await pool.end();
       process.exit(0);
     };
     process.once('SIGTERM', () => void shutdown());
     process.once('SIGINT', () => void shutdown());
+  });
+
+program
+  .command('purge-analytics')
+  .description('delete analytics older than OPEND_ANALYTICS_RETENTION_DAYS')
+  .option('--days <n>', 'retention in days (default: OPEND_ANALYTICS_RETENTION_DAYS)')
+  .action(async (options: { days?: string }) => {
+    const config = loadConfig();
+    const days = options.days
+      ? Number(options.days)
+      : (config.analytics ?? DEFAULT_ANALYTICS).retentionDays;
+    if (!Number.isInteger(days) || days < 1) throw new Error('--days must be a whole number >= 1');
+    const pool = createPool(config.databaseUrl);
+    const purged = await purgeAnalytics(pool, days);
+    jsonLog({ level: 'info', msg: 'analytics purged', days, ...purged });
+    await pool.end();
   });
 
 program
