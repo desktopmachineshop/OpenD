@@ -62,6 +62,11 @@
       <p>Besides the pages, the previewer serves a few helper pages:</p>
       <dl>
         <dlentry>
+          <dt><filepath>/search?q=…</filepath></dt>
+          <dd>The search box in the page header: the current reader's pages that match, searched in memory.
+            See <xref href="search.dita"/>.</dd>
+        </dlentry>
+        <dlentry>
           <dt><filepath>/_opend/publications</filepath></dt>
           <dd>Every PDF publication, and whether the current reader can see anything in it.</dd>
         </dlentry>

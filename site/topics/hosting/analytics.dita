@@ -16,7 +16,9 @@
         </dlentry>
         <dlentry>
           <dt>Searches</dt>
-          <dd>The query, in lower case with spaces tidied, and how many results it found. Email addresses
+          <dd>Searches from the docs site's search page (<codeph>site</codeph>), the help panel
+            (<codeph>embed</codeph>) and the JSON help API (<codeph>api</codeph>): the query, in lower case
+            with spaces tidied, and how many results it found. Email addresses
             and runs of seven or more digits are replaced with <codeph>[email]</codeph> and
             <codeph>[number]</codeph> before anything is stored. Empty searches are not counted.</dd>
         </dlentry>

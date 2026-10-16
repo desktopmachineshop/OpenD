@@ -71,8 +71,7 @@
         <li>Context-sensitive help embedded in your own web apps.</li>
         <li>PDF publications from bookmaps, filtered per reader.</li>
       </ul>
-      <p>The web editor, site-wide search on the docs site and multi-tenancy come later and reuse the
-        same packages. See <xref href="notes/release-0.1.dita"/>.</p>
+      <p>The web editor and multi-tenancy come later and reuse the same packages. See <xref href="notes/release-0.1.dita"/>.</p>
     </section>
 
     <section id="where-next">

@@ -12,6 +12,7 @@
     <topicref href="../topics/start/install-cli.dita"/>
     <topicref href="../topics/start/validate.dita"/>
     <topicref href="../topics/start/preview.dita"/>
+    <topicref href="../topics/start/search.dita"/>
     <topicref href="../topics/start/help-lab.dita" product="embed"/>
     <topicref href="../topics/start/cli-reference.dita"/>
     <topicref href="../topics/start/these-docs.dita"/>

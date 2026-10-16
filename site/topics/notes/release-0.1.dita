@@ -32,6 +32,9 @@
         <li>Release lines: 1.x and 2.x docs live side by side, each reader served their own line.</li>
         <li>OIDC reader sign-in, matched by verified email; filtered pages, navigation and images, cached per
           entitlement set.</li>
+        <li>Site-wide search: a search box in the header of every page and a results page that finds only
+          what the reader can see in their release, with stemming, phrases and prefix matching. See
+          <xref href="../start/search.dita"/>.</li>
         <li>An admin API with an audit log, a seed command, one Docker image for every role, a Compose file,
           S3-compatible blob storage, published images, and a Railway runbook.</li>
       </ul>
@@ -61,7 +64,7 @@
           and branch filtering. See <xref href="../authoring/dita-subset.dita"/>.</li>
         <li>The contents list in PDFs has no page numbers.</li>
         <li>One docs site and one embed secret per deployment.</li>
-        <li>No web editor, operator console or site-wide search page yet.</li>
+        <li>No web editor or operator console yet.</li>
       </ul>
     </section>
   </body>

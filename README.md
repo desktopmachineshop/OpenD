@@ -7,7 +7,7 @@ This repository holds:
 - **Stage 1:** the shared build and filter core, and a local previewer.
 - **Stage 2:** the hosted path. A push fires a GitHub webhook, a worker builds and validates the docs, and signed-in readers get pages filtered by their org's entitlements.
 
-It also renders curated publications (bookmaps) to PDF for each reader, through the same filter, and has a web editor that gives authors without Git a safe route into the same repository. Site-wide search and multi-tenancy come later and reuse the same packages.
+It also renders curated publications (bookmaps) to PDF for each reader, through the same filter, and has a web editor that gives authors without Git a safe route into the same repository. Multi-tenancy comes later and reuses the same packages.
 
 ## Quick start
 
@@ -29,7 +29,7 @@ pnpm opend preview templates/docs-starter --product widget,gadget --feature sso 
 pnpm opend build templates/docs-starter --out release.json
 ```
 
-The preview banner switches between reader contexts and lists any problems. `--ref v1` previews a release branch or tag without checking it out.
+The preview banner switches between reader contexts and lists any problems. The search box in the page header searches the current reader's pages in memory. `--ref v1` previews a release branch or tag without checking it out.
 
 ## Documentation
 
@@ -114,7 +114,7 @@ To try it without an identity provider, set `NODE_ENV=development` and `OPEND_DE
 
 See [ADR 0004](docs/adr/0004-hosted-architecture.md) for how it fits together.
 
-**Search.** The worker indexes each release for Postgres full-text search when it publishes it. The help panel and `GET /api/v1/help/search` match, rank and quote only what the signed-in reader can see, with stemming, `"quoted phrases"`, `or`, `-word` and prefix matching on the last word. Releases published before the upgrade that added search are searched in memory until you run `opend-server reindex` (all releases) or `opend-server reindex --release <id>`. See [ADR 0008](docs/adr/0008-search.md).
+**Search.** The worker indexes each release for Postgres full-text search when it publishes it. The docs site's search page (the header search box on every page, `GET /search?q=`), the help panel and `GET /api/v1/help/search` match, rank and quote only what the signed-in reader can see, with stemming, `"quoted phrases"`, `or`, `-word` and prefix matching on the last word. Releases published before the upgrade that added search are searched in memory until you run `opend-server reindex` (all releases) or `opend-server reindex --release <id>`. See [ADR 0008](docs/adr/0008-search.md).
 
 To run on Railway (web, worker, Postgres and a bucket), see [docs/railway.md](docs/railway.md).
 
@@ -152,7 +152,7 @@ When `PUBLIC_URL` is a private address, setup turns polling on (every 60 seconds
 
 ## Docs analytics and feedback
 
-The server counts page views (docs site, help panel and JSON API) and help searches, and every topic page ends with a "Was this page helpful? Yes / No" form with an optional comment. Rows record the org slug, release line, topic or normalised query, and time: never a reader's email, id or IP address. Recording is one unawaited insert per request, so it never slows or breaks a page.
+The server counts page views and searches (docs site, help panel and JSON API), and every topic page ends with a "Was this page helpful? Yes / No" form with an optional comment. Rows record the org slug, release line, topic or normalised query, and time: never a reader's email, id or IP address. Recording is one unawaited insert per request, so it never slows or breaks a page.
 
 - `DNT: 1` or `Sec-GPC: 1` skips views and searches. `OPEND_ANALYTICS=0` turns everything off and hides the form.
 - The form works without JavaScript, needs a signed-in reader and a CSRF token bound to their session, and only accepts topics the reader can see (anything else is the same 404).

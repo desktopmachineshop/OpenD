@@ -67,6 +67,6 @@ The candidate step is only an optimisation. Step 3 decides what is returned, its
 
 - **Cost per search:** three small round trips. Building a visible vector per candidate topic is linear in that topic's segments, and the GIN prefilter keeps the candidate set small. Re-matching step 3 costs at most `3 × limit` filtered topics.
 - **Index size:** indexes grow with every stored release, not only live ones. They go away with their release.
-- **No site page yet:** there is still no site-wide search page on the docs site, only the panel and the JSON API. When one is added, it calls `searchRelease`.
+- **Site page:** the docs site's search page (`GET /search?q=`, a plain form in the page header, since pages run no script) calls `searchRelease` with a limit of 20 and renders per request, never from the per-entitlement page cache. The previewer's search page uses `searchView`.
 - **Language:** the `english` configuration is fixed. Per-project languages need a config field and a `regconfig` column.
 - **Phrases across segments:** segment vectors are concatenated with adjacent positions, so a phrase can match across a condition boundary. Step 3 checks the filtered text again, where the hidden segment is absent.

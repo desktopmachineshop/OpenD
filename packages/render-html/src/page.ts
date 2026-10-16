@@ -1,5 +1,5 @@
 import type { NavEntry } from '@opend/model';
-import type { ReleaseView } from '@opend/filter';
+import type { ReleaseView, SearchHit } from '@opend/filter';
 import { DEFAULT_CSS } from './style.js';
 import { conditionLabel, pageHref, renderTopic, type RenderOptions } from './render.js';
 import { escapeHtml } from './escape.js';
@@ -15,6 +15,24 @@ export interface PageOptions extends RenderOptions {
   topicEnd?: string;
   /** "Download PDF" links in the header, for publications the reader can see. */
   publications?: { title: string; href: string }[];
+  /**
+   * Adds the search box to the header, submitting `GET <action>?q=`. Only for
+   * servers that answer it (hosted delivery and the previewer).
+   */
+  search?: { action: string; query?: string };
+}
+
+/** Longest search query the site accepts; longer ones are cut, as analytics does. */
+export const MAX_SEARCH_QUERY = 200;
+
+/**
+ * The `q` parameter of a site search request: the first value if it was given
+ * more than once, trimmed, and cut to `MAX_SEARCH_QUERY` characters.
+ */
+export function siteSearchQuery(raw: unknown): string {
+  const value = Array.isArray(raw) ? (raw as unknown[])[0] : raw;
+  if (typeof value !== 'string') return '';
+  return Array.from(value.trim()).slice(0, MAX_SEARCH_QUERY).join('').trim();
 }
 
 /** Renders the navigation tree for a view. */
@@ -60,6 +78,12 @@ function publicationLinks(options: PageOptions): string {
   return links ? `<nav class="site-pdfs" aria-label="Download PDF">${links}</nav>` : '';
 }
 
+function searchBox(options: PageOptions): string {
+  if (!options.search) return '';
+  const { action, query = '' } = options.search;
+  return `<form class="site-search" role="search" method="get" action="${escapeHtml(action)}"><label class="opend-visually-hidden" for="opend-search-q">Search the documentation</label><input type="search" id="opend-search-q" name="q" value="${escapeHtml(query)}" maxlength="${MAX_SEARCH_QUERY}" placeholder="Search the docs"><button type="submit">Search</button></form>`;
+}
+
 function shell(
   view: ReleaseView,
   title: string,
@@ -83,7 +107,7 @@ ${theme}
 </head>
 <body>
 ${options.banner ?? ''}
-<header class="site-header"><a class="site-title" href="${escapeHtml(base)}">${escapeHtml(release.title)}</a><span class="site-release">Release ${escapeHtml(release.release)}</span>${publicationLinks(options)}</header>
+<header class="site-header"><a class="site-title" href="${escapeHtml(base)}">${escapeHtml(release.title)}</a><span class="site-release">Release ${escapeHtml(release.release)}</span>${publicationLinks(options)}${searchBox(options)}</header>
 <div class="layout">
 <nav class="toc" aria-label="Contents">${renderNav(view, currentId, options)}</nav>
 <main>${main}</main>
@@ -124,4 +148,42 @@ export function renderNotFound(view: ReleaseView, options: PageOptions = {}): st
     null,
     options,
   );
+}
+
+/**
+ * Site search results. `hits` must come from searching this same view, so
+ * they only name topics the reader can see; titles, snippets and the query
+ * are plain text and escaped here. `limit` is the most hits the search returned.
+ */
+export function renderSearch(
+  view: ReleaseView,
+  query: string,
+  hits: readonly SearchHit[],
+  options: PageOptions & { limit?: number } = {},
+): string {
+  const base = options.base ?? '/';
+  const q = escapeHtml(query);
+  let body: string;
+  if (!query) {
+    body =
+      '<p class="search-summary">Enter one or more words in the search box to search the documentation.</p>';
+  } else if (!hits.length) {
+    body = `<p class="search-summary" role="status">No topics match <q>${q}</q>.</p>
+<p>Check the spelling, try fewer or more general words, or browse the contents.</p>`;
+  } else {
+    const count = hits.length === 1 ? '1 result' : `${hits.length} results`;
+    const top = options.limit !== undefined && hits.length >= options.limit ? 'Top ' : '';
+    const items = hits
+      .map(
+        (h) =>
+          `<li><a href="${escapeHtml(pageHref(h.topicId, base))}">${escapeHtml(h.title)}</a>${h.snippet ? `<p class="search-snippet">${escapeHtml(h.snippet)}</p>` : ''}</li>`,
+      )
+      .join('');
+    body = `<p class="search-summary" role="status">${top}${count} for <q>${q}</q></p>
+<ol class="search-hits">${items}</ol>`;
+  }
+  const main = `<article class="topic search-results"><h1>Search</h1>${body}</article>`;
+  const pageOptions: PageOptions = { ...options };
+  if (options.search) pageOptions.search = { ...options.search, query };
+  return shell(view, query ? `Search: ${query}` : 'Search', main, null, pageOptions);
 }

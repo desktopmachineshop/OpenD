@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="search" audience="author admin developer">
+  <title>Search the docs</title>
+  <shortdesc>Every page of the docs site has a search box in its header. It finds only the pages, and the
+    parts of pages, that you are allowed to read, in your own release.</shortdesc>
+  <conbody>
+    <section id="readers">
+      <title>Searching</title>
+      <p>Type one or more words in <uicontrol>Search the docs</uicontrol> at the top of any page and press
+        Enter. The results page lists up to 20 matching pages, best first, each with its title and a short
+        passage around the match. Select a title to open the page.</p>
+      <ul>
+        <li>Words are matched in any order and in any form: <userinput>installing</userinput> also finds
+          "install".</li>
+        <li>Put a phrase in double quotes to match it exactly: <userinput>"setup wizard"</userinput>.</li>
+        <li><userinput>or</userinput> between words matches either one, and a minus sign in front of a word
+          leaves out pages that contain it: <userinput>sso -saml</userinput>.</li>
+        <li>The last word also matches as the start of a longer word, so <userinput>insta</userinput> finds
+          "installer".</li>
+        <li>Queries longer than 200 characters are cut to 200.</li>
+      </ul>
+      <p>The search works without JavaScript: it is an ordinary form, and the results page has its own
+        address (<filepath>/search?q=…</filepath>) that you can bookmark or share. Someone else who opens
+        that address sees the results for what they can read, not yours.</p>
+    </section>
+
+    <section id="scope">
+      <title>What is searched</title>
+      <p>Search uses the same reader filter as the pages. It looks only at the release your account reads,
+        for example the 2.x docs, and only at text you can see: a hidden page never appears in the results,
+        and words from a section, paragraph or alternative hidden from you never match, rank or appear in
+        a passage. Titles count most, then short descriptions, then the rest of the page.</p>
+      <p>Results are worked out for each request and never cached or shared between readers.
+        <ph product="embed">The help panel in your apps and the JSON help API search the same way.</ph></p>
+    </section>
+
+    <section id="authors">
+      <title>For authors</title>
+      <p>Good titles and short descriptions make pages easy to find, because they weigh most in the
+        ranking and the short description is quoted when the body has no text.</p>
+      <p><cmdname>opend preview</cmdname> has the same search box. It searches the current
+        <uicontrol>Preview as</uicontrol> reader's pages in memory, so you can check what each reader
+        finds. Switching reader on the results page keeps the query. The previewer's search has no stemming
+        or phrase syntax: words must appear as typed. See <xref href="preview.dita"/>.</p>
+    </section>
+
+    <section id="admins" product="core">
+      <title>For administrators</title>
+      <p>The worker indexes each release for Postgres full-text search when it publishes it. Releases
+        published before search indexing existed are searched in memory, without stemming, until you run
+        <codeph>opend-server reindex</codeph>. See <xref href="../hosting/upgrades.dita"/>. Site searches are
+        counted in <xref href="../hosting/analytics.dita"/> with the surface <codeph>site</codeph>.</p>
+    </section>
+  </conbody>
+</concept>
