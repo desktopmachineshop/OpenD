@@ -97,6 +97,12 @@ describe.skipIf(!url)('push to publish', () => {
     expect((await h.app.inject({ method: 'GET', url: '/admin/api/repos' })).statusCode).toBe(401);
     const bad = await admin(h.app, 'POST', '/repos', { fullName: 'no-slash', sourceUrl: docs.dir });
     expect(bad.statusCode).toBe(400);
+    const insecure = await admin(h.app, 'POST', '/repos', {
+      fullName: 'acme/docs',
+      sourceUrl: 'http://example.com/acme/docs.git',
+    });
+    expect(insecure.statusCode).toBe(400);
+    expect(insecure.json().issues).toEqual([expect.stringMatching(/^sourceUrl: /)]);
     const res = await admin(h.app, 'POST', '/repos', {
       fullName: 'acme/docs',
       sourceUrl: docs.dir,

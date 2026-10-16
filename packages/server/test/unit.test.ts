@@ -1,7 +1,49 @@
 import { createHmac } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { FsBlobStore, S3BlobStore, createBlobStore } from '@opend/store';
-import { loadConfig, safeReturnTo, shortRef, verifySignature } from '../src/index.js';
+import {
+  loadConfig,
+  safeReturnTo,
+  shortRef,
+  sourceUrlSchema,
+  verifySignature,
+} from '../src/index.js';
+
+describe('sourceUrlSchema', () => {
+  const ok = (production: boolean, url: string) =>
+    sourceUrlSchema(production).safeParse(url).success;
+
+  it('accepts https clone URLs everywhere', () => {
+    for (const production of [true, false]) {
+      expect(ok(production, 'https://github.com/acme/docs.git')).toBe(true);
+      expect(ok(production, 'https://ghe.example:8443/acme/docs.git')).toBe(true);
+    }
+  });
+
+  it('accepts local paths and file: URLs only outside production', () => {
+    for (const url of ['/srv/docs', 'file:///srv/docs']) {
+      expect(ok(false, url), url).toBe(true);
+      expect(ok(true, url), url).toBe(false);
+    }
+  });
+
+  it('rejects other schemes, relative paths and option-like values', () => {
+    for (const production of [true, false]) {
+      for (const url of [
+        'http://github.com/acme/docs.git',
+        'ssh://git@github.com/acme/docs.git',
+        'git@github.com:acme/docs.git',
+        'ext::sh -c touch% /tmp/pwned',
+        '--upload-pack=touch /tmp/pwned',
+        'docs',
+        'https://',
+        '',
+      ]) {
+        expect(ok(production, url), url).toBe(false);
+      }
+    }
+  });
+});
 
 const base = {
   DATABASE_URL: 'postgres://localhost/opend',
