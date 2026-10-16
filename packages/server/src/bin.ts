@@ -2,9 +2,10 @@
 import { readFile } from 'node:fs/promises';
 import { Command } from 'commander';
 import { FsBlobStore, createPool, migrate } from '@opend/store';
-import { GitHubApp, jsonLog, startWorker } from '@opend/worker';
+import { GitHubApp, jsonLog, startPoller, startWorker } from '@opend/worker';
 import { createApp } from './app.js';
 import { loadConfig } from './config.js';
+import { runReconcileCommand, type ReconcileCommandOptions } from './reconcile-command.js';
 import { applySeed } from './seed.js';
 
 const program = new Command('opend-server').description(
@@ -61,8 +62,13 @@ program
       github,
       databaseUrl: config.databaseUrl,
     });
-    jsonLog({ level: 'info', msg: 'worker started', github: Boolean(github) });
+    // Polling mode, for installs that GitHub's webhooks cannot reach.
+    const pollSeconds = config.selfHosting?.pollIntervalSeconds ?? 0;
+    const poller =
+      pollSeconds > 0 ? startPoller({ pool, github, intervalMs: pollSeconds * 1000 }) : null;
+    jsonLog({ level: 'info', msg: 'worker started', github: Boolean(github), pollSeconds });
     const shutdown = async () => {
+      await poller?.stop();
       await worker.stop();
       await pool.end();
       process.exit(0);
@@ -81,6 +87,17 @@ program
     const counts = await applySeed(pool, await readFile(file, 'utf8'));
     jsonLog({ level: 'info', msg: 'seed applied', ...counts });
     await pool.end();
+  });
+
+program
+  .command('reconcile')
+  .description('apply a customer and licence snapshot from a CRM or billing export')
+  .option('--from <url>', 'export URL (default: ENTITLEMENT_SOURCE_URL)')
+  .option('--mode <mode>', 'merge or replace (default: ENTITLEMENT_SYNC_MODE, else merge)')
+  .option('--dry-run', 'print the changes without applying them')
+  .option('--allow-empty', 'apply a replace even when the export lists no orgs')
+  .action(async (options: ReconcileCommandOptions) => {
+    await runReconcileCommand(loadConfig(), options);
   });
 
 program.parseAsync(process.argv).catch((err: unknown) => {
