@@ -16,7 +16,7 @@ export function helpLab(
   const apps = Object.entries(view.release.contexts ?? {});
   const resolvedCell = (r: ReturnType<typeof resolveContext>) =>
     r
-      ? `<a href="/${escapeHtml(r.topicId)}.html">${escapeHtml(view.topic(r.topicId)?.title ?? r.topicId)}</a>${r.via === 'key' ? '' : ` <small>(via ${r.via}: ${escapeHtml(r.key)})</small>`}`
+      ? `<a href="/${escapeHtml(r.topicId)}.html${r.fragment ? `#${escapeHtml(encodeURIComponent(r.fragment))}` : ''}">${escapeHtml(view.topic(r.topicId)?.title ?? r.topicId)}</a>${r.via === 'key' ? '' : ` <small>(via ${r.via}: ${escapeHtml(r.key)})</small>`}`
       : '<em>nothing visible</em>';
   const openButton = (app: string, attr: string, value: string) =>
     `<button type="button" data-app="${escapeHtml(app)}" ${attr}="${escapeHtml(value)}">Open in widget</button>`;

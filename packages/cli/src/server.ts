@@ -188,7 +188,10 @@ export async function startPreview(options: PreviewOptions): Promise<PreviewServ
       if (app) embed.app = app;
       if (release.theme) embed.themeHref = '/_theme.css';
       const result = handleEmbedRequest(view, path, url.searchParams, embed);
-      send(res, result.status, 'text/html; charset=utf-8', result.html);
+      if (result.location) {
+        res.writeHead(result.status, { location: result.location, 'cache-control': 'no-store' });
+        res.end();
+      } else send(res, result.status, 'text/html; charset=utf-8', result.html);
       return;
     }
     if (path === '/_opend/publications') {
