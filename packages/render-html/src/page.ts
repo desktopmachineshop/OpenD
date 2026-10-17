@@ -7,6 +7,8 @@ import { escapeHtml } from './escape.js';
 export interface PageOptions extends RenderOptions {
   /** URL of the theme stylesheet, if the project has one. */
   themeHref?: string;
+  /** URL of the project logo, shown before the site title in the header. */
+  logoHref?: string;
   /** Trusted HTML inserted at the top of the page body, e.g. the previewer banner. */
   banner?: string;
   /** Trusted HTML inserted at the end of the body, e.g. the live-reload script. */
@@ -35,38 +37,58 @@ export function siteSearchQuery(raw: unknown): string {
   return Array.from(value.trim()).slice(0, MAX_SEARCH_QUERY).join('').trim();
 }
 
-/** Renders the navigation tree for a view. */
+/**
+ * Renders the navigation tree for a view. Entries with children are collapsible
+ * `<details>` groups (no script needed): the groups on the path to the current
+ * page start open, the others closed. A heading group's `<summary>` is its
+ * label; a topic with children keeps its link and gets a separate toggle.
+ */
 export function renderNav(
   view: ReleaseView,
   currentId: string | null,
   options: RenderOptions = {},
 ): string {
   const base = options.base ?? '/';
-  // Returns the `<li>` items for a list of entries.
-  const items = (entries: readonly NavEntry[]): string =>
-    entries
-      .map((e) => {
-        if (e.hidden) return '';
-        const visible = e.topicId !== undefined && view.isVisible(e.topicId);
-        const inner = items(e.children);
-        // Groups, submaps and entries whose topic is hidden: lift the children.
-        // A hidden topic's navtitle is never shown, as it would reveal the topic.
-        if (!visible && (!e.title || e.topicId !== undefined)) return inner;
-        const children = inner ? `<ul>${inner}</ul>` : '';
-        // A heading with nothing visible under it is omitted.
-        if (!visible && !children) return '';
-        const label = escapeHtml(e.title);
-        const link =
-          visible && e.topicId
-            ? `<a href="${escapeHtml(pageHref(e.topicId, base))}"${e.topicId === currentId ? ' aria-current="page"' : ''}>${label}</a>`
-            : `<span class="nav-heading">${label}</span>`;
-        const condition = options.showConditions ? conditionLabel(e.condition) : '';
-        const badge = condition ? ` <span class="opend-badge">${escapeHtml(condition)}</span>` : '';
-        return `<li>${link}${badge}${children}</li>`;
-      })
-      .join('');
-  const inner = items(view.nav);
-  return inner ? `<ul>${inner}</ul>` : '';
+  // The `<li>` items for a list of entries, and whether the current page is among them.
+  const items = (entries: readonly NavEntry[]): { html: string; current: boolean } => {
+    let html = '';
+    let current = false;
+    for (const e of entries) {
+      if (e.hidden) continue;
+      const visible = e.topicId !== undefined && view.isVisible(e.topicId);
+      const inner = items(e.children);
+      // Groups, submaps and entries whose topic is hidden: lift the children.
+      // A hidden topic's navtitle is never shown, as it would reveal the topic.
+      if (!visible && (!e.title || e.topicId !== undefined)) {
+        html += inner.html;
+        current ||= inner.current;
+        continue;
+      }
+      // A heading with nothing visible under it is omitted.
+      if (!visible && !inner.html) continue;
+      const isCurrent = visible && e.topicId === currentId;
+      current ||= isCurrent || inner.current;
+      const label = escapeHtml(e.title);
+      const condition = options.showConditions ? conditionLabel(e.condition) : '';
+      const badge = condition ? ` <span class="opend-badge">${escapeHtml(condition)}</span>` : '';
+      const link =
+        visible && e.topicId
+          ? `<a href="${escapeHtml(pageHref(e.topicId, base))}"${isCurrent ? ' aria-current="page"' : ''}>${label}</a>`
+          : '';
+      if (!inner.html) {
+        html += `<li>${link}${badge}</li>`;
+        continue;
+      }
+      const open = isCurrent || inner.current ? ' open' : '';
+      const list = `<ul>${inner.html}</ul>`;
+      html += link
+        ? `<li class="nav-group nav-group-link">${link}${badge}<details${open}><summary class="nav-toggle"><span class="opend-visually-hidden">Subtopics of ${label}</span></summary>${list}</details></li>`
+        : `<li class="nav-group"><details${open}><summary class="nav-heading">${label}${badge}</summary>${list}</details></li>`;
+    }
+    return { html, current };
+  };
+  const { html } = items(view.nav);
+  return html ? `<ul>${html}</ul>` : '';
 }
 
 function publicationLinks(options: PageOptions): string {
@@ -85,6 +107,15 @@ function searchBox(options: PageOptions): string {
   return `<form class="site-search" role="search" method="get" action="${escapeHtml(action)}"><label class="opend-visually-hidden" for="opend-search-q">Search the documentation</label><input type="search" id="opend-search-q" name="q" value="${escapeHtml(query)}" maxlength="${MAX_SEARCH_QUERY}" placeholder="Search the docs"><button type="submit">Search</button></form>`;
 }
 
+/** Three bars, and a cross shown instead while the menu is open. */
+const MENU_ICON =
+  '<svg class="site-menu-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><path class="site-menu-bars" d="M4 7h16M4 12h16M4 17h16"/><path class="site-menu-close" d="M6 6l12 12M18 6L6 18"/></svg>';
+
+/**
+ * The page frame. On narrow screens the contents collapse behind the header's
+ * "Menu" control: a `<details>` whose state the stylesheet reads with `:has()`,
+ * so it works without scripts. Wider screens show the contents as a sidebar.
+ */
 function shell(
   view: ReleaseView,
   title: string,
@@ -97,6 +128,13 @@ function shell(
   const theme = options.themeHref
     ? `<link rel="stylesheet" href="${escapeHtml(options.themeHref)}">`
     : '';
+  const logo = options.logoHref
+    ? `<img class="site-logo" src="${escapeHtml(options.logoHref)}" alt="">`
+    : '';
+  const nav = renderNav(view, currentId, options);
+  const menu = nav
+    ? `<details class="site-menu"><summary aria-controls="opend-toc">${MENU_ICON}<span>Menu</span></summary></details>`
+    : '';
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -106,12 +144,13 @@ function shell(
 <style>${DEFAULT_CSS}</style>
 ${theme}
 </head>
-<body>
+<body class="opend-site">
+<a class="opend-skip" href="#opend-main">Skip to content</a>
 ${options.banner ?? ''}
-<header class="site-header"><a class="site-title" href="${escapeHtml(base)}">${escapeHtml(release.title)}</a><span class="site-release">Release ${escapeHtml(release.release)}</span>${publicationLinks(options)}${searchBox(options)}</header>
+<header class="site-header">${menu}<a class="site-title" href="${escapeHtml(base)}">${logo}<span>${escapeHtml(release.title)}</span></a><span class="site-release">Release ${escapeHtml(release.release)}</span>${publicationLinks(options)}${searchBox(options)}</header>
 <div class="layout">
-<nav class="toc" aria-label="Contents">${renderNav(view, currentId, options)}</nav>
-<main>${main}</main>
+<nav class="toc" id="opend-toc" aria-label="Contents">${nav}</nav>
+<main id="opend-main">${main}</main>
 </div>
 ${options.bodyEnd ?? ''}
 </body>
