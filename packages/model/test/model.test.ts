@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { entitlementKey, projectConfigSchema, readerContextSchema } from '../src/index.js';
+import {
+  entitlementKey,
+  logoRoute,
+  projectConfigSchema,
+  readerContextSchema,
+} from '../src/index.js';
 
 describe('entitlementKey', () => {
   it('is the same for readers with the same entitlements, whatever their org or order', () => {
@@ -39,5 +44,17 @@ describe('projectConfigSchema', () => {
       projectConfigSchema.safeParse({ release: '1', map: 'm', attributes: { product: ['a b'] } })
         .success,
     ).toBe(false);
+  });
+
+  it('takes an image inside the docs root as the logo, and serves it by extension', () => {
+    const parse = (logo: string) =>
+      projectConfigSchema.safeParse({ release: '1', map: 'm', logo }).success;
+    expect(parse('theme/logo.svg')).toBe(true);
+    expect(parse('images/Logo.PNG')).toBe(true);
+    expect(parse('theme/site.css')).toBe(false);
+    expect(parse('../logo.svg')).toBe(false);
+    expect(parse('/logo.svg')).toBe(false);
+    expect(logoRoute('theme/logo.svg')).toBe('_logo.svg');
+    expect(logoRoute('images/Logo.JPEG')).toBe('_logo.jpeg');
   });
 });

@@ -79,6 +79,8 @@ describe.skipIf(!url)('push to publish', () => {
     // A Gadget-only image, to check images are filtered per reader too.
     const pairing = readFileSync(join(STARTER, 'topics/gadget-pairing.dita'), 'utf8');
     mainSha = docs.commit({
+      // A header logo, served at /_logo.svg.
+      'opend.config.yaml': `${readFileSync(join(STARTER, 'opend.config.yaml'), 'utf8')}logo: images/logo.svg\n`,
       'images/gadget.svg':
         '<svg xmlns="http://www.w3.org/2000/svg"><text>GADGET-ONLY-IMAGE</text></svg>',
       'topics/gadget-pairing.dita': pairing.replace(
@@ -217,6 +219,18 @@ describe.skipIf(!url)('push to publish', () => {
       const gadget = await get('/_assets/images/gadget.svg', cookies[name]);
       expect(gadget.statusCode).toBe(reader.context.products.includes('gadget') ? 200 : 404);
       expect((await get('/_assets/opend.config.yaml', cookies[name])).statusCode).toBe(404);
+    });
+
+    it('shows the project logo in the header and serves it sandboxed', async () => {
+      const page = (await get('/topics/overview.html', cookies[name])).body;
+      expect(page).toContain('<img class="site-logo" src="/_logo.svg" alt="">');
+      expect(page).toContain('<details class="site-menu">');
+      const logo = await get('/_logo.svg', cookies[name]);
+      expect(logo.statusCode).toBe(200);
+      expect(logo.headers['content-type']).toContain('image/svg+xml');
+      expect(logo.headers['content-security-policy']).toContain('sandbox');
+      expect((await get('/_logo.png', cookies[name])).statusCode).toBe(404);
+      expect((await get('/_logo.svg')).statusCode).toBe(302);
     });
 
     it('sends hardening headers and never caches personalised pages', async () => {

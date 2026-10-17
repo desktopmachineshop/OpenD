@@ -281,9 +281,13 @@ describe('the OpenD documentation site', async () => {
     afterAll(() => preview?.close());
     const get = (path: string) => fetch(new URL(path, preview.url), { redirect: 'manual' });
 
-    it('serves pages, the theme and the diagrams', async () => {
-      expect((await get('/topics/overview.html')).status).toBe(200);
+    it('serves pages, the theme, the logo and the diagrams', async () => {
+      const page = await (await get('/topics/overview.html')).text();
+      expect(page).toContain('<img class="site-logo" src="/_logo.svg" alt="">');
       expect(await (await get('/_theme.css')).text()).toContain('--opend-brand');
+      const logo = await get('/_logo.svg');
+      expect(logo.headers.get('content-type')).toBe('image/svg+xml');
+      expect(await logo.text()).toContain('aria-label="OpenD"');
       const svg = await get('/_assets/images/architecture.svg');
       expect(svg.headers.get('content-type')).toBe('image/svg+xml');
     });

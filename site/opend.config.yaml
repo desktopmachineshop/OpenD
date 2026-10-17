@@ -28,4 +28,6 @@ attributes:
 # Applied to every reader at build time.
 buildFilter: filters/publish.ditaval
 
+# Stylesheet for the site, the help panel and the PDFs, and the header logo.
 theme: theme/site.css
+logo: theme/logo.svg

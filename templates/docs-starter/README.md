@@ -4,17 +4,17 @@ A starting point for docs published with OpenD. Copy this folder into a new repo
 
 ## Layout
 
-| Path                             | What it holds                                                                       |
-| -------------------------------- | ----------------------------------------------------------------------------------- |
-| `opend.config.yaml`              | Release, root map, publications, declared attribute values, build filter, theme     |
-| `maps/user-guide.ditamap`        | Website navigation and key definitions                                              |
-| `maps/admin-guide.bookmap`       | A curated publication (PDF in a later release)                                      |
-| `topics/`                        | One file per page                                                                   |
-| `reuse/`                         | Reusable chunks, pulled in with `conref` or `conkeyref`. Not published on their own |
-| `filters/publish.ditaval`        | Build-time filter: drops `audience="internal"` for everyone                         |
-| `preview-contexts.yaml`          | Sample readers for local preview                                                    |
-| `theme/site.css`                 | Brand colours and fonts                                                             |
-| `.github/workflows/validate.yml` | Validates every pull request                                                        |
+| Path                             | What it holds                                                                         |
+| -------------------------------- | ------------------------------------------------------------------------------------- |
+| `opend.config.yaml`              | Release, root map, publications, declared attribute values, build filter, theme, logo |
+| `maps/user-guide.ditamap`        | Website navigation and key definitions                                                |
+| `maps/admin-guide.bookmap`       | A curated publication (PDF in a later release)                                        |
+| `topics/`                        | One file per page                                                                     |
+| `reuse/`                         | Reusable chunks, pulled in with `conref` or `conkeyref`. Not published on their own   |
+| `filters/publish.ditaval`        | Build-time filter: drops `audience="internal"` for everyone                           |
+| `preview-contexts.yaml`          | Sample readers for local preview                                                      |
+| `theme/site.css`                 | Brand colours and fonts: override the `--opend-*` custom properties                   |
+| `.github/workflows/validate.yml` | Validates every pull request                                                          |
 
 ## Writing conditional content
 

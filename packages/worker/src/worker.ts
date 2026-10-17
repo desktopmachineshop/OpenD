@@ -166,7 +166,11 @@ async function buildAndPublish(deps: WorkerDeps, repo: Repo, job: BuildJob): Pro
       return { kind: 'invalid', message: formatDiagnostic(d), diagnostics: [d, ...diagnostics] };
     }
     try {
-      const files = [...release.assets, ...(release.theme ? [release.theme] : [])];
+      const files = [
+        ...release.assets,
+        ...(release.theme ? [release.theme] : []),
+        ...(release.logo ? [release.logo] : []),
+      ];
       for (const path of files) {
         await deps.blobs.put(assetKey(repo.id, job.sha, path), await readSourceFile(root, path));
       }

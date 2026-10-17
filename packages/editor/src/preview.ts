@@ -1,5 +1,5 @@
 import { posix } from 'node:path';
-import type { ReaderContext } from '@opend/model';
+import { logoRoute, type ReaderContext } from '@opend/model';
 import { readerPolicy, viewRelease } from '@opend/filter';
 import {
   escapeHtml,
@@ -44,7 +44,7 @@ export function banner(text: string, tone: 'draft' | 'org' = 'draft'): string {
 
 /**
  * Serves one preview path (`index.html`, `<topic>.html`, `_theme.css`,
- * `_assets/<file>`) from a draft build, under `base`.
+ * `_logo.<ext>`, `_assets/<file>`) from a draft build, under `base`.
  */
 export async function renderPreview(
   service: EditorService,
@@ -88,6 +88,7 @@ export async function renderPreview(
       return { status: 200, type: 'text/css; charset=utf-8', body: edited };
     return fileResponse(release.theme);
   }
+  if (release.logo && rest === logoRoute(release.logo)) return fileResponse(release.logo);
   if (rest.startsWith('_assets/')) {
     const path = rest.slice('_assets/'.length);
     // Only files the content references, never sources or config.
@@ -106,6 +107,7 @@ export async function renderPreview(
     banner: audience.banner,
   };
   if (release.theme) options.themeHref = `${base}_theme.css`;
+  if (release.logo) options.logoHref = `${base}${logoRoute(release.logo)}`;
   if (rest === '' || rest === 'index.html')
     return { status: 200, type: 'text/html; charset=utf-8', body: renderIndex(view, options) };
   if (rest.endsWith('.html')) {

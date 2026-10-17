@@ -1,7 +1,7 @@
 import { watch, type FSWatcher } from 'node:fs';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { posix } from 'node:path';
-import { findPublication, formatDiagnostic, type Diagnostic } from '@opend/model';
+import { findPublication, formatDiagnostic, logoRoute, type Diagnostic } from '@opend/model';
 import { searchView, viewRelease } from '@opend/filter';
 import { readSourceFile } from '@opend/build';
 import { frameScript, widgetScript } from '@opend/embed';
@@ -150,6 +150,10 @@ export async function startPreview(options: PreviewOptions): Promise<PreviewServ
       await sendFile(res, project, release.theme);
       return;
     }
+    if (release.logo && path === `/${logoRoute(release.logo)}`) {
+      await sendFile(res, project, release.logo);
+      return;
+    }
     if (path.startsWith('/_assets/')) {
       const asset = path.slice('/_assets/'.length);
       // Only files the content references are served, never sources or config.
@@ -174,6 +178,7 @@ export async function startPreview(options: PreviewOptions): Promise<PreviewServ
       })),
     };
     if (release.theme) pageOptions.themeHref = '/_theme.css';
+    if (release.logo) pageOptions.logoHref = `/${logoRoute(release.logo)}`;
 
     if (path === '/embed/frame.js' || path === '/embed/opend-help.js') {
       send(

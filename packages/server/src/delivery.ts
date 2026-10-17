@@ -3,6 +3,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import {
   ASSET_ATTR,
   entitlementKey,
+  logoRoute,
   publicationSlug,
   walk,
   type Publication,
@@ -229,6 +230,7 @@ export function registerDelivery(app: FastifyInstance, ctx: AppContext): void {
       })),
     };
     if (release.view.release.theme) options.themeHref = '/_theme.css';
+    if (release.view.release.logo) options.logoHref = `/${logoRoute(release.view.release.logo)}`;
     return options;
   };
   const resolve = (request: FastifyRequest, reply: FastifyReply) =>
@@ -264,6 +266,21 @@ export function registerDelivery(app: FastifyInstance, ctx: AppContext): void {
       : null;
     if (!data) return reply.code(404).send('Not found');
     return reply.headers(ASSET_HEADERS).type('text/css; charset=utf-8').send(data);
+  });
+
+  app.get('/_logo.:ext', async (request, reply) => {
+    const r = await resolve(request, reply);
+    if (!r) return reply;
+    const logo = r.release.stored.snapshot.logo;
+    const data =
+      logo && request.url.split('?')[0] === `/${logoRoute(logo)}`
+        ? await ctx.blobs.get(assetKey(r.release.stored.repoId, r.release.stored.sha, logo))
+        : null;
+    if (!data) return reply.code(404).headers(ASSET_HEADERS).type('text/plain').send('Not found');
+    return reply
+      .headers(ASSET_HEADERS)
+      .type(CONTENT_TYPES[posix.extname(logo!).toLowerCase()] ?? 'application/octet-stream')
+      .send(data);
   });
 
   app.get('/_assets/*', async (request, reply) => {
