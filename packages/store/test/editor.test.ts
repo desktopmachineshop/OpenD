@@ -13,6 +13,10 @@ import {
   listEditorAudit,
   recordEditorAudit,
   revokeEditorSession,
+  SecretBox,
+  deleteEditorGitHubTokens,
+  getEditorGitHubToken,
+  putEditorGitHubToken,
   setEditorUserDisabled,
   updateEditorBranch,
   upsertEditorUser,
@@ -156,5 +160,54 @@ describe.skipIf(!url)('editor store', () => {
     const found = await getEditorPreview(db.pool, preview.id);
     expect(found?.context.products).toEqual(['widget']);
     expect(found!.expiresAt.getTime() - Date.now()).toBeGreaterThan(29 * 60_000);
+  });
+
+  it('seals GitHub user tokens per session and opens them only with the same key', async () => {
+    const user = await upsertEditorUser(db.pool, { email: 'hal@example.com' });
+    const session = await createEditorSession(db.pool, user.id, 'github', 1);
+    const other = await createEditorSession(db.pool, user.id, 'github', 1);
+    const box = new SecretBox(Buffer.alloc(32, 7));
+    const grant = {
+      accessToken: 'ghu_secret-access',
+      refreshToken: 'ghr_secret-refresh',
+      expiresIn: 28_800,
+      refreshTokenExpiresIn: 15_897_600,
+    };
+    await putEditorGitHubToken(db.pool, box, {
+      sessionId: session.id,
+      userId: user.id,
+      githubId: 9,
+      githubLogin: 'hal',
+      grant,
+    });
+    const { rows } = await db.pool.query('select * from editor_github_tokens');
+    expect(JSON.stringify(rows)).not.toContain('secret-access');
+    expect(JSON.stringify(rows)).not.toContain('secret-refresh');
+    const found = await getEditorGitHubToken(db.pool, box, session.id);
+    expect(found).toMatchObject({ accessToken: grant.accessToken, githubLogin: 'hal' });
+    expect(found!.expiresAt!.getTime() - Date.now()).toBeGreaterThan(7 * 3600_000);
+    // Bound to its session: copied to another session's row, it does not open.
+    await db.pool.query(
+      `insert into editor_github_tokens (session_id, user_id, github_id, github_login, access_sealed, key_id)
+       select $1, user_id, github_id, github_login, access_sealed, key_id from editor_github_tokens
+       where session_id = $2`,
+      [other.id, session.id],
+    );
+    expect(await getEditorGitHubToken(db.pool, box, other.id)).toBeNull();
+    // Another key cannot open it, and the unreadable row is dropped.
+    expect(
+      await getEditorGitHubToken(db.pool, new SecretBox(Buffer.alloc(32, 8)), session.id),
+    ).toBeNull();
+    expect(await deleteEditorGitHubTokens(db.pool, { userId: user.id })).toBe(0);
+    await putEditorGitHubToken(db.pool, box, {
+      sessionId: session.id,
+      userId: user.id,
+      githubId: 9,
+      githubLogin: 'hal',
+      grant: { accessToken: 'ghu_plain' },
+    });
+    await revokeEditorSession(db.pool, session.id);
+    expect(await getEditorGitHubToken(db.pool, box, session.id)).toBeNull();
+    expect((await db.pool.query('select 1 from editor_github_tokens')).rowCount).toBe(0);
   });
 });

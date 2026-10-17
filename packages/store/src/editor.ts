@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import type { ReaderContext } from '@opend/model';
 import type { Db } from './db.js';
+import type { SecretBox } from './settings.js';
 
 /** A web editor account. Separate from readers: see migration `002_editor`. */
 export interface EditorUser {
@@ -43,6 +44,11 @@ export async function setEditorUserDisabled(
   if (disabled) {
     await db.query(
       `update editor_sessions set revoked_at = now() where revoked_at is null and user_id in
+         (select id from editor_users where lower(email) = lower($1))`,
+      [email.trim()],
+    );
+    await db.query(
+      `delete from editor_github_tokens where user_id in
          (select id from editor_users where lower(email) = lower($1))`,
       [email.trim()],
     );
@@ -186,8 +192,10 @@ export async function getEditorSession(
   return { session: { id: sessionId, userId: user.id, provider, expiresAt }, user };
 }
 
+/** Revokes a session and deletes its GitHub token. */
 export async function revokeEditorSession(db: Db, id: string): Promise<void> {
   await db.query('update editor_sessions set revoked_at = now() where id = $1', [id]);
+  await db.query('delete from editor_github_tokens where session_id = $1', [id]);
 }
 
 export interface EditorBranch {
@@ -373,4 +381,151 @@ export async function getEditorPreview(db: Db, id: string): Promise<EditorPrevie
     [id],
   );
   return rows[0] ?? null;
+}
+
+// ---- GitHub user access tokens (signed commits) -----------------------------
+
+/** A GitHub user access token as GitHub issued it. Never log, render or return one. */
+export interface GitHubUserGrant {
+  accessToken: string;
+  /** Present when the GitHub App issues expiring user tokens. */
+  refreshToken?: string;
+  /** Lifetimes in seconds, as GitHub reports them. */
+  expiresIn?: number;
+  refreshTokenExpiresIn?: number;
+}
+
+/** A stored token, opened for the editor's own use. */
+export interface EditorGitHubToken {
+  sessionId: string;
+  userId: number;
+  githubId: number;
+  githubLogin: string;
+  accessToken: string;
+  refreshToken: string | null;
+  expiresAt: Date | null;
+  refreshExpiresAt: Date | null;
+}
+
+const tokenName = (sessionId: string, part: 'access' | 'refresh') =>
+  `editor-github-token:${sessionId}:${part}`;
+
+/**
+ * Seals and stores (or replaces) the GitHub token of an editor session. The
+ * ciphertext is bound to the session id, so a row copied to another session
+ * does not open.
+ */
+export async function putEditorGitHubToken(
+  db: Db,
+  box: SecretBox,
+  input: {
+    sessionId: string;
+    userId: number;
+    githubId: number;
+    githubLogin: string;
+    grant: GitHubUserGrant;
+  },
+): Promise<void> {
+  const { sessionId, grant } = input;
+  await db.query(
+    `insert into editor_github_tokens (session_id, user_id, github_id, github_login, access_sealed,
+       refresh_sealed, expires_at, refresh_expires_at, key_id)
+     values ($1, $2, $3, $4, $5, $6,
+       case when $7::int is null then null else now() + make_interval(secs => $7) end,
+       case when $8::int is null then null else now() + make_interval(secs => $8) end, $9)
+     on conflict (session_id) do update set access_sealed = excluded.access_sealed,
+       refresh_sealed = excluded.refresh_sealed, expires_at = excluded.expires_at,
+       refresh_expires_at = excluded.refresh_expires_at, key_id = excluded.key_id,
+       github_login = excluded.github_login, updated_at = now()`,
+    [
+      sessionId,
+      input.userId,
+      input.githubId,
+      input.githubLogin,
+      box.encrypt(tokenName(sessionId, 'access'), grant.accessToken),
+      grant.refreshToken ? box.encrypt(tokenName(sessionId, 'refresh'), grant.refreshToken) : null,
+      grant.expiresIn ?? null,
+      grant.refreshToken ? (grant.refreshTokenExpiresIn ?? null) : null,
+      box.keyId,
+    ],
+  );
+}
+
+/**
+ * The GitHub token of a live session (not expired, not revoked, user not
+ * disabled), or null. A row this key cannot open is deleted: the author signs
+ * in with GitHub again.
+ */
+export async function getEditorGitHubToken(
+  db: Db,
+  box: SecretBox,
+  sessionId: string,
+): Promise<EditorGitHubToken | null> {
+  const { rows } = await db.query<{
+    userId: number;
+    githubId: string;
+    githubLogin: string;
+    accessSealed: string;
+    refreshSealed: string | null;
+    expiresAt: Date | null;
+    refreshExpiresAt: Date | null;
+  }>(
+    `select t.user_id as "userId", t.github_id as "githubId", t.github_login as "githubLogin",
+       t.access_sealed as "accessSealed", t.refresh_sealed as "refreshSealed",
+       t.expires_at as "expiresAt", t.refresh_expires_at as "refreshExpiresAt"
+     from editor_github_tokens t
+     join editor_sessions s on s.id = t.session_id
+     join editor_users u on u.id = t.user_id
+     where t.session_id = $1 and s.revoked_at is null and s.expires_at > now() and not u.disabled`,
+    [sessionId],
+  );
+  const row = rows[0];
+  if (!row) return null;
+  const accessToken = box.decrypt(tokenName(sessionId, 'access'), row.accessSealed);
+  const refreshToken = row.refreshSealed
+    ? box.decrypt(tokenName(sessionId, 'refresh'), row.refreshSealed)
+    : null;
+  if (accessToken === null || (row.refreshSealed && refreshToken === null)) {
+    await deleteEditorGitHubTokens(db, { sessionId });
+    return null;
+  }
+  return {
+    sessionId,
+    userId: row.userId,
+    githubId: Number(row.githubId),
+    githubLogin: row.githubLogin,
+    accessToken,
+    refreshToken,
+    expiresAt: row.expiresAt,
+    refreshExpiresAt: row.refreshExpiresAt,
+  };
+}
+
+/** Whether a session has a stored GitHub token, without opening it. */
+export async function hasEditorGitHubToken(db: Db, sessionId: string): Promise<boolean> {
+  const { rowCount } = await db.query('select 1 from editor_github_tokens where session_id = $1', [
+    sessionId,
+  ]);
+  return rowCount === 1;
+}
+
+/** Deletes the GitHub tokens of one session, or of every session of a user. */
+export async function deleteEditorGitHubTokens(
+  db: Db,
+  which: { sessionId: string } | { userId: number },
+): Promise<number> {
+  const { rowCount } =
+    'sessionId' in which
+      ? await db.query('delete from editor_github_tokens where session_id = $1', [which.sessionId])
+      : await db.query('delete from editor_github_tokens where user_id = $1', [which.userId]);
+  return rowCount ?? 0;
+}
+
+/** Deletes the tokens of sessions that expired or were revoked. */
+export async function purgeEditorGitHubTokens(db: Db): Promise<number> {
+  const { rowCount } = await db.query(
+    `delete from editor_github_tokens t using editor_sessions s
+     where s.id = t.session_id and (s.revoked_at is not null or s.expires_at <= now())`,
+  );
+  return rowCount ?? 0;
 }
