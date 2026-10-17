@@ -290,4 +290,34 @@ create index if not exists analytics_feedback_at on analytics_feedback (at);
 create index if not exists analytics_feedback_topic_at on analytics_feedback (topic_id, at);
 `,
   },
+  {
+    id: '006_access',
+    sql: `
+-- Who may read a site. 'private': only signed-in, registered readers. 'public':
+-- anonymous visitors too, filtered for public_entitlements ({products, features,
+-- version}); null there means anonymous visitors see only unconditioned content.
+-- Operator-controlled through the admin API, never read from the docs repository.
+alter table repos add column if not exists access text not null default 'private'
+  check (access in ('private', 'public'));
+alter table repos add column if not exists public_entitlements jsonb;
+
+-- Staff readers (the docs owner and their team) see the unfiltered staff view.
+-- Only the admin API and seed files set it; entitlement sync never touches it.
+alter table readers add column if not exists staff boolean not null default false;
+
+-- Sign-in identities other than the OIDC subject on readers, e.g. GitHub user
+-- ids. Linked on the first sign-in with a verified email, then matched by id.
+create table if not exists reader_identities (
+  reader_id bigint not null references readers (id) on delete cascade,
+  issuer text not null,
+  subject text not null,
+  created_at timestamptz not null default now(),
+  primary key (issuer, subject),
+  unique (reader_id, issuer)
+);
+
+-- Anonymous visitors of public sites have no org.
+alter table analytics_events alter column org_slug drop not null;
+`,
+  },
 ];

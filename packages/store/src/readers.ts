@@ -17,6 +17,8 @@ export interface Reader {
   name: string | null;
   oidcIssuer: string | null;
   oidcSubject: string | null;
+  /** Sees the unfiltered staff view. Set only by operators (admin API, seed). */
+  staff: boolean;
 }
 
 export interface Entitlements {
@@ -26,7 +28,7 @@ export interface Entitlements {
 }
 
 const READER_COLUMNS = `r.id, r.org_id as "orgId", r.email, r.name, r.oidc_issuer as "oidcIssuer",
-  r.oidc_subject as "oidcSubject"`;
+  r.oidc_subject as "oidcSubject", r.staff`;
 
 export async function upsertOrg(db: Db, org: { slug: string; name: string }): Promise<number> {
   const { rows } = await db.query<{ id: number }>(
@@ -66,18 +68,33 @@ export async function listOrgs(db: Db): Promise<Org[]> {
   return rows;
 }
 
-/** Adds or moves a reader by email. Returns null when the org does not exist. */
+/**
+ * Adds or moves a reader by email. Returns null when the org does not exist.
+ * `staff` is changed only when given, so entitlement sync (which never passes
+ * it) cannot grant or revoke the staff view.
+ */
 export async function upsertReader(
   db: Db,
-  reader: { orgSlug: string; email: string; name?: string | null },
+  reader: { orgSlug: string; email: string; name?: string | null; staff?: boolean },
 ): Promise<Reader | null> {
   const { rows } = await db.query<Reader>(
     `with o as (select id from orgs where slug = $1)
-     insert into readers as r (org_id, email, name) select o.id, $2, $3 from o
+     insert into readers as r (org_id, email, name, staff) select o.id, $2, $3, coalesce($4, false)
+     from o
      on conflict ((lower(email))) do update set org_id = excluded.org_id,
-       name = coalesce(excluded.name, r.name)
+       name = coalesce(excluded.name, r.name), staff = coalesce($4, r.staff)
      returning ${READER_COLUMNS}`,
-    [reader.orgSlug, reader.email.trim(), reader.name ?? null],
+    [reader.orgSlug, reader.email.trim(), reader.name ?? null, reader.staff ?? null],
+  );
+  await notify(db, CHANNELS.entitlementsChanged);
+  return rows[0] ?? null;
+}
+
+/** Grants or revokes the staff view. Returns null when there is no such reader. */
+export async function setReaderStaff(db: Db, id: number, staff: boolean): Promise<Reader | null> {
+  const { rows } = await db.query<Reader>(
+    `update readers r set staff = $2 where id = $1 returning ${READER_COLUMNS}`,
+    [id, staff],
   );
   await notify(db, CHANNELS.entitlementsChanged);
   return rows[0] ?? null;
@@ -119,6 +136,39 @@ export async function findReaderForLogin(
     [login.issuer, login.subject, login.email],
   );
   return rows[0] ?? null;
+}
+
+/**
+ * Finds the reader for a sign-in with another provider (e.g. GitHub), by the
+ * same rule as OIDC: an identity already linked to a reader wins; otherwise
+ * the first verified email a registered reader has, whose reader has no
+ * identity from this issuer yet, is linked on this first sign-in. Pass only
+ * emails the provider has verified.
+ */
+export async function findReaderForIdentity(
+  db: Db,
+  login: { issuer: string; subject: string; verifiedEmails: readonly string[] },
+): Promise<Reader | null> {
+  const linked = await db.query<Reader>(
+    `select ${READER_COLUMNS} from readers r
+     join reader_identities i on i.reader_id = r.id where i.issuer = $1 and i.subject = $2`,
+    [login.issuer, login.subject],
+  );
+  if (linked.rows[0]) return linked.rows[0];
+  for (const email of login.verifiedEmails) {
+    const { rows } = await db.query<Reader>(
+      `with linked as (
+         insert into reader_identities (reader_id, issuer, subject)
+         select r.id, $1, $2 from readers r
+         where lower(r.email) = lower($3)
+           and not exists (select 1 from reader_identities i where i.reader_id = r.id and i.issuer = $1)
+         on conflict do nothing returning reader_id)
+       select ${READER_COLUMNS} from readers r join linked on linked.reader_id = r.id`,
+      [login.issuer, login.subject, email.trim()],
+    );
+    if (rows[0]) return rows[0];
+  }
+  return null;
 }
 
 export interface ReaderAccess {
