@@ -123,4 +123,6 @@ export interface CompiledRelease {
    */
   contexts?: Record<string, HelpApp>;
   theme?: string;
+  /** Docs-root-relative path of the header logo, from the project config. */
+  logo?: string;
 }

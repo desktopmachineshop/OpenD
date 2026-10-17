@@ -46,7 +46,17 @@
         <proptype><parmname>theme</parmname></proptype>
         <propvalue>none</propvalue>
         <propdesc>A stylesheet loaded after the built-in styles on every page, in the help panel and in
-          PDFs.</propdesc>
+          PDFs. See <xref href="../pdf/pdf-theming.dita"/>.</propdesc>
+      </property>
+      <property>
+        <proptype><parmname>logo</parmname></proptype>
+        <propvalue>none</propvalue>
+        <propdesc>An image shown before the site title in the page header: an <filepath>.svg</filepath>,
+          <filepath>.png</filepath>, <filepath>.jpg</filepath>, <filepath>.jpeg</filepath>,
+          <filepath>.gif</filepath> or <filepath>.webp</filepath> file. It is drawn 28 pixels high and is
+          decorative, because the title follows it. An SVG logo can carry its own
+          <codeph>prefers-color-scheme</codeph> rule for dark mode, as this site's
+          <filepath>theme/logo.svg</filepath> does.</propdesc>
       </property>
       <property>
         <proptype><parmname>title</parmname></proptype>
@@ -68,7 +78,8 @@ attributes:
   feature: [early-access]
   audience: [author, admin, developer, internal]
 buildFilter: filters/publish.ditaval
-theme: theme/site.css</codeblock>
+theme: theme/site.css
+logo: theme/logo.svg</codeblock>
       <p>Quote the release. Unquoted, YAML reads <codeph>0.1</codeph> as a number, and the config is
         rejected.</p>
       <p>Every path must stay inside the docs root: no leading <codeph>/</codeph> and no

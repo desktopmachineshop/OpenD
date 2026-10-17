@@ -7,24 +7,50 @@
   <taskbody>
     <steps>
       <step>
-        <cmd>Override the <codeph>--opend-*</codeph> variables in your theme.</cmd>
+        <cmd>Override the <codeph>--opend-*</codeph> custom properties in your theme.</cmd>
         <stepxmp>
           <codeblock>:root {
-  --opend-accent: #1f5fbf;      /* links and highlights */
+  --opend-accent: #1f5fbf;      /* brand colour: links, highlights, focus */
   --opend-text: #14213d;
   --opend-muted: #52607a;       /* short descriptions, secondary text */
   --opend-surface: #ffffff;     /* page background */
-  --opend-surface-alt: #f2f5fa; /* code, notes, table headers */
+  --opend-surface-alt: #f2f5fa; /* code, table headers, the open menu */
   --opend-border: #d9e0ea;
-  --opend-warn: #b45309;        /* warning, caution and danger notes */
+  --opend-warn: #b45309;        /* warning, caution and restriction notes */
+  --opend-danger: #b3261e;      /* danger notes */
+  --opend-info: #2457c5;        /* plain notes */
   --opend-cond: #7c3aed;        /* condition markers in the staff view */
   --opend-font: system-ui, sans-serif;
   --opend-mono: ui-monospace, Menlo, monospace;
 }
 @media (prefers-color-scheme: dark) {
-  :root { --opend-surface: #10151d; --opend-text: #e6ebf2; }
+  :root { --opend-accent: #7fb0ff; --opend-surface: #10151d; --opend-text: #e6ebf2; }
 }</codeblock>
         </stepxmp>
+        <info>
+          <p>The link, hover, focus and highlight colours, headings, code backgrounds and note tints are
+            derived from these, so a theme that sets only <codeph>--opend-accent</codeph> rebrands the whole
+            site. To fine-tune, set the derived properties too: <codeph>--opend-link</codeph>,
+            <codeph>--opend-link-hover</codeph>, <codeph>--opend-accent-soft</codeph>,
+            <codeph>--opend-focus</codeph>, <codeph>--opend-heading</codeph>,
+            <codeph>--opend-border-strong</codeph>, <codeph>--opend-code-bg</codeph> and
+            <codeph>--opend-on-accent</codeph>. Layout properties are <codeph>--opend-radius</codeph>,
+            <codeph>--opend-radius-sm</codeph>, <codeph>--opend-shadow</codeph>,
+            <codeph>--opend-measure</codeph> (reading width), <codeph>--opend-sidebar-width</codeph>,
+            <codeph>--opend-header-height</codeph> and <codeph>--opend-layout-max</codeph>.</p>
+          <p>Keep text readable: body text and links need a contrast of at least 4.5:1 against
+            <codeph>--opend-surface</codeph>, in both colour schemes.</p>
+        </info>
+      </step>
+      <step>
+        <cmd>Optional: add a logo.</cmd>
+        <stepxmp>
+          <codeblock>logo: theme/logo.svg</codeblock>
+        </stepxmp>
+        <info>
+          <p>The image is shown before the site title in the page header. See the <parmname>logo</parmname>
+            field in <xref href="../authoring/config-reference.dita"/>.</p>
+        </info>
       </step>
       <step>
         <cmd>Optional: add print rules for PDFs.</cmd>
@@ -39,12 +65,17 @@
         </info>
       </step>
       <step>
-        <cmd>Check the result on a page, in the help lab's panel and in the print HTML.</cmd>
+        <cmd>Check the result on a page, in the help lab's panel and in the print HTML, at phone and
+          desktop widths and in the light and dark schemes.</cmd>
       </step>
     </steps>
     <result>
       <p>The theme loads after the built-in styles, and in PDFs after the print styles, so its rules win.
-        This site's theme is <filepath>site/theme/site.css</filepath>.</p>
+        This site's theme is <filepath>site/theme/site.css</filepath>. Custom rules
+        can use the page's class names, such as <codeph>.site-header</codeph>, <codeph>.toc</codeph>
+        (the sidebar on wide screens), <codeph>.site-menu-panel</codeph> (the panel the
+        <uicontrol>Menu</uicontrol> button opens on narrow screens, with search, the contents and the PDF
+        links), <codeph>.opend-nav</codeph> (both copies of the contents) and <codeph>main</codeph>.</p>
       <note type="restriction">In PDFs the theme is inlined into a document without a base URL, so
         <codeph>url()</codeph> references to fonts or images in it are not loaded. Use fonts installed on the
         server, or the system font stack.</note>

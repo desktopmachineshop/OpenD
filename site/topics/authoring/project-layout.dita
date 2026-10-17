@@ -10,7 +10,7 @@
       convention, and the starter template follows it:</p>
     <simpletable relcolwidth="2* 5*">
       <sthead><stentry>Path</stentry><stentry>What it holds</stentry></sthead>
-      <strow><stentry><filepath>opend.config.yaml</filepath></stentry><stentry>Release, root map, publications, declared attribute values, build filter and theme. See <xref href="config-reference.dita"/>.</stentry></strow>
+      <strow><stentry><filepath>opend.config.yaml</filepath></stentry><stentry>Release, root map, publications, declared attribute values, build filter, theme and logo. See <xref href="config-reference.dita"/>.</stentry></strow>
       <strow><stentry><filepath>maps/</filepath></stentry><stentry>The site map, bookmaps for PDF publications, and submaps such as shared key definitions.</stentry></strow>
       <strow><stentry><filepath>topics/</filepath></stentry><stentry>One topic file per page. The page URL is the file path without its extension, for example <filepath>/topics/install.html</filepath>.</stentry></strow>
       <strow><stentry><filepath>reuse/</filepath></stentry><stentry>Reusable chunks pulled in with <codeph>conref</codeph> or <codeph>conkeyref</codeph>. Kept out of every map, so they are never published on their own.</stentry></strow>

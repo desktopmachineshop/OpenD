@@ -80,6 +80,29 @@ describe('buildRelease diagnostics', () => {
       'main.ditamap:3:1: error [missing-topic] topic not found: gone.dita',
     ]);
   });
+
+  it('records the logo, and reports a missing one', () => {
+    const files = {
+      'main.ditamap': '<map><topicref href="a.dita"/></map>',
+      'a.dita': '<topic id="a"><title>A</title></topic>',
+    };
+    const ok = buildRelease(
+      tree({
+        ...files,
+        'opend.config.yaml': 'release: "1.0"\nmap: main.ditamap\nlogo: logo.svg\n',
+        'logo.svg': '<svg/>',
+      }),
+    );
+    expect(ok.diagnostics).toEqual([]);
+    expect(ok.release?.logo).toBe('logo.svg');
+    const missing = buildRelease(
+      tree({
+        ...files,
+        'opend.config.yaml': 'release: "1.0"\nmap: main.ditamap\nlogo: gone.png\n',
+      }),
+    );
+    expect(missing.diagnostics.map((d) => d.code)).toEqual(['missing-logo']);
+  });
 });
 
 describe('readGitRef', () => {

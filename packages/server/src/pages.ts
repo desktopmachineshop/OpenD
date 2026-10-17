@@ -27,8 +27,8 @@ export function messagePage(title: string, message: string): string {
 export const USER_BAR_MARKER = '<!--opend-user-bar-->';
 
 export function userBar(email: string): string {
-  return `<div class="opend-user-bar" style="display:flex;gap:12px;justify-content:flex-end;align-items:center;padding:6px 16px;font-size:14px;border-bottom:1px solid var(--opend-border)">
+  return `<div class="opend-user-bar">
 <span>Signed in as ${escapeHtml(email)}</span>
-<form method="post" action="/auth/logout" style="margin:0"><button type="submit">Sign out</button></form>
+<form method="post" action="/auth/logout"><button type="submit">Sign out</button></form>
 </div>`;
 }

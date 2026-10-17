@@ -41,6 +41,16 @@ const relPath = z
     message: 'must be a path inside the docs root',
   });
 
+const LOGO_EXTENSION = /\.(svg|png|jpe?g|gif|webp)$/i;
+
+/**
+ * Site path, without the leading `/`, that serves the project logo, e.g.
+ * `_logo.svg`. The extension is kept so the response gets the right type.
+ */
+export function logoRoute(logo: string): string {
+  return `_logo${(LOGO_EXTENSION.exec(logo)?.[0] ?? '').toLowerCase()}`;
+}
+
 export const projectConfigSchema = z
   .object({
     /** The version this source tree documents, e.g. `2.1`. */
@@ -59,6 +69,12 @@ export const projectConfigSchema = z
     buildFilter: relPath.optional(),
     /** Stylesheet served with every page. */
     theme: relPath.optional(),
+    /** Image shown before the site title in the page header. */
+    logo: relPath
+      .refine((p) => LOGO_EXTENSION.test(p), {
+        message: 'must be an .svg, .png, .jpg, .jpeg, .gif or .webp image',
+      })
+      .optional(),
     /** Site title shown in the page header. */
     title: z.string().default('Documentation'),
   })

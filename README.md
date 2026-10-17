@@ -43,6 +43,17 @@ pnpm opend validate site --strict
 
 `/pdf/admin-guide.pdf` and `/pdf/author-guide.pdf` print the two publications for the current reader. To publish it on an OpenD server, register this repository with `"docsPath": "site"`. `packages/cli/test/site.test.ts` builds it, requires zero problems, renders every page and publication for each preview reader, and fails when a reference topic falls behind the code.
 
+## Look and theming
+
+Pages follow the OpenD design system: system fonts, an emerald accent, light and dark schemes, a sticky sidebar on wide screens and a "Menu" button on narrow ones. Navigation groups are collapsible, with the current page's group open. Everything works without JavaScript, under a CSP that allows no scripts.
+
+A project restyles its site, help panel and PDFs with two optional fields in `opend.config.yaml`:
+
+- `theme`: a stylesheet loaded after the built-in styles. It overrides the `--opend-*` custom properties: `--opend-accent`, `--opend-text`, `--opend-muted`, `--opend-surface`, `--opend-surface-alt`, `--opend-border`, `--opend-warn`, `--opend-danger`, `--opend-info`, `--opend-cond`, `--opend-font` and `--opend-mono`. Link, hover, focus and highlight colours are derived from `--opend-accent`, so setting it alone rebrands the site.
+- `logo`: an `.svg`, `.png`, `.jpg`, `.gif` or `.webp` image shown before the site title in the header.
+
+See [Theme the site, the panel and PDFs](site/topics/pdf/pdf-theming.dita) for the full list.
+
 ## How applicability works
 
 Any map entry, topic or element can carry DITA filtering attributes:

@@ -245,6 +245,126 @@ describe('renderNav and renderPage', () => {
   });
 });
 
+describe('collapsible navigation', () => {
+  const a = topic('a', '<topic id="a"><title>Alpha</title></topic>');
+  const b = topic('b', '<topic id="b"><title>Beta</title></topic>');
+  const c = topic('c', '<topic id="c"><title>Gamma</title></topic>');
+  const g = topic('g', '<topic id="g" product="gadget"><title>Gadget page</title></topic>');
+  const g2 = topic('g2', '<topic id="g2" product="gadget"><title>Gadget child</title></topic>');
+  const ref = (id: string, children: CompiledRelease['nav'] = [], title = '') => ({
+    title,
+    topicId: id,
+    condition: {},
+    kind: 'topicref' as const,
+    children,
+  });
+  const head = (title: string, children: CompiledRelease['nav']) => ({
+    title,
+    condition: {},
+    kind: 'topichead' as const,
+    children,
+  });
+  const rel: CompiledRelease = {
+    ...release([a, b, c, g, g2]),
+    nav: [
+      head('Start', [ref('a', [ref('b')])]),
+      head('More', [ref('c')]),
+      // Only hidden topics under it: the heading must vanish for widget readers.
+      head('Gadget heading', [ref('g', [ref('g2')], 'Gadget navtitle')]),
+      // A hidden topic with a navtitle and visible children: the children are lifted.
+      ref('g', [ref('c')], 'Secret navtitle'),
+    ],
+  };
+  const view = viewRelease(rel, [widgetV1]);
+
+  it('opens the groups on the path to the current page and closes the others', () => {
+    const nav = renderNav(view, 'b');
+    expect(nav).toContain(
+      '<li class="nav-group"><details open><summary class="nav-heading">Start</summary>',
+    );
+    expect(nav).toContain(
+      '<li class="nav-group nav-group-link"><a href="/a.html">Alpha</a><details open><summary class="nav-toggle"><span class="opend-visually-hidden">Subtopics of Alpha</span></summary><ul><li><a href="/b.html" aria-current="page">Beta</a></li></ul></details></li>',
+    );
+    expect(nav).toContain('<details><summary class="nav-heading">More</summary>');
+    expect(nav.match(/aria-current/g)).toHaveLength(1);
+    // A topic with children is open on its own page too.
+    expect(renderNav(view, 'a')).toContain(
+      '<a href="/a.html" aria-current="page">Alpha</a><details open>',
+    );
+    // Pages outside the tree (index, search) start with every group closed.
+    expect(renderNav(view, null)).not.toContain('<details open');
+  });
+
+  it('never puts a hidden topic in a group label, toggle or heading', () => {
+    for (const current of ['a', 'b', 'c', null]) {
+      const nav = renderNav(view, current);
+      expect(nav).not.toMatch(/Gadget|Secret|g2|g\.html/);
+      const page = current
+        ? renderPage(view, current, { search: { action: '/search' } })!
+        : renderIndex(view);
+      expect(page).not.toMatch(/Gadget|Secret|g2\.html|\/g\.html/);
+    }
+    // The lifted child of the hidden topic is still listed, as a plain entry.
+    expect(renderNav(view, 'c').match(/href="\/c\.html"/g)).toHaveLength(2);
+    // The staff view shows every group.
+    const staff = renderNav(viewRelease(rel, []), 'g2');
+    expect(staff).toContain('<summary class="nav-heading">Gadget heading</summary>');
+    expect(staff).toContain('Subtopics of Gadget navtitle');
+    expect(staff).toContain('<a href="/g2.html" aria-current="page">');
+  });
+
+  it('puts a Menu control for the contents in the header, and the logo when there is one', () => {
+    const page = renderPage(view, 'a', { logoHref: '/_logo.svg' })!;
+    const header = /<header class="site-header">.*<\/header>/.exec(page)![0];
+    expect(header).toContain(
+      '<details class="site-menu"><summary aria-controls="opend-menu-panel"><span class="site-menu-button">',
+    );
+    expect(header).toContain('<span>Menu</span></span></summary>');
+    expect(header).toContain('<img class="site-logo" src="/_logo.svg" alt="">');
+    expect(page).toContain('<nav class="toc opend-nav" id="opend-toc" aria-label="Contents">');
+    expect(page).toContain('<a class="opend-skip" href="#opend-main">');
+    expect(page).toContain('<main id="opend-main">');
+    expect(page).not.toMatch(/<script|onclick|onchange/);
+    expect(renderPage(view, 'a')).not.toContain('<img class="site-logo"');
+    // No contents, no menu.
+    const empty = viewRelease({ ...rel, nav: [] }, [widgetV1]);
+    expect(renderIndex(empty)).not.toContain('<details class="site-menu"');
+    // Search alone still gets a menu on narrow screens.
+    expect(renderIndex(empty, { search: { action: '/search' } })).toContain(
+      '<details class="site-menu">',
+    );
+  });
+
+  it('copies search, the contents and the PDF links into the menu panel, with unique ids', () => {
+    const page = renderPage(view, 'b', {
+      search: { action: '/search', query: 'q<' },
+      publications: [{ title: 'Guide <&>', href: '/pdf/guide.pdf' }],
+    })!;
+    const panel = /<div class="site-menu-panel" id="opend-menu-panel">(.*?)<\/div><\/details>/.exec(
+      page,
+    )![1]!;
+    // Search comes first, then the contents, then the publications.
+    expect(panel.startsWith('<form class="site-menu-search" role="search"')).toBe(true);
+    expect(panel).toContain('<label class="opend-visually-hidden" for="opend-menu-search-q">');
+    expect(panel).toContain('id="opend-menu-search-q" name="q" value="q&lt;"');
+    expect(panel).toContain(
+      '<nav class="opend-nav site-menu-nav" aria-label="Contents"><ul><li class="nav-group"><details open>',
+    );
+    expect(panel).toContain('<a href="/b.html" aria-current="page">Beta</a>');
+    expect(panel).toMatch(
+      /<nav class="site-menu-pdfs" aria-label="Download PDF"><p class="site-menu-heading">Publications<\/p><ul><li><a href="\/pdf\/guide\.pdf">Guide &lt;&amp;&gt; \(PDF\)<\/a><\/li><\/ul><\/nav>$/,
+    );
+    // Each copy exists exactly twice: the wide layout's and the menu's, one hidden by CSS at each width.
+    expect(page.match(/role="search"/g)).toHaveLength(2);
+    expect(page.match(/href="\/pdf\/guide\.pdf"/g)).toHaveLength(2);
+    expect(page.match(/ aria-current="page"/g)).toHaveLength(2);
+    const ids = [...page.matchAll(/ id="([^"]+)"/g)].map((m) => m[1]);
+    expect(new Set(ids).size).toBe(ids.length);
+    // The menu copy never shows more than the sidebar.
+    expect(panel).not.toMatch(/Gadget|Secret/);
+  });
+});
+
 describe('site search', () => {
   const a = topic('a', '<topic id="a"><title>Alpha</title></topic>');
   const view = viewRelease(release([a]), [widgetV1]);

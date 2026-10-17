@@ -135,6 +135,14 @@ export function buildRelease(tree: SourceTree, options: BuildOptions = {}): Buil
       file: CONFIG_FILE,
     });
   }
+  if (config.logo && !tree.files.has(config.logo)) {
+    diagnostics.push({
+      severity: 'error',
+      code: 'missing-logo',
+      message: `logo not found: ${config.logo}`,
+      file: CONFIG_FILE,
+    });
+  }
 
   const site = loadMap(workspace, config.map);
   diagnostics.push(...site.diagnostics);
@@ -240,6 +248,7 @@ export function buildRelease(tree: SourceTree, options: BuildOptions = {}): Buil
   if (Object.keys(contexts).length) release.contexts = contexts;
   if (tree.ref) release.sourceRef = tree.ref;
   if (config.theme) release.theme = config.theme;
+  if (config.logo) release.logo = config.logo;
 
   diagnostics.push(...workspace.diagnostics);
   const referencedTopicFiles = new Set(

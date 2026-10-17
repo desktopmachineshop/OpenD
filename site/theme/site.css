@@ -1,84 +1,36 @@
 /*
- * OpenD brand theme. It loads after the built-in styles, so it only needs to
- * override the --opend-* variables and add a few brand touches. The same file
- * styles the site, the help panel and the PDF publications.
+ * OpenD brand theme. The built-in styles already follow the OpenD design
+ * system, so this file only pins the brand tokens and adds a few touches. It
+ * loads after the built-in styles and also styles the help panel and the PDF
+ * publications. The header logo is theme/logo.svg (`logo` in opend.config.yaml).
  */
 :root {
-  --opend-accent: #1f5fbf;
-  --opend-text: #14213d;
-  --opend-muted: #52607a;
+  --opend-accent: #187f65;
+  --opend-text: #1d2733;
+  --opend-heading: #15202b;
+  --opend-muted: #5a6673;
   --opend-surface: #ffffff;
-  --opend-surface-alt: #f2f5fa;
-  --opend-border: #d9e0ea;
-  --opend-warn: #b45309;
-  --opend-cond: #7c3aed;
-  --opend-font:
-    'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  --opend-mono: ui-monospace, 'SFMono-Regular', 'JetBrains Mono', Menlo, Consolas, monospace;
-  --opend-brand: #13795b;
+  --opend-surface-alt: #f5f7f6;
+  --opend-border: #e1e7e4;
+  /* Brand emerald for the PDF cover and chapter rules. */
+  --opend-brand: #187f65;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --opend-accent: #7fb0ff;
-    --opend-text: #e6ebf2;
-    --opend-muted: #a3afc2;
-    --opend-surface: #10151d;
-    --opend-surface-alt: #18202b;
-    --opend-border: #2a3442;
-    --opend-warn: #f59e0b;
-    --opend-cond: #b49cff;
-    --opend-brand: #4fd1a5;
+    --opend-accent: #3fbf98;
+    --opend-text: #dfe7e3;
+    --opend-heading: #f2f6f4;
+    --opend-muted: #9aa8a2;
+    --opend-surface: #111816;
+    --opend-surface-alt: #141c19;
+    --opend-border: #233029;
+    --opend-brand: #3fbf98;
   }
 }
 
-/* Header: a brand bar with the site name in the brand colour. */
-.site-header {
-  border-bottom: 3px solid var(--opend-brand);
-}
-.site-title {
-  color: var(--opend-brand);
-  letter-spacing: 0.01em;
-}
-
-/* Navigation and reading width. */
-.toc a {
-  color: var(--opend-text);
-}
-.toc a:hover,
-.toc a[aria-current='page'] {
-  color: var(--opend-accent);
-}
-article {
-  max-width: 780px;
-}
-h1,
-h2,
-h3 {
-  letter-spacing: -0.01em;
-}
-
-/* Code and tables. */
-pre {
-  border: 1px solid var(--opend-border);
-}
-:not(pre) > code {
-  padding: 0.05em 0.3em;
-  border-radius: 4px;
-  background: var(--opend-surface-alt);
-}
-th {
-  font-weight: 600;
-}
-
-/* Notes: the important ones stand out in the brand colour. */
-.note-important,
-.note-tip {
-  border-left-color: var(--opend-brand);
-}
-
 /* Diagrams have their own white background; give them a frame. */
-img[src$='.svg'] {
+article img[src$='.svg'] {
   border: 1px solid var(--opend-border);
   border-radius: 12px;
 }

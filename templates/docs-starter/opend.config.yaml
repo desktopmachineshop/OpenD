@@ -22,3 +22,6 @@ attributes:
 buildFilter: filters/publish.ditaval
 
 theme: theme/site.css
+
+# Optional header logo, shown before the title: .svg, .png, .jpg, .gif or .webp.
+# logo: theme/logo.svg
