@@ -7,7 +7,7 @@ export default tseslint.config(
   ...tseslint.configs.recommended,
   {
     // Plain Node scripts outside the TypeScript packages.
-    files: ['examples/**/*.mjs'],
+    files: ['examples/**/*.mjs', 'scripts/**/*.mjs'],
     languageOptions: {
       globals: { process: 'readonly', Buffer: 'readonly', URL: 'readonly', console: 'readonly' },
     },
