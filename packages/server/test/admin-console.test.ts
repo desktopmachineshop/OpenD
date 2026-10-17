@@ -619,6 +619,10 @@ describe.skipIf(!url)('the admin console', () => {
       const appId = [...gh.apps.keys()][0]!;
       gh.addInstallation(55, 'acme', ['acme/docs', 'acme/handbook'], appId);
       gh.addInstallation(66, 'someone-else', ['evil/repo'], appId + 1);
+      // acme/docs was registered before GitHub was connected, so without an installation.
+      expect((await admin(h.app, 'GET', '/repos')).json()).toEqual([
+        expect.objectContaining({ fullName: 'acme/docs', installationId: null }),
+      ]);
       expect((await get('/admin/github/installed?installation_id=66', owner)).statusCode).toBe(400);
       expect((await get('/admin/github/installed?installation_id=99', owner)).statusCode).toBe(400);
       expect((await get('/admin/github/installed?installation_id=abc', owner)).statusCode).toBe(
@@ -633,6 +637,11 @@ describe.skipIf(!url)('the admin console', () => {
       const page = await get('/admin/source?done=installed', owner);
       expect(page.body).toMatch(/<option\s+value="acme\/docs"/);
       expect(page.body).toContain('acme/handbook');
+      // The repository registered earlier now builds and edits through the installation.
+      const repos = (await admin(h.app, 'GET', '/repos')).json() as object[];
+      expect(repos).toEqual([
+        expect.objectContaining({ fullName: 'acme/docs', installationId: 55 }),
+      ]);
     });
 
     it('registers a picked repository with its installation, never a posted one', async () => {

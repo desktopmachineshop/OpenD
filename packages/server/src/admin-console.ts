@@ -916,7 +916,24 @@ export function registerAdminConsole(app: FastifyInstance, ctx: AppContext): voi
       );
     }
     if (!installation) return fail('That installation does not belong to this site’s GitHub App.');
+    // A repository registered before GitHub was connected has no installation, and the
+    // worker and editor cannot reach it until it gets one: attach every registered
+    // repository this installation can access. Best effort; picking the source again also works.
+    let reachable = new Set<string>();
+    try {
+      const repos = await githubApp.installationRepos(id);
+      reachable = new Set(repos.map((r) => r.fullName.toLowerCase()));
+    } catch {
+      // Listing failed; the docs-source page still attaches the repository when picked.
+    }
+    const registered = (await listRepos(ctx.pool)).filter(
+      (r) => r.installationId !== id && reachable.has(r.fullName.toLowerCase()),
+    );
     await withTransaction(ctx.pool, async (db: Db) => {
+      for (const r of registered) {
+        await updateRepo(db, r.id, { ...r, installationId: id });
+        await audit(db, s.actor, 'repo.upsert', { fullName: r.fullName, installationId: id });
+      }
       await putSetting(
         db,
         SETTING.githubInstallation,
