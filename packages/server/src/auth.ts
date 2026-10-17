@@ -1,15 +1,29 @@
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import { newPkce, type GitHubSignIn } from '@opend/editor';
 import { escapeHtml } from '@opend/render-html';
-import { findReaderForLogin, getReaderAccess, listReaders, type ReaderAccess } from '@opend/store';
+import {
+  audit,
+  findReaderByEmail,
+  findReaderForIdentity,
+  findReaderForLogin,
+  getReaderAccess,
+  listReaders,
+  upsertReader,
+  withTransaction,
+  type Reader,
+  type ReaderAccess,
+} from '@opend/store';
 import type { AppContext } from './context.js';
+import { publicSiteTitle, siteRepo } from './delivery.js';
 import { newChecks, type OidcChecks } from './oidc.js';
-import { messagePage, simplePage } from './pages.js';
+import { messagePage, signInPage, simplePage } from './pages.js';
 
 export const SESSION_COOKIE = 'opend_session';
 export const EMBED_COOKIE = 'opend_embed';
 const EMBED_SESSION_MINUTES = 60;
 const OIDC_COOKIE = 'opend_oidc';
+const GITHUB_COOKIE = 'opend_github';
 const SESSION_HOURS = 12;
 
 interface SessionValue {
@@ -150,51 +164,157 @@ export function redirectToLogin(request: FastifyRequest, reply: FastifyReply) {
   return reply.redirect(loginPath(safeReturnTo(request.url)));
 }
 
+function sameString(a: string, b: string): boolean {
+  const x = Buffer.from(a);
+  const y = Buffer.from(b);
+  return x.length === y.length && timingSafeEqual(x, y);
+}
+
+/** GitHub permissions that may auto-provision a reader (they can push to the docs anyway). */
+const PUSH_PERMISSIONS = new Set(['admin', 'maintain', 'write']);
+
+/**
+ * With `OPEND_GITHUB_COLLABORATOR_ORG`, a GitHub user who can push to the
+ * site's repository, and whose primary email GitHub has verified and no
+ * reader uses yet, becomes a reader of that org on first sign-in.
+ */
+async function provisionCollaborator(
+  ctx: AppContext,
+  login: GitHubSignIn,
+  issuer: string,
+): Promise<Reader | null> {
+  const orgSlug = ctx.config.githubOAuth?.collaboratorOrg;
+  if (!orgSlug || !ctx.repoPermission || !login.verifiedEmail) return null;
+  const repo = await siteRepo(ctx);
+  if (!repo) return null;
+  let permission: string | null;
+  try {
+    permission = await ctx.repoPermission(repo, login.login);
+  } catch (err) {
+    ctx.log({ level: 'warn', msg: 'github permission check failed', error: String(err) });
+    return null;
+  }
+  if (!permission || !PUSH_PERMISSIONS.has(permission)) return null;
+  // Never move an existing reader to another org.
+  if (await findReaderByEmail(ctx.pool, login.verifiedEmail)) return null;
+  const staff = ctx.config.githubOAuth?.collaboratorStaff === true;
+  const created = await withTransaction(ctx.pool, async (db) => {
+    const reader = await upsertReader(db, {
+      orgSlug,
+      email: login.verifiedEmail!,
+      name: login.name,
+      staff,
+    });
+    if (reader)
+      await audit(db, `github:${login.login}`, 'reader.provision', {
+        org: orgSlug,
+        email: reader.email,
+        permission,
+        staff,
+      });
+    return reader;
+  });
+  if (!created) {
+    ctx.log({ level: 'warn', msg: 'collaborator org does not exist', org: orgSlug });
+    return null;
+  }
+  ctx.caches.entitlementsChanged();
+  return findReaderForIdentity(ctx.pool, {
+    issuer,
+    subject: String(login.id),
+    verifiedEmails: [login.verifiedEmail],
+  });
+}
+
 export function registerAuth(app: FastifyInstance, ctx: AppContext): void {
   const callbackUrl = `${ctx.config.publicUrl}/auth/callback`;
+  const githubCallbackUrl = `${ctx.config.publicUrl}/auth/github/callback`;
+  const oidcName = ctx.config.oidc?.displayName ?? 'your company account';
 
+  const html = (reply: FastifyReply, status: number, body: string) =>
+    reply.code(status).type('text/html; charset=utf-8').send(body);
+  const refuse = async (reply: FastifyReply, status: number, title: string, message: string) => {
+    const repo = await siteRepo(ctx).catch(() => null);
+    const link =
+      repo?.access === 'public' ? { href: '/', text: 'Back to the documentation' } : undefined;
+    return html(reply, status, messagePage(title, message, link));
+  };
+  const finish = (reply: FastifyReply, readerId: number, returnTo: unknown) => {
+    ctx.caches.readers.delete(readerId);
+    setSession(reply, ctx, readerId);
+    return reply.redirect(safeReturnTo(returnTo));
+  };
+  const setFlowCookie = (reply: FastifyReply, name: string, value: object) =>
+    reply.setCookie(name, JSON.stringify(value), {
+      signed: true,
+      httpOnly: true,
+      // Lax lets the cookie come back on the provider's top-level redirect to the callback.
+      sameSite: 'lax',
+      secure: secureCookies(ctx),
+      path: '/auth',
+      maxAge: 600,
+    });
+  const readFlowCookie = <T>(request: FastifyRequest, reply: FastifyReply, name: string) => {
+    const raw = request.cookies[name];
+    const unsigned = raw ? request.unsignCookie(raw) : null;
+    reply.clearCookie(name, { path: '/auth' });
+    if (!unsigned?.valid || !unsigned.value) return null;
+    try {
+      return JSON.parse(unsigned.value) as T;
+    } catch {
+      return null;
+    }
+  };
+
+  // The sign-in page: every configured provider, and demo readers in development.
   app.get('/auth/login', async (request, reply) => {
     const returnTo = safeReturnTo((request.query as { returnTo?: unknown }).returnTo);
-    if (ctx.oidc) {
-      const checks = newChecks();
-      reply.setCookie(OIDC_COOKIE, JSON.stringify({ ...checks, returnTo }), {
-        signed: true,
-        httpOnly: true,
-        // Lax lets the cookie come back on the IdP's top-level redirect to the callback.
-        sameSite: 'lax',
-        secure: secureCookies(ctx),
-        path: '/auth',
-        maxAge: 600,
-      });
-      return reply.redirect((await ctx.oidc.authorizationUrl(callbackUrl, checks)).href);
-    }
-    if (ctx.config.devLogin) return reply.redirect('/auth/dev');
+    const q = `?returnTo=${encodeURIComponent(returnTo)}`;
+    const providers = [ctx.githubOAuth ? '/auth/github' : null, ctx.oidc ? '/auth/oidc' : null];
+    const configured = providers.filter((p): p is string => p !== null);
+    // A single provider needs no choice.
+    if (configured.length === 1 && !ctx.config.devLogin) return reply.redirect(configured[0] + q);
+    const repo = await siteRepo(ctx);
+    const options: Parameters<typeof signInPage>[0] = {
+      returnTo,
+      github: Boolean(ctx.githubOAuth),
+      backToDocs: repo?.access === 'public',
+    };
+    if (ctx.oidc) options.oidcName = oidcName;
+    if (ctx.config.devLogin) options.demoReaders = await listReaders(ctx.pool);
+    const title = await publicSiteTitle(ctx);
+    if (title) options.siteTitle = title;
+    const configuredAny = configured.length > 0 || ctx.config.devLogin;
     return reply
-      .code(503)
-      .type('text/html')
-      .send(messagePage('Sign-in unavailable', 'No sign-in method is configured.'));
+      .code(configuredAny ? 200 : 503)
+      .headers({
+        'cache-control': 'no-store',
+        'x-content-type-options': 'nosniff',
+        'content-security-policy':
+          "default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
+      })
+      .type('text/html; charset=utf-8')
+      .send(signInPage(options));
+  });
+
+  app.get('/auth/oidc', async (request, reply) => {
+    if (!ctx.oidc) return refuse(reply, 404, 'Not available', 'Company sign-in is not configured.');
+    const returnTo = safeReturnTo((request.query as { returnTo?: unknown }).returnTo);
+    const checks = newChecks();
+    setFlowCookie(reply, OIDC_COOKIE, { ...checks, returnTo });
+    return reply.redirect((await ctx.oidc.authorizationUrl(callbackUrl, checks)).href);
   });
 
   app.get('/auth/callback', async (request, reply) => {
-    const raw = request.cookies[OIDC_COOKIE];
-    const unsigned = raw ? request.unsignCookie(raw) : null;
-    reply.clearCookie(OIDC_COOKIE, { path: '/auth' });
-    if (!ctx.oidc || !unsigned?.valid || !unsigned.value) {
-      return reply
-        .code(400)
-        .type('text/html')
-        .send(messagePage('Sign-in expired', 'Please sign in again.'));
-    }
-    const pending = JSON.parse(unsigned.value) as OidcChecks & { returnTo: string };
+    const pending = readFlowCookie<OidcChecks & { returnTo: string }>(request, reply, OIDC_COOKIE);
+    if (!ctx.oidc || !pending)
+      return refuse(reply, 400, 'Sign-in expired', 'Please sign in again.');
     let identity;
     try {
       identity = await ctx.oidc.exchange(new URL(request.url, ctx.config.publicUrl), pending);
     } catch (err) {
       ctx.log({ level: 'warn', msg: 'oidc callback rejected', error: String(err) });
-      return reply
-        .code(400)
-        .type('text/html')
-        .send(messagePage('Sign-in failed', 'Please try signing in again.'));
+      return refuse(reply, 400, 'Sign-in failed', 'Please try signing in again.');
     }
     const login: Parameters<typeof findReaderForLogin>[1] = {
       issuer: identity.issuer,
@@ -210,64 +330,117 @@ export function registerAuth(app: FastifyInstance, ctx: AppContext): void {
         issuer: identity.issuer,
         subject: identity.subject,
       });
-      return reply
-        .code(403)
-        .type('text/html')
-        .send(
-          messagePage(
-            'No access',
-            `${identity.email ?? 'This account'} is not registered for this documentation. Ask your administrator for access.`,
-          ),
-        );
+      return refuse(
+        reply,
+        403,
+        'No access',
+        `${identity.email ?? 'This account'} is not registered for this documentation. Ask your administrator for access.`,
+      );
     }
-    ctx.caches.readers.delete(reader.id);
-    setSession(reply, ctx, reader.id);
-    return reply.redirect(safeReturnTo(pending.returnTo));
+    return finish(reply, reader.id, pending.returnTo);
   });
 
-  const logout = async (_request: FastifyRequest, reply: FastifyReply) => {
-    reply.clearCookie(SESSION_COOKIE, { path: '/' });
-    return reply
-      .type('text/html')
-      .send(
-        simplePage(
-          'Signed out',
-          '<h1>Signed out</h1><p><a href="/auth/login">Sign in again</a></p>',
-        ),
+  // GitHub sign-in: OAuth web flow with state and PKCE (S256), matched by verified email.
+  app.get('/auth/github', async (request, reply) => {
+    if (!ctx.githubOAuth)
+      return refuse(reply, 404, 'Not available', 'GitHub sign-in is not configured.');
+    const returnTo = safeReturnTo((request.query as { returnTo?: unknown }).returnTo);
+    const state = randomBytes(24).toString('base64url');
+    const pkce = newPkce();
+    setFlowCookie(reply, GITHUB_COOKIE, { state, verifier: pkce.verifier, returnTo });
+    return reply.redirect(
+      ctx.githubOAuth.authorizationUrl(githubCallbackUrl, state, pkce.challenge),
+    );
+  });
+
+  app.get('/auth/github/callback', async (request, reply) => {
+    const pending = readFlowCookie<{ state: string; verifier: string; returnTo: string }>(
+      request,
+      reply,
+      GITHUB_COOKIE,
+    );
+    const query = request.query as { code?: unknown; state?: unknown };
+    if (
+      !ctx.githubOAuth ||
+      !ctx.config.githubOAuth ||
+      !pending ||
+      typeof pending.state !== 'string' ||
+      typeof query.code !== 'string' ||
+      typeof query.state !== 'string' ||
+      !sameString(query.state, pending.state)
+    )
+      return refuse(reply, 400, 'Sign-in expired', 'Please sign in again.');
+    let login: GitHubSignIn;
+    try {
+      login = await ctx.githubOAuth.exchange(query.code, githubCallbackUrl, pending.verifier);
+    } catch (err) {
+      ctx.log({ level: 'warn', msg: 'github sign-in rejected', error: String(err) });
+      return refuse(reply, 400, 'Sign-in failed', 'Please try signing in again.');
+    }
+    const issuer = ctx.config.githubOAuth.webUrl;
+    const identity = {
+      issuer,
+      subject: String(login.id),
+      verifiedEmails: login.verifiedEmails,
+    };
+    const reader =
+      (await findReaderForIdentity(ctx.pool, identity)) ??
+      (await provisionCollaborator(ctx, login, issuer));
+    if (!reader) {
+      ctx.log({ level: 'info', msg: 'sign-in without access', github: login.login });
+      return refuse(
+        reply,
+        403,
+        'No access',
+        `@${login.login} is not registered for this documentation: no verified email address on this GitHub account matches a reader. Ask your administrator for access.`,
       );
-  };
-  app.post('/auth/logout', logout);
-  app.get('/auth/logout', logout);
+    }
+    return finish(reply, reader.id, pending.returnTo);
+  });
+
+  const signedOut = (reply: FastifyReply) =>
+    html(
+      reply,
+      200,
+      simplePage(
+        'Signed out',
+        '<h1>Signed out</h1><p>You are signed out of the documentation.</p><p><a href="/">Back to the documentation</a> · <a href="/auth/login">Sign in again</a></p>',
+      ),
+    );
+
+  // Signing out is a POST from our own pages: the session's CSRF token must match.
+  app.post('/auth/logout', async (request, reply) => {
+    if (sessionReaderId(request) !== null && !checkReaderCsrf(request, ctx))
+      return refuse(reply, 403, 'Form expired', 'Reload the page and sign out again.');
+    reply.clearCookie(SESSION_COOKIE, { path: '/' });
+    return signedOut(reply);
+  });
+  // A plain link only asks: a GET must not sign anyone out.
+  app.get('/auth/logout', async (request, reply) => {
+    const csrf = readerCsrfToken(request, ctx);
+    if (csrf === null) return signedOut(reply);
+    return html(
+      reply,
+      200,
+      simplePage(
+        'Sign out',
+        `<h1>Sign out?</h1><p>You will need to sign in again to see your documentation.</p><form method="post" action="/auth/logout"><input type="hidden" name="_csrf" value="${escapeHtml(csrf)}"><button type="submit">Sign out</button></form>`,
+      ),
+    );
+  });
 
   if (ctx.config.devLogin) {
-    // Development only: sign in as any registered reader without an IdP.
-    app.get('/auth/dev', async (_request, reply) => {
-      const readers = await listReaders(ctx.pool);
-      const items = readers
-        .map(
-          (r) =>
-            `<li><form method="post" action="/auth/dev" style="margin:0"><input type="hidden" name="readerId" value="${r.id}"><button type="submit">${escapeHtml(r.email)}</button> <small>${escapeHtml(r.orgSlug)}</small></form></li>`,
-        )
-        .join('');
-      return reply
-        .type('text/html')
-        .send(
-          simplePage(
-            'Development sign-in',
-            `<h1>Development sign-in</h1><p>OPEND_DEV_LOGIN is on. Choose a reader:</p><ul>${items || '<li>No readers yet. Run <code>opend-server seed</code>.</li>'}</ul>`,
-          ),
-        );
+    // Development only: sign in as any registered reader, from the sign-in page.
+    app.get('/auth/dev', async (request, reply) => {
+      const returnTo = safeReturnTo((request.query as { returnTo?: unknown }).returnTo);
+      return reply.redirect(loginPath(returnTo));
     });
     app.post('/auth/dev', async (request, reply) => {
-      const readerId = Number((request.body as { readerId?: string } | undefined)?.readerId);
+      const body = request.body as { readerId?: string; returnTo?: string } | undefined;
+      const readerId = Number(body?.readerId);
       const access = Number.isInteger(readerId) ? await getReaderAccess(ctx.pool, readerId) : null;
-      if (!access)
-        return reply
-          .code(400)
-          .type('text/html')
-          .send(messagePage('Unknown reader', 'Choose a reader from the list.'));
-      setSession(reply, ctx, readerId);
-      return reply.redirect('/');
+      if (!access) return refuse(reply, 400, 'Unknown reader', 'Choose a reader from the list.');
+      return finish(reply, readerId, body?.returnTo);
     });
   }
 }

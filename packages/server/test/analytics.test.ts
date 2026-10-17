@@ -300,7 +300,7 @@ describe.skipIf(!url)('docs analytics and feedback', () => {
       expect(ok.headers.location).toBe('/topics/overview.html?feedback=thanks#opend-feedback');
       const thanks = await get('/topics/overview.html?feedback=thanks', { cookie: gus });
       expect(thanks.body).toContain('Thanks for your feedback.');
-      expect(thanks.body).not.toContain('name="_csrf"');
+      expect(thanks.body).not.toContain('action="/_opend/feedback"');
     });
 
     it('accepts a comment with No, from the site and the help panel', async () => {

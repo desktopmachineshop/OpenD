@@ -38,6 +38,8 @@ interface OAuthUser {
   name: string | null;
   email: string | null;
   verified?: boolean;
+  /** Further addresses on the account, as `/user/emails` lists them. */
+  otherEmails?: { email: string; verified: boolean }[];
 }
 
 type FileTree = Map<string, { sha: string; mode: string }>;
@@ -67,7 +69,7 @@ export class FakeGitHub {
   private readonly trees = new Map<string, FileTree>();
   private readonly commits = new Map<string, FakeCommit>();
   private readonly repos = new Map<string, FakeRepo>();
-  private readonly oauthCodes = new Map<string, OAuthUser>();
+  private readonly oauthCodes = new Map<string, { user: OAuthUser; challenge?: string }>();
   private readonly oauthTokens = new Map<string, OAuthUser>();
   private readonly installationTokens = new Set<string>();
   private nextPull = 1;
@@ -181,9 +183,13 @@ export class FakeGitHub {
     this.repo(fullName).collaborators.set(login.toLowerCase(), permission);
   }
 
-  /** Makes `code` a valid OAuth callback code for this GitHub user. */
-  addOAuthCode(code: string, user: OAuthUser): void {
-    this.oauthCodes.set(code, user);
+  /**
+   * Makes `code` a valid OAuth callback code for this GitHub user. With a PKCE
+   * `challenge` (from the authorization URL), the exchange must send the
+   * matching verifier, as GitHub requires.
+   */
+  addOAuthCode(code: string, user: OAuthUser, challenge?: string): void {
+    this.oauthCodes.set(code, challenge === undefined ? { user } : { user, challenge });
   }
 
   // ---- object store --------------------------------------------------------
@@ -263,9 +269,15 @@ export class FakeGitHub {
 
   private handle(method: string, url: URL, body: Json, auth: string): Response {
     if (url.origin === this.webUrl && url.pathname === '/login/oauth/access_token') {
-      const user = this.oauthCodes.get(String(body.code));
-      if (!user) return json(200, { error: 'bad_verification_code' });
+      const pending = this.oauthCodes.get(String(body.code));
+      if (!pending) return json(200, { error: 'bad_verification_code' });
       this.oauthCodes.delete(String(body.code));
+      if (pending.challenge !== undefined) {
+        const verifier = typeof body.code_verifier === 'string' ? body.code_verifier : '';
+        const challenge = createHash('sha256').update(verifier).digest('base64url');
+        if (challenge !== pending.challenge) return json(200, { error: 'invalid_grant' });
+      }
+      const user = pending.user;
       const token = `gho_${randomBytes(8).toString('hex')}`;
       this.oauthTokens.set(token, user);
       return json(200, { access_token: token, token_type: 'bearer' });
@@ -286,10 +298,12 @@ export class FakeGitHub {
       const user = this.oauthTokens.get(token);
       if (!user) return json(401, { message: 'Bad credentials' });
       if (path === '/user') return json(200, { id: user.id, login: user.login, name: user.name });
-      return json(
-        200,
-        user.email ? [{ email: user.email, primary: true, verified: user.verified ?? true }] : [],
-      );
+      return json(200, [
+        ...(user.email
+          ? [{ email: user.email, primary: true, verified: user.verified ?? true }]
+          : []),
+        ...(user.otherEmails ?? []).map((e) => ({ ...e, primary: false })),
+      ]);
     }
 
     const m = /^\/repos\/([^/]+\/[^/]+)(\/.*)$/.exec(path);

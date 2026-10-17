@@ -119,6 +119,11 @@ opend-server editor disable-user writer@example.com</codeblock>
       <p>Authors sign in at <codeph>EDITOR_PUBLIC_URL</codeph>. See <xref href="../editor/editor.dita"/> for
         what they can do.</p>
       <ul>
+        <li><b>Edit this page.</b> Set <codeph>EDITOR_PUBLIC_URL</codeph> on the docs site too, and signed-in
+          readers see <uicontrol>Edit this page</uicontrol> under each topic, opening
+          <filepath>/edit?path=<varname>topic file</varname></filepath> in the editor. The editor still asks
+          them to sign in as an author. One GitHub App can serve both hosts; see
+          <xref href="github-app.dita"/>.</li>
         <li><b>Separate accounts.</b> Editors are not readers. A reader session never opens the editor, and
           an editor session grants nothing on the docs site.</li>
         <li><b>Commits.</b> Each save is a commit by the App to the author's branch

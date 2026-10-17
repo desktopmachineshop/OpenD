@@ -14,14 +14,16 @@ export type AnalyticsEvent =
   | {
       kind: 'view';
       surface: AnalyticsSurface;
-      orgSlug: string;
+      /** `null` for anonymous visitors of a public site. */
+      orgSlug: string | null;
       releaseLine: string;
       topicId: string;
     }
   | {
       kind: 'search';
       surface: AnalyticsSurface;
-      orgSlug: string;
+      /** `null` for anonymous visitors of a public site. */
+      orgSlug: string | null;
       releaseLine: string;
       /** Already normalised; see `normaliseQuery`. */
       query: string;

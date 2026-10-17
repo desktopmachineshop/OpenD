@@ -18,7 +18,10 @@
     <topicref href="../topics/hosting/env-vars.dita"/>
     <topicref href="../topics/hosting/blob-storage.dita"/>
     <topicref href="../topics/hosting/github.dita"/>
+    <topicref href="../topics/hosting/github-app.dita"/>
+    <topicref href="../topics/hosting/access.dita"/>
     <topicref href="../topics/hosting/oidc.dita"/>
+    <topicref href="../topics/hosting/github-sign-in.dita"/>
     <topicref href="../topics/hosting/editor.dita"/>
   </chapter>
 

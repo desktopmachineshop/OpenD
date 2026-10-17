@@ -22,6 +22,13 @@ export interface PageOptions extends RenderOptions {
    * servers that answer it (hosted delivery and the previewer).
    */
   search?: { action: string; query?: string };
+  /**
+   * Trusted HTML for the reader's account controls ("Sign in", or their name
+   * and "Sign out"): `header` at the end of the wide-screen header, `menu` at
+   * the end of the narrow-screen menu panel. The hosted server passes markers
+   * here and fills them per request, as pages are cached per entitlement set.
+   */
+  account?: { header: string; menu: string };
 }
 
 /** Longest search query the site accepts; longer ones are cut, as analytics does. */
@@ -110,7 +117,7 @@ function searchBox(options: PageOptions, className = 'site-search', id = 'opend-
 
 /**
  * The narrow-screen menu: a `<details>` in the sticky header whose panel holds
- * search, the contents and the PDF links. These duplicate the header's search
+ * search, the contents, the PDF links and the account controls. These duplicate the header's search
  * and PDF links and the sidebar, which the stylesheet hides (`display: none`)
  * on narrow screens, while the menu is hidden on wide ones; so each is in the
  * accessibility tree only once.
@@ -120,14 +127,17 @@ function menu(nav: string, options: PageOptions): string {
   const pdfs = (options.publications ?? [])
     .map((p) => `<li><a href="${escapeHtml(p.href)}">${escapeHtml(p.title)} (PDF)</a></li>`)
     .join('');
-  if (!nav && !search && !pdfs) return '';
+  const account = options.account?.menu
+    ? `<div class="site-menu-account">${options.account.menu}</div>`
+    : '';
+  if (!nav && !search && !pdfs && !account) return '';
   const contents = nav
     ? `<nav class="opend-nav site-menu-nav" aria-label="Contents">${nav}</nav>`
     : '';
   const publications = pdfs
     ? `<nav class="site-menu-pdfs" aria-label="Download PDF"><p class="site-menu-heading">Publications</p><ul>${pdfs}</ul></nav>`
     : '';
-  return `<details class="site-menu"><summary aria-controls="opend-menu-panel"><span class="site-menu-button">${MENU_ICON}<span>Menu</span></span></summary><div class="site-menu-panel" id="opend-menu-panel">${search}${contents}${publications}</div></details>`;
+  return `<details class="site-menu"><summary aria-controls="opend-menu-panel"><span class="site-menu-button">${MENU_ICON}<span>Menu</span></span></summary><div class="site-menu-panel" id="opend-menu-panel">${search}${contents}${publications}${account}</div></details>`;
 }
 
 /** Three bars, and a cross shown instead while the menu is open. */
@@ -167,7 +177,7 @@ ${theme}
 <body class="opend-site">
 <a class="opend-skip" href="#opend-main">Skip to content</a>
 ${options.banner ?? ''}
-<header class="site-header">${menu(nav, options)}<a class="site-title" href="${escapeHtml(base)}">${logo}<span>${escapeHtml(release.title)}</span></a><span class="site-release">Release ${escapeHtml(release.release)}</span>${publicationLinks(options)}${searchBox(options)}</header>
+<header class="site-header">${menu(nav, options)}<a class="site-title" href="${escapeHtml(base)}">${logo}<span>${escapeHtml(release.title)}</span></a><span class="site-release">Release ${escapeHtml(release.release)}</span>${publicationLinks(options)}${searchBox(options)}${options.account?.header ?? ''}</header>
 <div class="layout">
 <nav class="toc opend-nav" id="opend-toc" aria-label="Contents">${nav}</nav>
 <main id="opend-main">${main}</main>

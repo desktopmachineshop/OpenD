@@ -1,4 +1,12 @@
-import type { Db } from './db.js';
+import { CHANNELS, notify, type Db } from './db.js';
+import type { Entitlements } from './readers.js';
+
+/**
+ * Who may read a site: `private` needs a signed-in, registered reader for
+ * every page; `public` also serves anonymous visitors, filtered for the
+ * repo's public entitlements.
+ */
+export type RepoAccess = 'private' | 'public';
 
 export interface Repo {
   id: number;
@@ -7,6 +15,13 @@ export interface Repo {
   installationId: number | null;
   releaseRefs: string[];
   docsPath: string;
+  access: RepoAccess;
+  /**
+   * What anonymous visitors of a public site are entitled to. `null`: nothing
+   * gated, so they see only content without product, feature or release
+   * conditions (fail-closed).
+   */
+  publicEntitlements: Entitlements | null;
 }
 
 export interface RepoInput {
@@ -18,7 +33,8 @@ export interface RepoInput {
 }
 
 const COLUMNS = `id, full_name as "fullName", source_url as "sourceUrl", installation_id as "installationId",
-  release_refs as "releaseRefs", docs_path as "docsPath"`;
+  release_refs as "releaseRefs", docs_path as "docsPath", access,
+  public_entitlements as "publicEntitlements"`;
 
 export async function upsertRepo(db: Db, input: RepoInput): Promise<Repo> {
   const { rows } = await db.query<Repo>(
@@ -55,6 +71,25 @@ export async function findRepoByName(db: Db, fullName: string): Promise<Repo | n
 export async function listRepos(db: Db): Promise<Repo[]> {
   const { rows } = await db.query<Repo>(`select ${COLUMNS} from repos order by id`);
   return rows;
+}
+
+/**
+ * Sets who may read the repo's site. Pages are cached per entitlement set, so
+ * this notifies every replica to drop its caches, as a release swap does.
+ * Returns null when the repo does not exist.
+ */
+export async function setRepoAccess(
+  db: Db,
+  id: number,
+  access: RepoAccess,
+  publicEntitlements: Entitlements | null,
+): Promise<Repo | null> {
+  const { rows } = await db.query<Repo>(
+    `update repos set access = $2, public_entitlements = $3 where id = $1 returning ${COLUMNS}`,
+    [id, access, publicEntitlements === null ? null : JSON.stringify(publicEntitlements)],
+  );
+  await notify(db, CHANNELS.releaseChanged, String(id));
+  return rows[0] ?? null;
 }
 
 /** Whether a branch or tag name matches any release ref pattern; `*` matches any run of characters. */

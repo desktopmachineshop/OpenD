@@ -11,6 +11,7 @@ import {
   type EditorUser,
 } from '@opend/store';
 import type { EditorContext } from './context.js';
+import { newPkce } from './github/oauth.js';
 import { newChecks, type OidcChecks } from './oidc.js';
 import { h, layout, messagePage, PAGE_HEADERS } from './pages.js';
 import type { Actor } from './service.js';
@@ -199,21 +200,26 @@ export function registerAuth(app: FastifyInstance, ctx: EditorContext): void {
     if (!ctx.githubOAuth)
       return refuse(reply, 404, 'Not available', 'GitHub sign-in is not configured.');
     const state = randomBytes(16).toString('base64url');
+    const pkce = newPkce();
     setLoginCookie(reply, ctx, {
       state,
+      verifier: pkce.verifier,
       returnTo: safeReturnTo((request.query as { returnTo?: unknown }).returnTo),
     });
-    return reply.redirect(ctx.githubOAuth.authorizationUrl(githubCallback, state));
+    return reply.redirect(ctx.githubOAuth.authorizationUrl(githubCallback, state, pkce.challenge));
   });
 
   app.get('/auth/github/callback', async (request, reply) => {
-    const pending = readLoginCookie<{ state: string; returnTo: string }>(request, reply);
+    const pending = readLoginCookie<{ state: string; verifier?: string; returnTo: string }>(
+      request,
+      reply,
+    );
     const query = request.query as { code?: string; state?: string };
     if (!ctx.githubOAuth || !pending || !query.code || query.state !== pending.state)
       return refuse(reply, 400, 'Sign-in expired', 'Please sign in again.');
     let login;
     try {
-      login = await ctx.githubOAuth.exchange(query.code, githubCallback);
+      login = await ctx.githubOAuth.exchange(query.code, githubCallback, pending.verifier);
     } catch (err) {
       ctx.log({ level: 'warn', msg: 'github sign-in rejected', error: String(err) });
       return refuse(reply, 400, 'Sign-in failed', 'Please try signing in again.');

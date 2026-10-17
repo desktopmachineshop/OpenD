@@ -179,7 +179,13 @@ describe.skipIf(!url)('push to publish', () => {
     const res = await get('/topics/install.html');
     expect(res.statusCode).toBe(302);
     expect(res.headers.location).toBe('/auth/login?returnTo=%2Ftopics%2Finstall.html');
-    expect((await get('/auth/login')).headers.location).toBe('/auth/dev');
+    // Development login and no provider: the sign-in page lists the demo readers.
+    const login = await get('/auth/login?returnTo=%2Ftopics%2Finstall.html');
+    expect(login.statusCode).toBe(200);
+    expect(login.body).toContain('Demo readers');
+    expect(login.body).toContain('ann@acme.example');
+    expect(login.body).toContain('name="returnTo" value="/topics/install.html"');
+    expect(login.body).not.toContain('Sign in with GitHub');
 
     const cookie = await devLogin(h.app, READERS['v1-basic']!.email);
     expect((await get('/topics/install.html', cookie)).statusCode).toBe(200);
@@ -211,7 +217,10 @@ describe.skipIf(!url)('push to publish', () => {
     it('serves the release line matching the reader version', async () => {
       const page = (await get('/topics/overview.html', cookies[name])).body;
       expect(page).toContain(`Release ${reader.context.version.startsWith('1') ? '1.4' : '2.1'}`);
-      expect(page).toContain(`Signed in as ${reader.email}`);
+      // The header shows the reader's name (or email), with the email as its title.
+      expect(page).toContain(`title="${reader.email}"`);
+      expect(page).toContain(`Signed in as </span>${name === 'v2-pro' ? 'Gus' : reader.email}`);
+      expect(page).toContain('<form method="post" action="/auth/logout">');
     });
 
     it('serves images only when a visible topic references them', async () => {

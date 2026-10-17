@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE task PUBLIC "-//OASIS//DTD DITA Task//EN" "task.dtd">
+<task id="github-sign-in" product="core" audience="admin">
+  <title>Let readers sign in with GitHub</title>
+  <shortdesc>Readers can sign in with their GitHub account, matched to a registered reader by a verified
+    email address. The web editor's GitHub App provides the credentials.</shortdesc>
+  <taskbody>
+    <prereq>
+      <p>A GitHub App (or an OAuth App) with the docs site's callback URL. One GitHub App can serve the docs
+        site, the web editor and the build webhook; see <xref href="github-app.dita"/>.</p>
+    </prereq>
+    <steps>
+      <step>
+        <cmd>Add <filepath>$PUBLIC_URL/auth/github/callback</filepath> to the App's callback URLs.</cmd>
+        <info><p>A GitHub App takes up to ten callback URLs, so the editor's
+          <filepath>$EDITOR_PUBLIC_URL/auth/github/callback</filepath> stays next to it. For a GitHub App,
+          give it the account permission <uicontrol>Email addresses: Read-only</uicontrol>.</p></info>
+      </step>
+      <step>
+        <cmd>Set <codeph>GITHUB_OAUTH_CLIENT_ID</codeph> and <codeph>GITHUB_OAUTH_CLIENT_SECRET</codeph> on the
+          web service: the same values as the editor's.</cmd>
+      </step>
+      <step importance="optional">
+        <cmd>Let your own team in without registering each person: set
+          <codeph>OPEND_GITHUB_COLLABORATOR_ORG</codeph> to an organization slug, and
+          <codeph>OPEND_GITHUB_COLLABORATOR_STAFF=1</codeph> to make them staff.</cmd>
+        <info>
+          <p>Then anyone with write, maintain or admin access to the docs repository becomes a reader of that
+            organization the first time they sign in with GitHub. The server asks GitHub through the App
+            installation, so the repository must be registered with its <parmname>installationId</parmname>,
+            and <codeph>GITHUB_APP_ID</codeph> set. Their primary email must be verified on GitHub and not
+            already belong to a reader. Each such reader is recorded in the audit log as
+            <codeph>reader.provision</codeph>.</p>
+        </info>
+      </step>
+      <step>
+        <cmd>Restart the web service and open <filepath>$PUBLIC_URL/auth/login</filepath>.</cmd>
+        <stepresult><p>The sign-in page lists <uicontrol>Sign in with GitHub</uicontrol>, and any other
+          configured provider. With exactly one provider and no demo readers, it goes straight to
+          it.</p></stepresult>
+      </step>
+    </steps>
+    <result>
+      <ul>
+        <li>The flow is GitHub's OAuth web flow with a random <codeph>state</codeph> and PKCE
+          (<codeph>S256</codeph>), held in a signed, <codeph>HttpOnly</codeph> cookie for ten minutes. It
+          asks for <codeph>read:user user:email</codeph> (OAuth Apps); a GitHub App uses its permissions
+          instead.</li>
+        <li>The server reads the account's addresses from GitHub and uses only verified ones, the primary
+          first. The first that matches a registered reader links that reader to the GitHub account, and
+          later sign-ins match the account itself, even after its email changes. Another GitHub account
+          with the same email cannot take the reader over.</li>
+        <li>GitHub sign-in and OIDC are separate links: a reader may use both.</li>
+        <li>Anyone else sees "No access" and is not signed in.</li>
+      </ul>
+    </result>
+  </taskbody>
+</task>

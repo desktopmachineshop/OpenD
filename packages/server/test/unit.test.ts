@@ -1,7 +1,19 @@
 import { createHmac } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { FsBlobStore, S3BlobStore, createBlobStore } from '@opend/store';
+import { entitlementKey } from '@opend/model';
+import { readerPolicy } from '@opend/filter';
 import {
+  FsBlobStore,
+  S3BlobStore,
+  createBlobStore,
+  type ReaderAccess,
+  type Repo,
+} from '@opend/store';
+import {
+  NOTHING_GATED,
+  audienceFor,
+  sourceHref,
+  type Audience,
   loadConfig,
   safeReturnTo,
   shortRef,
@@ -220,5 +232,157 @@ describe('createBlobStore', () => {
     });
     expect(store).toBeInstanceOf(S3BlobStore);
     (store as S3BlobStore).destroy();
+  });
+});
+
+describe('audienceFor', () => {
+  const repo = (access: 'private' | 'public', pub: Repo['publicEntitlements'] = null): Repo => ({
+    id: 1,
+    fullName: 'acme/docs',
+    sourceUrl: 'https://github.com/acme/docs.git',
+    installationId: null,
+    releaseRefs: ['main'],
+    docsPath: '.',
+    access,
+    publicEntitlements: pub,
+  });
+  const reader = (context: ReaderAccess['context'], staff = false): ReaderAccess => ({
+    reader: {
+      id: 1,
+      orgId: 1,
+      email: 'r@example.com',
+      name: null,
+      oidcIssuer: null,
+      oidcSubject: null,
+      staff,
+    },
+    orgSlug: 'acme',
+    context,
+  });
+  const own = { products: ['gadget'], features: ['sso'], version: '2.0' };
+  const pub = { products: ['widget'], features: [], version: '2.4' };
+
+  it('keeps private sites closed to anonymous visitors and readers without entitlements', () => {
+    expect(audienceFor(repo('private', pub), null)).toBe('sign-in');
+    expect(audienceFor(repo('private', pub), reader(null))).toBe('no-entitlements');
+    expect(audienceFor(repo('private', pub), reader(own))).toEqual({
+      key: entitlementKey(own),
+      context: own,
+      line: '2',
+    });
+  });
+
+  it('shows nothing gated on a public site without public entitlements', () => {
+    const a = audienceFor(repo('public'), null);
+    expect(a).toEqual({ key: 'public|none', context: NOTHING_GATED, line: null });
+    const policy = readerPolicy(NOTHING_GATED);
+    expect(policy.decide('product', 'widget')).toBe('exclude');
+    expect(policy.decide('feature', 'sso')).toBe('exclude');
+    expect(policy.decide('release', '1.0..')).toBe('exclude');
+    expect(policy.decide('release', '..9')).toBe('exclude');
+  });
+
+  it('gives anonymous visitors their own cache key space', () => {
+    const a = audienceFor(repo('public', pub), null) as Audience;
+    expect(a.key).toBe(`public|${entitlementKey(pub)}`);
+    expect(a.key).not.toBe(entitlementKey(pub));
+    expect(audienceFor(repo('public', pub), reader(null))).toEqual(a);
+  });
+
+  it('unions a reader with the public set on the same release line only', () => {
+    const a = audienceFor(repo('public', pub), reader(own)) as Audience;
+    expect(a.context).toEqual({
+      products: ['gadget', 'widget'],
+      features: ['sso'],
+      version: '2.0',
+    });
+    const other = { ...own, version: '1.9' };
+    expect((audienceFor(repo('public', pub), reader(other)) as Audience).context).toEqual(other);
+  });
+
+  it('gives staff the unfiltered view in every mode', () => {
+    for (const r of [repo('private'), repo('public', pub)]) {
+      expect(audienceFor(r, reader(null, true))).toEqual({
+        key: 'staff',
+        context: null,
+        line: null,
+      });
+      expect(audienceFor(r, reader(own, true))).toEqual({ key: 'staff', context: null, line: '2' });
+    }
+  });
+});
+
+describe('sourceHref', () => {
+  const sha = 'a'.repeat(40);
+  it('links GitHub repositories at the built commit, inside the docs path', () => {
+    expect(
+      sourceHref(
+        { fullName: 'x/y', sourceUrl: 'https://github.com/acme/docs.git', docsPath: 'docs' },
+        sha,
+        'topics/a b.dita',
+      ),
+    ).toBe(`https://github.com/acme/docs/blob/${sha}/docs/topics/a%20b.dita`);
+    expect(
+      sourceHref(
+        { fullName: 'x/y', sourceUrl: 'https://github.com/acme/docs', docsPath: '.' },
+        sha,
+        't.dita',
+      ),
+    ).toBe(`https://github.com/acme/docs/blob/${sha}/t.dita`);
+  });
+  it('gives nothing for other hosts and local sources', () => {
+    for (const sourceUrl of [
+      '/srv/docs',
+      'https://gitlab.com/a/b.git',
+      'https://github.com.evil/a/b',
+    ])
+      expect(sourceHref({ fullName: 'a/b', sourceUrl, docsPath: '.' }, sha, 't.dita')).toBeNull();
+  });
+});
+
+describe('reader sign-in configuration', () => {
+  it('reads GitHub sign-in, the editor URL and source links', () => {
+    const config = loadConfig({
+      ...base,
+      GITHUB_OAUTH_CLIENT_ID: 'Iv1.abc',
+      GITHUB_OAUTH_CLIENT_SECRET: 'secret',
+      GITHUB_APP_ID: '1',
+      GITHUB_APP_PRIVATE_KEY: 'key',
+      OPEND_GITHUB_COLLABORATOR_ORG: 'docs-team',
+      OPEND_GITHUB_COLLABORATOR_STAFF: '1',
+      EDITOR_PUBLIC_URL: 'https://editor.example/',
+      OPEND_SOURCE_LINKS: '1',
+      OIDC_ISSUER: 'https://id.example',
+      OIDC_CLIENT_ID: 'c',
+      OIDC_CLIENT_SECRET: 's',
+      OIDC_DISPLAY_NAME: 'Acme SSO',
+    });
+    expect(config.githubOAuth).toEqual({
+      clientId: 'Iv1.abc',
+      clientSecret: 'secret',
+      webUrl: 'https://github.com',
+      collaboratorOrg: 'docs-team',
+      collaboratorStaff: true,
+    });
+    expect(config.editorUrl).toBe('https://editor.example');
+    expect(config.sourceLinks).toBe(true);
+    expect(config.oidc?.displayName).toBe('Acme SSO');
+  });
+
+  it('refuses half-configured GitHub sign-in and collaborator provisioning', () => {
+    expect(() => loadConfig({ ...base, GITHUB_OAUTH_CLIENT_ID: 'x' })).toThrow(
+      /GITHUB_OAUTH_CLIENT_ID and GITHUB_OAUTH_CLIENT_SECRET/,
+    );
+    expect(() =>
+      loadConfig({
+        ...base,
+        GITHUB_OAUTH_CLIENT_ID: 'x',
+        GITHUB_OAUTH_CLIENT_SECRET: 'y',
+        OPEND_GITHUB_COLLABORATOR_ORG: 'team',
+      }),
+    ).toThrow(/OPEND_GITHUB_COLLABORATOR_ORG needs/);
+    expect(() => loadConfig({ ...base, OPEND_GITHUB_COLLABORATOR_STAFF: '1' })).toThrow(
+      /OPEND_GITHUB_COLLABORATOR_STAFF needs/,
+    );
   });
 });

@@ -41,6 +41,16 @@ const envSchema = z
     OIDC_CLIENT_ID: z.string().min(1).optional(),
     OIDC_CLIENT_SECRET: z.string().min(1).optional(),
     OIDC_SCOPES: z.string().default('openid email profile'),
+    OIDC_DISPLAY_NAME: optional(z.string().min(1).max(60)),
+    GITHUB_OAUTH_CLIENT_ID: optional(z.string().min(1)),
+    GITHUB_OAUTH_CLIENT_SECRET: optional(z.string().min(1)),
+    GITHUB_WEB_URL: optional(z.url()),
+    OPEND_GITHUB_COLLABORATOR_ORG: optional(
+      z.string().regex(/^[a-z0-9][a-z0-9-]{0,62}$/, 'an org slug'),
+    ),
+    OPEND_GITHUB_COLLABORATOR_STAFF: flag,
+    EDITOR_PUBLIC_URL: optional(z.url()),
+    OPEND_SOURCE_LINKS: flag,
     BLOB_DIR: z.string().default('./data/blobs'),
     S3_ENDPOINT: optional(z.url()),
     S3_BUCKET: optional(z.string()),
@@ -89,6 +99,22 @@ const envSchema = z
     message: 'OIDC_ISSUER needs OIDC_CLIENT_ID and OIDC_CLIENT_SECRET',
     path: ['OIDC_ISSUER'],
   })
+  .refine((e) => !e.GITHUB_OAUTH_CLIENT_ID === !e.GITHUB_OAUTH_CLIENT_SECRET, {
+    message: 'GITHUB_OAUTH_CLIENT_ID and GITHUB_OAUTH_CLIENT_SECRET must be set together',
+    path: ['GITHUB_OAUTH_CLIENT_ID'],
+  })
+  .refine(
+    (e) => !e.OPEND_GITHUB_COLLABORATOR_ORG || (e.GITHUB_OAUTH_CLIENT_ID && e.GITHUB_APP_ID),
+    {
+      message:
+        'OPEND_GITHUB_COLLABORATOR_ORG needs GitHub sign-in (GITHUB_OAUTH_CLIENT_ID) and the GitHub App (GITHUB_APP_ID) to check repository access',
+      path: ['OPEND_GITHUB_COLLABORATOR_ORG'],
+    },
+  )
+  .refine((e) => !e.OPEND_GITHUB_COLLABORATOR_STAFF || e.OPEND_GITHUB_COLLABORATOR_ORG, {
+    message: 'OPEND_GITHUB_COLLABORATOR_STAFF needs OPEND_GITHUB_COLLABORATOR_ORG',
+    path: ['OPEND_GITHUB_COLLABORATOR_STAFF'],
+  })
   .refine((e) => !e.OPEND_EMBED_SECRET === (e.OPEND_EMBED_ORIGINS.length === 0), {
     message: 'OPEND_EMBED_SECRET and OPEND_EMBED_ORIGINS must be set together',
     path: ['OPEND_EMBED_SECRET'],
@@ -125,7 +151,35 @@ export interface ServerConfig {
   sessionSecret: string;
   webhookSecret?: string;
   github?: { appId: string; privateKey: string; apiUrl?: string };
-  oidc?: { issuer: string; clientId: string; clientSecret: string; scopes: string };
+  oidc?: {
+    issuer: string;
+    clientId: string;
+    clientSecret: string;
+    scopes: string;
+    /** Shown on the sign-in page as "Sign in with <displayName>". */
+    displayName?: string;
+  };
+  /**
+   * Reader sign-in with GitHub: the same OAuth credentials as the editor's
+   * (one GitHub App serves both; each host has its own callback URL).
+   */
+  githubOAuth?: {
+    clientId: string;
+    clientSecret: string;
+    webUrl: string;
+    apiUrl?: string;
+    /**
+     * Readers who sign in with GitHub and can push to the site's repository
+     * are added to this org on first sign-in (off when absent).
+     */
+    collaboratorOrg?: string;
+    /** Such collaborators also get the staff view. */
+    collaboratorStaff?: boolean;
+  };
+  /** The web editor's origin: signed-in readers get "Edit this page" links. */
+  editorUrl?: string;
+  /** "View source on GitHub" links on topic pages of repositories hosted on GitHub. */
+  sourceLinks?: boolean;
   /** S3-compatible storage when S3_BUCKET is set, otherwise the BLOB_DIR folder. */
   blobs: BlobStoreConfig;
   adminToken?: string;
@@ -192,7 +246,22 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
       clientSecret: e.OIDC_CLIENT_SECRET,
       scopes: e.OIDC_SCOPES,
     };
+    if (e.OIDC_DISPLAY_NAME) config.oidc.displayName = e.OIDC_DISPLAY_NAME;
   }
+  if (e.GITHUB_OAUTH_CLIENT_ID && e.GITHUB_OAUTH_CLIENT_SECRET) {
+    config.githubOAuth = {
+      clientId: e.GITHUB_OAUTH_CLIENT_ID,
+      clientSecret: e.GITHUB_OAUTH_CLIENT_SECRET,
+      webUrl: (e.GITHUB_WEB_URL ?? 'https://github.com').replace(/\/$/, ''),
+    };
+    if (e.GITHUB_API_URL) config.githubOAuth.apiUrl = e.GITHUB_API_URL;
+    if (e.OPEND_GITHUB_COLLABORATOR_ORG) {
+      config.githubOAuth.collaboratorOrg = e.OPEND_GITHUB_COLLABORATOR_ORG;
+      config.githubOAuth.collaboratorStaff = e.OPEND_GITHUB_COLLABORATOR_STAFF;
+    }
+  }
+  if (e.EDITOR_PUBLIC_URL) config.editorUrl = new URL(e.EDITOR_PUBLIC_URL).origin;
+  if (e.OPEND_SOURCE_LINKS) config.sourceLinks = true;
   if (e.OPEND_ADMIN_TOKEN) config.adminToken = e.OPEND_ADMIN_TOKEN;
   if (e.OPEND_SITE_REPO) config.siteRepo = e.OPEND_SITE_REPO;
   if (e.OPEND_EMBED_SECRET)

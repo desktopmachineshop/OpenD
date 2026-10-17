@@ -20,7 +20,12 @@ export interface Harness extends OpendApp {
 
 export async function startHarness(
   url: string,
-  options: { oidc?: OidcProvider | null; config?: Partial<ServerConfig>; pdf?: PdfRenderer } = {},
+  options: {
+    oidc?: OidcProvider | null;
+    config?: Partial<ServerConfig>;
+    pdf?: PdfRenderer;
+    githubFetch?: typeof fetch;
+  } = {},
 ): Promise<Harness> {
   const db = await createTestDatabase(url);
   const blobDir = mkdtempSync(join(tmpdir(), 'opend-server-blobs-'));
@@ -44,6 +49,7 @@ export async function startHarness(
   };
   if (options.oidc !== undefined) deps.oidc = options.oidc;
   if (options.pdf) deps.pdf = options.pdf;
+  if (options.githubFetch) deps.githubFetch = options.githubFetch;
   const opend = await createApp(config, deps);
   await opend.app.ready();
   return {

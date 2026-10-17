@@ -16,7 +16,8 @@
           <codeblock>OIDC_ISSUER=https://login.example.com
 OIDC_CLIENT_ID=...
 OIDC_CLIENT_SECRET=...
-# OIDC_SCOPES=openid email profile   (the default)</codeblock>
+# OIDC_SCOPES=openid email profile   (the default)
+# OIDC_DISPLAY_NAME=Acme SSO          ("Sign in with Acme SSO" on the sign-in page)</codeblock>
         </stepxmp>
       </step>
       <step>
@@ -25,6 +26,11 @@ OIDC_CLIENT_SECRET=...
       </step>
       <step>
         <cmd>Restart the web service and sign in at <filepath>$PUBLIC_URL/auth/login</filepath>.</cmd>
+        <info><p>The sign-in page lists every configured provider: <uicontrol>Sign in with GitHub</uicontrol>
+          (see <xref href="github-sign-in.dita"/>), <uicontrol>Sign in with</uicontrol> your OIDC provider,
+          and, with <codeph>OPEND_DEV_LOGIN</codeph> outside production, <uicontrol>Demo readers</uicontrol>.
+          With exactly one provider and no demo readers it goes straight to that provider. The OIDC flow
+          starts at <filepath>/auth/oidc</filepath>.</p></info>
       </step>
     </steps>
     <result>
@@ -39,7 +45,12 @@ OIDC_CLIENT_SECRET=...
             12 hours. Entitlements are re-read through a short cache that is cleared as soon as an admin
             changes them.</li>
           <li>A reader whose organization has no entitlements yet sees "No access yet".</li>
-          <li>Sign out at <filepath>/auth/logout</filepath>.</li>
+          <li>Pages show the reader's name and <uicontrol>Sign out</uicontrol> in the header, and in the menu
+            on narrow screens. Signing out is a form post carrying the session's CSRF token; opening
+            <filepath>/auth/logout</filepath> only asks.</li>
+          <li>On a private site every page sends signed-out visitors to the sign-in page, which returns them to
+            the page afterwards. On a public site they read the public view and can sign in from the header.
+            The return address is always a path on the same site. See <xref href="access.dita"/>.</li>
         </ul>
     </result>
   </taskbody>

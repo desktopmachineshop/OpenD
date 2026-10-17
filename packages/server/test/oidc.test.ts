@@ -123,10 +123,14 @@ describe.skipIf(!url)('OIDC sign-in', () => {
 
   /** Starts sign-in and returns the IdP URL and the pending-login cookie. */
   async function begin(returnTo = '/topics/install.html') {
-    const res = await h.app.inject({
+    // OIDC is the only provider, so the sign-in page goes straight to it.
+    const login = await h.app.inject({
       method: 'GET',
       url: `/auth/login?returnTo=${encodeURIComponent(returnTo)}`,
     });
+    expect(login.statusCode).toBe(302);
+    expect(String(login.headers.location)).toMatch(/^\/auth\/oidc\?returnTo=/);
+    const res = await h.app.inject({ method: 'GET', url: String(login.headers.location) });
     expect(res.statusCode).toBe(302);
     return { idp: new URL(String(res.headers.location)), cookie: cookiesFrom(res) };
   }
@@ -210,7 +214,12 @@ describe.skipIf(!url)('OIDC sign-in', () => {
   });
 
   it('has no development sign-in when it is turned off', async () => {
-    expect((await h.app.inject({ method: 'GET', url: '/auth/dev' })).statusCode).toBe(302); // falls to delivery → login
+    const dev = await h.app.inject({ method: 'GET', url: '/auth/dev' });
+    expect(dev.statusCode).toBe(302); // falls to delivery → login
+    expect(dev.headers.location).toBe('/auth/login?returnTo=%2Fauth%2Fdev');
+    const page = await h.app.inject({ method: 'GET', url: '/auth/login' });
+    expect(page.statusCode).toBe(302); // the only provider: straight to OIDC
+    expect(page.body).not.toContain('Demo readers');
     expect(
       (
         await h.app.inject({
