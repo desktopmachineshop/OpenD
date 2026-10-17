@@ -540,7 +540,7 @@ describe.skipIf(!url)('the admin console', () => {
           'http://editor.test/auth/github/callback',
         ],
         setup_url: 'http://docs.test/admin/github/installed',
-        public: false,
+        public: true,
         request_oauth_on_install: false,
         default_events: ['push'],
         default_permissions: {

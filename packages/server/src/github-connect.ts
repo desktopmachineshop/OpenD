@@ -46,7 +46,11 @@ export function buildManifest(options: {
     callback_urls: callbacks,
     setup_url: `${base}/admin/github/installed`,
     setup_on_update: true,
-    public: false,
+    // A private app can only be authorized by its owner account (or members of the
+    // owning organization), so GitHub sign-in fails with a 404 for everyone else.
+    // Public only lets other accounts install it: pushes from repositories that are
+    // not registered are ignored, and only staff can complete the setup URL.
+    public: true,
     request_oauth_on_install: false,
     default_permissions: {
       contents: 'write',
