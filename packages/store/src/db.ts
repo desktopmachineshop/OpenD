@@ -17,6 +17,8 @@ export const CHANNELS = {
   entitlementsChanged: 'opend_entitlements_changed',
   /** A build job was queued. */
   jobQueued: 'opend_job_queued',
+  /** A setting or stored secret changed (admin console); payload is its key. */
+  settingsChanged: 'opend_settings_changed',
 } as const;
 
 export function createPool(
