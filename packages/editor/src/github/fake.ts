@@ -74,6 +74,8 @@ function json(status: number, body?: unknown): Response {
 export class FakeGitHub {
   readonly apiUrl = 'https://api.github.test';
   readonly webUrl = 'https://github.test';
+  /** Simulate an app without the account-level "Email addresses" permission. */
+  noEmailPermission = false;
   private readonly blobs = new Map<string, Buffer>();
   private readonly trees = new Map<string, FileTree>();
   private readonly commits = new Map<string, FakeCommit>();
@@ -531,7 +533,16 @@ export class FakeGitHub {
     if (path === '/user' || path === '/user/emails') {
       const user = this.userFor(token);
       if (!user) return json(401, { message: 'Bad credentials' });
-      if (path === '/user') return json(200, { id: user.id, login: user.login, name: user.name });
+      if (path === '/user')
+        return json(200, {
+          id: user.id,
+          login: user.login,
+          name: user.name,
+          ...(this.noEmailPermission ? { email: user.email } : {}),
+        });
+      // An app without the "Email addresses" permission can't list a user's emails.
+      if (this.noEmailPermission)
+        return json(403, { message: 'Resource not accessible by integration' });
       return json(200, [
         ...(user.email
           ? [{ email: user.email, primary: true, verified: user.verified ?? true }]

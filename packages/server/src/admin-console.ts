@@ -397,6 +397,7 @@ export function registerAdminConsole(app: FastifyInstance, ctx: AppContext): voi
                 slug: app.slug,
                 appId: app.appId,
                 owner: app.owner,
+                ownerIsOrg: app.ownerIsOrg === true,
                 htmlUrl: app.htmlUrl,
                 webUrl: app.webUrl,
               }

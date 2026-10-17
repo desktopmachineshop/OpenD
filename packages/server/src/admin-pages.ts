@@ -1034,6 +1034,7 @@ export interface GitHubPageData {
     slug: string;
     appId: string;
     owner: string | null;
+    ownerIsOrg: boolean;
     htmlUrl: string;
     webUrl: string;
   } | null;
@@ -1135,6 +1136,16 @@ export function githubPage(d: GitHubPageData): Html {
           <dd>
             ${d.app.htmlUrl ? html`<a href="${d.app.htmlUrl}">${d.app.name || d.app.slug}</a>` : d.app.slug}
             (id ${d.app.appId})
+          </dd>
+          <dt>Email permission</dt>
+          <dd>
+            GitHub sign-in reads each person’s verified email. GitHub doesn’t let a new app ask for
+            that, so add it once:
+            <a
+              href="${d.app.webUrl}/${d.app.ownerIsOrg && d.app.owner ? html`organizations/${d.app.owner}/` : ''}settings/apps/${d.app.slug}/permissions"
+              >open the app’s permissions</a
+            >, set <strong>Account permissions → Email addresses</strong> to <em>Read-only</em> and
+            save. Until then, sign-in uses the public email on a person’s GitHub profile.
           </dd>
           <dt>Webhook</dt>
           <dd>${sourceBadge(d.webhook)}</dd>

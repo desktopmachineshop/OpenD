@@ -55,7 +55,9 @@ export function buildManifest(options: {
       checks: 'read',
       statuses: 'write',
       metadata: 'read',
-      email_addresses: 'read',
+      // GitHub refuses account permissions such as "Email addresses" in a manifest
+      // ("Default permission records resource is not included in the list"). The
+      // admin console asks the owner to add it on GitHub after the app exists.
     },
     default_events: ['push'],
   };
@@ -151,7 +153,8 @@ export async function convertManifestCode(
   const clientSecret = str(body.client_secret);
   if (!id || !pem || !clientId || !clientSecret)
     throw new Error('GitHub returned an incomplete app (no id, client or private key)');
-  const owner = (body.owner as { login?: unknown } | undefined)?.login;
+  const ownerInfo = body.owner as { login?: unknown; type?: unknown } | undefined;
+  const owner = ownerInfo?.login;
   return {
     app: {
       appId: id,
@@ -160,6 +163,7 @@ export async function convertManifestCode(
       clientId,
       htmlUrl: str(body.html_url),
       owner: typeof owner === 'string' ? owner : null,
+      ownerIsOrg: ownerInfo?.type === 'Organization',
       webUrl: urls.web,
       apiUrl: urls.api,
       createdAt: new Date().toISOString(),
