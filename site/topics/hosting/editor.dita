@@ -50,18 +50,27 @@
         <cmd>Set the editor's variables.</cmd>
         <info>
           <p>The editor reads its own settings and checks them all at start-up. It shares
-            <codeph>DATABASE_URL</codeph> and the GitHub App with the other services, but never the session
-            secret.</p>
+            <codeph>DATABASE_URL</codeph> with the other services, and with it everything the admin console
+            stores: once GitHub is connected there, the editor uses the same GitHub App for commits and
+            author sign-in without variables of its own. With only <codeph>SESSION_SECRET</codeph> it derives
+            a cookie key of its own, so it never signs cookies with the docs site's key.</p>
+          <p>The smallest set, with GitHub connected in the admin console: <codeph>DATABASE_URL</codeph>,
+            <codeph>SESSION_SECRET</codeph> (the docs site's value), <codeph>EDITOR_PUBLIC_URL</codeph> and
+            <codeph>PUBLIC_URL</codeph>.</p>
           <properties relcolwidth="3* 2* 6*">
             <prophead><proptypehd>Variable</proptypehd><propvaluehd>Default</propvaluehd><propdeschd>Meaning and rules</propdeschd></prophead>
             <property id="DATABASE_URL"><proptype><codeph>DATABASE_URL</codeph></proptype><propvalue>required</propvalue><propdesc>The same Postgres database as the docs site.</propdesc></property>
             <property id="EDITOR_PUBLIC_URL"><proptype><codeph>EDITOR_PUBLIC_URL</codeph></proptype><propvalue>required</propvalue><propdesc>Where authors reach the editor. Must not share a host with <codeph>PUBLIC_URL</codeph>; in production the host names must differ.</propdesc></property>
-            <property id="EDITOR_SESSION_SECRET"><proptype><codeph>EDITOR_SESSION_SECRET</codeph></proptype><propvalue>required</propvalue><propdesc>Signs the editor's session cookie. At least 32 characters, and not the docs site's <codeph>SESSION_SECRET</codeph>.</propdesc></property>
-            <property id="GITHUB_APP_ID"><proptype><codeph>GITHUB_APP_ID</codeph></proptype><propvalue>required</propvalue><propdesc>The GitHub App that commits and opens pull requests.</propdesc></property>
-            <property id="GITHUB_APP_PRIVATE_KEY"><proptype><codeph>GITHUB_APP_PRIVATE_KEY</codeph></proptype><propvalue>required</propvalue><propdesc>The App's private key, as for the worker.</propdesc></property>
-            <property id="GITHUB_OAUTH_CLIENT_ID"><proptype><codeph>GITHUB_OAUTH_CLIENT_ID</codeph></proptype><propvalue>none</propvalue><propdesc>Turns on GitHub sign-in. Set together with <codeph>GITHUB_OAUTH_CLIENT_SECRET</codeph>.</propdesc></property>
+            <property id="SESSION_SECRET"><proptype><codeph>SESSION_SECRET</codeph></proptype><propvalue>see the meaning</propvalue><propdesc>The docs site's value. The editor derives its own cookie key from it under a separate label (so the two never share a key), and opens the settings and secrets the admin console stored with it. Set this or <codeph>EDITOR_SESSION_SECRET</codeph>.</propdesc></property>
+            <property id="EDITOR_SESSION_SECRET"><proptype><codeph>EDITOR_SESSION_SECRET</codeph></proptype><propvalue>derived from <codeph>SESSION_SECRET</codeph></propvalue><propdesc>Signs the editor's session cookie instead of the derived key. At least 32 characters, and not the docs site's <codeph>SESSION_SECRET</codeph>.</propdesc></property>
+            <property id="OPEND_SECRET_KEY"><proptype><codeph>OPEND_SECRET_KEY</codeph></proptype><propvalue>none</propvalue><propdesc>The docs site's value, when it sets one: the key stored secrets are sealed with. Without it the key comes from <codeph>SESSION_SECRET</codeph>.</propdesc></property>
+            <property id="GITHUB_APP_ID"><proptype><codeph>GITHUB_APP_ID</codeph></proptype><propvalue>the connected app</propvalue><propdesc>The GitHub App that commits and opens pull requests. Without it, the editor uses the app connected in the admin console (<uicontrol>Integrations</uicontrol> > <uicontrol>GitHub</uicontrol>) or the token broker. Set together with <codeph>GITHUB_APP_PRIVATE_KEY</codeph>.</propdesc></property>
+            <property id="GITHUB_APP_PRIVATE_KEY"><proptype><codeph>GITHUB_APP_PRIVATE_KEY</codeph></proptype><propvalue>the connected app</propvalue><propdesc>The App's private key, as for the worker.</propdesc></property>
+            <property id="OPEND_GITHUB_BROKER_URL"><proptype><codeph>OPEND_GITHUB_BROKER_URL</codeph></proptype><propvalue>none</propvalue><propdesc>Managed hosting: the control plane's token broker. The editor asks it for <codeph>write</codeph> tokens. Set by the hosting provider, together with <codeph>OPEND_GITHUB_BROKER_SECRET</codeph>.</propdesc></property>
+            <property id="OPEND_GITHUB_BROKER_SECRET"><proptype><codeph>OPEND_GITHUB_BROKER_SECRET</codeph></proptype><propvalue>none</propvalue><propdesc>This instance's bearer token for the broker.</propdesc></property>
+            <property id="GITHUB_OAUTH_CLIENT_ID"><proptype><codeph>GITHUB_OAUTH_CLIENT_ID</codeph></proptype><propvalue>the connected app's</propvalue><propdesc>Turns on GitHub sign-in. Without it, the client id of the app connected in the admin console is used. Set together with <codeph>GITHUB_OAUTH_CLIENT_SECRET</codeph>.</propdesc></property>
             <property id="GITHUB_OAUTH_CLIENT_SECRET"><proptype><codeph>GITHUB_OAUTH_CLIENT_SECRET</codeph></proptype><propvalue>none</propvalue><propdesc>The OAuth client secret.</propdesc></property>
-            <property id="EDITOR_OIDC_ISSUER"><proptype><codeph>EDITOR_OIDC_ISSUER</codeph></proptype><propvalue>none</propvalue><propdesc>Turns on company sign-in. Needs <codeph>EDITOR_OIDC_CLIENT_ID</codeph> and <codeph>EDITOR_OIDC_CLIENT_SECRET</codeph>.</propdesc></property>
+            <property id="EDITOR_OIDC_ISSUER"><proptype><codeph>EDITOR_OIDC_ISSUER</codeph></proptype><propvalue>none</propvalue><propdesc>Turns on company sign-in. Needs <codeph>EDITOR_OIDC_CLIENT_ID</codeph> and <codeph>EDITOR_OIDC_CLIENT_SECRET</codeph>. Managed hosting sets all three to its own sign-in service.</propdesc></property>
             <property id="EDITOR_OIDC_CLIENT_ID"><proptype><codeph>EDITOR_OIDC_CLIENT_ID</codeph></proptype><propvalue>none</propvalue><propdesc>The editor's OIDC client id.</propdesc></property>
             <property id="EDITOR_OIDC_CLIENT_SECRET"><proptype><codeph>EDITOR_OIDC_CLIENT_SECRET</codeph></proptype><propvalue>none</propvalue><propdesc>The editor's OIDC client secret.</propdesc></property>
             <property id="EDITOR_OIDC_SCOPES"><proptype><codeph>EDITOR_OIDC_SCOPES</codeph></proptype><propvalue><codeph>openid email profile</codeph></propvalue><propdesc>Scopes to request.</propdesc></property>

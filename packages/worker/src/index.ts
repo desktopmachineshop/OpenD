@@ -4,3 +4,5 @@ export * from './worker.js';
 export * from './testing.js';
 export * from './poller.js';
 export * from './search.js';
+export * from './broker.js';
+export * from './connection.js';

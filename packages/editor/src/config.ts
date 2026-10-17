@@ -1,4 +1,7 @@
+import { hkdfSync } from 'node:crypto';
 import { z } from 'zod';
+import { deriveSecretKey } from '@opend/store';
+import type { BrokerConfig, GitHubAppConfig } from '@opend/worker';
 
 /** Optional string where an empty value (e.g. an unresolved reference variable) counts as unset. */
 const optional = <T extends z.ZodType>(schema: T) =>
@@ -11,11 +14,18 @@ const envSchema = z
     EDITOR_PUBLIC_URL: z.url(),
     PORT: z.coerce.number().int().min(0).max(65535).default(3001),
     HOST: z.string().default('0.0.0.0'),
-    EDITOR_SESSION_SECRET: z
-      .string()
-      .min(32, 'EDITOR_SESSION_SECRET must be at least 32 characters'),
-    GITHUB_APP_ID: z.string().min(1),
-    GITHUB_APP_PRIVATE_KEY: z.string().min(1),
+    EDITOR_SESSION_SECRET: optional(
+      z.string().min(32, 'EDITOR_SESSION_SECRET must be at least 32 characters'),
+    ),
+    /** The docs site's: signs editor sessions under its own label, and opens stored secrets. */
+    SESSION_SECRET: optional(z.string().min(32, 'SESSION_SECRET must be at least 32 characters')),
+    OPEND_SECRET_KEY: optional(
+      z.string().min(32, 'OPEND_SECRET_KEY must be at least 32 characters'),
+    ),
+    GITHUB_APP_ID: optional(z.string().min(1)),
+    GITHUB_APP_PRIVATE_KEY: optional(z.string().min(1)),
+    OPEND_GITHUB_BROKER_URL: optional(z.url()),
+    OPEND_GITHUB_BROKER_SECRET: optional(z.string().min(16)),
     GITHUB_API_URL: optional(z.url()),
     GITHUB_WEB_URL: optional(z.url()),
     GITHUB_OAUTH_CLIENT_ID: optional(z.string().min(1)),
@@ -42,9 +52,17 @@ const envSchema = z
       path: ['EDITOR_OIDC_ISSUER'],
     },
   )
-  .refine((e) => e.GITHUB_OAUTH_CLIENT_ID || e.EDITOR_OIDC_ISSUER, {
-    message: 'configure at least one sign-in: GITHUB_OAUTH_CLIENT_ID or EDITOR_OIDC_ISSUER',
-    path: ['GITHUB_OAUTH_CLIENT_ID'],
+  .refine((e) => e.EDITOR_SESSION_SECRET || e.SESSION_SECRET, {
+    message: "set SESSION_SECRET (the docs site's) or EDITOR_SESSION_SECRET",
+    path: ['EDITOR_SESSION_SECRET'],
+  })
+  .refine((e) => !e.GITHUB_APP_ID === !e.GITHUB_APP_PRIVATE_KEY, {
+    message: 'GITHUB_APP_ID and GITHUB_APP_PRIVATE_KEY must be set together',
+    path: ['GITHUB_APP_ID'],
+  })
+  .refine((e) => !e.OPEND_GITHUB_BROKER_URL === !e.OPEND_GITHUB_BROKER_SECRET, {
+    message: 'OPEND_GITHUB_BROKER_URL and OPEND_GITHUB_BROKER_SECRET must be set together',
+    path: ['OPEND_GITHUB_BROKER_URL'],
   })
   .refine((e) => !e.PUBLIC_URL || separateHosts(e.EDITOR_PUBLIC_URL, e.PUBLIC_URL, e.NODE_ENV), {
     message:
@@ -67,6 +85,16 @@ function separateHosts(editorUrl: string, siteUrl: string, nodeEnv: string): boo
   return editor.host !== site.host;
 }
 
+/**
+ * The editor's cookie key when only the docs site's SESSION_SECRET is given:
+ * derived under its own label, so it never equals the docs site's key.
+ */
+export function editorSessionSecret(sessionSecret: string): string {
+  return Buffer.from(
+    hkdfSync('sha256', sessionSecret, 'opend-editor', 'opend-editor-session', 32),
+  ).toString('base64url');
+}
+
 export function isBranchName(name: string): boolean {
   return (
     /^[A-Za-z0-9._/-]+$/.test(name) &&
@@ -85,7 +113,18 @@ export interface EditorConfig {
   port: number;
   host: string;
   sessionSecret: string;
-  github: { appId: string; privateKey: string; apiUrl?: string };
+  /**
+   * The GitHub App from the environment. Without it (and without the broker),
+   * the editor uses the app the docs site's admin console connected.
+   */
+  github?: GitHubAppConfig;
+  /** Managed hosting: installation tokens from the control plane's broker. */
+  broker?: BrokerConfig;
+  /** Opens the secrets the admin console stored (same key as the docs site), or null. */
+  secretKey: Buffer | null;
+  /** GitHub web and API URLs, for GitHub Enterprise Server. */
+  githubWebUrl: string;
+  githubApiUrl?: string;
   /** GitHub sign-in for developers (OAuth app, or the GitHub App's own OAuth credentials). */
   githubOAuth?: { clientId: string; clientSecret: string; webUrl: string; apiUrl?: string };
   /** Company sign-in for other authors. */
@@ -97,7 +136,9 @@ export interface EditorConfig {
 }
 
 export function loadEditorConfig(env: NodeJS.ProcessEnv = process.env): EditorConfig {
-  const parsed = envSchema.safeParse(env);
+  const parsed = envSchema.safeParse(
+    Object.fromEntries(Object.entries(env).filter(([, v]) => v !== '')),
+  );
   if (!parsed.success) {
     const problems = parsed.error.issues
       .map((i) => `  ${i.path.join('.')}: ${i.message}`)
@@ -110,12 +151,21 @@ export function loadEditorConfig(env: NodeJS.ProcessEnv = process.env): EditorCo
     publicUrl: new URL(e.EDITOR_PUBLIC_URL).origin,
     port: e.PORT,
     host: e.HOST,
-    sessionSecret: e.EDITOR_SESSION_SECRET,
-    github: { appId: e.GITHUB_APP_ID, privateKey: e.GITHUB_APP_PRIVATE_KEY },
+    sessionSecret: e.EDITOR_SESSION_SECRET ?? editorSessionSecret(e.SESSION_SECRET!),
+    secretKey: deriveSecretKey({ secretKey: e.OPEND_SECRET_KEY, sessionSecret: e.SESSION_SECRET }),
+    githubWebUrl: (e.GITHUB_WEB_URL ?? 'https://github.com').replace(/\/$/, ''),
     baseBranch: e.EDITOR_BASE_BRANCH,
     production: e.NODE_ENV === 'production',
   };
-  if (e.GITHUB_API_URL) config.github.apiUrl = e.GITHUB_API_URL;
+  if (e.GITHUB_API_URL) config.githubApiUrl = e.GITHUB_API_URL;
+  if (e.GITHUB_APP_ID && e.GITHUB_APP_PRIVATE_KEY) {
+    config.github = { appId: e.GITHUB_APP_ID, privateKey: e.GITHUB_APP_PRIVATE_KEY };
+    if (e.GITHUB_API_URL) config.github.apiUrl = e.GITHUB_API_URL;
+  } else if (e.OPEND_GITHUB_BROKER_URL && e.OPEND_GITHUB_BROKER_SECRET) {
+    config.broker = { url: e.OPEND_GITHUB_BROKER_URL, secret: e.OPEND_GITHUB_BROKER_SECRET };
+    if (e.GITHUB_API_URL) config.broker.apiUrl = e.GITHUB_API_URL;
+    if (e.GITHUB_WEB_URL) config.broker.webUrl = e.GITHUB_WEB_URL;
+  }
   if (e.GITHUB_OAUTH_CLIENT_ID && e.GITHUB_OAUTH_CLIENT_SECRET) {
     config.githubOAuth = {
       clientId: e.GITHUB_OAUTH_CLIENT_ID,

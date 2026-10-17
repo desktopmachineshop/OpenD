@@ -281,3 +281,101 @@ export async function countStaffReaders(db: Db): Promise<number> {
   );
   return rows[0]!.n;
 }
+
+// ---- typed accessors for the settings OpenD knows -------------------------
+
+/** Setting keys and secret names. Secrets live in the `secrets` table only. */
+export const SETTING = {
+  /** The GitHub App created through Connect GitHub (no secrets). */
+  githubApp: 'github.app',
+  /** The installation chosen after Connect GitHub: `{ id, account }`. */
+  githubInstallation: 'github.installation',
+  /** Reader sign-in: `{ github?: boolean, devLogin?: boolean }`. */
+  signIn: 'signin',
+  /** OIDC provider without its secret: `{ issuer, clientId, displayName?, icon? }`. */
+  oidc: 'oidc',
+  /** `{ url?: string, editLinks?: boolean, sourceLinks?: boolean }`. */
+  editor: 'editor',
+} as const;
+
+export const SECRET = {
+  githubPrivateKey: 'github.privateKey',
+  githubClientSecret: 'github.clientSecret',
+  githubWebhookSecret: 'github.webhookSecret',
+  oidcClientSecret: 'oidc.clientSecret',
+} as const;
+
+export interface StoredGitHubApp {
+  appId: string;
+  slug: string;
+  name: string;
+  clientId: string;
+  htmlUrl: string;
+  owner: string | null;
+  /** The web and API URLs it was created on (GitHub Enterprise Server installs differ). */
+  webUrl: string;
+  apiUrl: string;
+  createdAt: string;
+}
+
+const isRecord = (v: unknown): v is Record<string, unknown> =>
+  typeof v === 'object' && v !== null && !Array.isArray(v);
+const str = (v: unknown): string | undefined => (typeof v === 'string' && v ? v : undefined);
+
+/** The connected GitHub App with its secrets, or null when none is stored (or unreadable). */
+export function storedGitHubApp(
+  snapshot: SettingsSnapshot,
+): (StoredGitHubApp & { privateKey: string; clientSecret?: string; webhookSecret?: string }) | null {
+  const v = snapshot.values[SETTING.githubApp];
+  const privateKey = snapshot.secrets[SECRET.githubPrivateKey];
+  if (!isRecord(v) || !str(v.appId) || !privateKey) return null;
+  const app = {
+    appId: String(v.appId),
+    slug: str(v.slug) ?? '',
+    name: str(v.name) ?? '',
+    clientId: str(v.clientId) ?? '',
+    htmlUrl: str(v.htmlUrl) ?? '',
+    owner: str(v.owner) ?? null,
+    webUrl: str(v.webUrl) ?? 'https://github.com',
+    apiUrl: str(v.apiUrl) ?? 'https://api.github.com',
+    createdAt: str(v.createdAt) ?? '',
+    privateKey,
+  };
+  const clientSecret = snapshot.secrets[SECRET.githubClientSecret];
+  const webhookSecret = snapshot.secrets[SECRET.githubWebhookSecret];
+  return {
+    ...app,
+    ...(clientSecret ? { clientSecret } : {}),
+    ...(webhookSecret ? { webhookSecret } : {}),
+  };
+}
+
+/** The installation picked after Connect GitHub. */
+export function storedInstallation(
+  snapshot: SettingsSnapshot,
+): { id: number; account: string | null } | null {
+  const v = snapshot.values[SETTING.githubInstallation];
+  if (!isRecord(v) || typeof v.id !== 'number' || !Number.isInteger(v.id)) return null;
+  return { id: v.id, account: str(v.account) ?? null };
+}
+
+/** A boolean setting inside an object setting, or `fallback`. */
+export function settingFlag(
+  snapshot: SettingsSnapshot,
+  key: string,
+  field: string,
+  fallback: boolean,
+): boolean {
+  const v = snapshot.values[key];
+  return isRecord(v) && typeof v[field] === 'boolean' ? v[field] : fallback;
+}
+
+/** A string field of an object setting. */
+export function settingString(
+  snapshot: SettingsSnapshot,
+  key: string,
+  field: string,
+): string | undefined {
+  const v = snapshot.values[key];
+  return isRecord(v) ? str(v[field]) : undefined;
+}

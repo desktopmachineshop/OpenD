@@ -1,8 +1,15 @@
 import cookie from '@fastify/cookie';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { LRUCache } from 'lru-cache';
-import type { Pool, Repo } from '@opend/store';
-import { GitHubApp, jsonLog, type Log } from '@opend/worker';
+import {
+  SecretBox,
+  SettingsCache,
+  storedGitHubApp,
+  type Pool,
+  type Repo,
+  type SettingsSnapshot,
+} from '@opend/store';
+import { GitHubConnection, jsonLog, type Log } from '@opend/worker';
 import { registerAuth, wantsJson } from './auth.js';
 import { editorScript } from './client.js';
 import type { EditorConfig } from './config.js';
@@ -22,10 +29,28 @@ export interface EditorDeps {
   /** `fetch` for GitHub (API and OAuth). Tests pass `FakeGitHub.fetch`. */
   fetch?: typeof fetch;
   /** Override the GitHub client per repository (tests). Defaults to the App's REST client. */
-  clientFor?: (repo: Repo & { installationId: number }) => GitHubClient;
+  clientFor?: (repo: Repo) => GitHubClient;
   /** Override sign-in providers (tests). Default: built from the config. */
   oidc?: OidcProvider | null;
   githubOAuth?: GitHubOAuth | null;
+  /** Reload settings on Postgres notifications. Default true. */
+  listen?: boolean;
+}
+
+/** GitHub sign-in for authors: the environment's OAuth app, or the connected app's credentials. */
+function storedOAuth(
+  config: EditorConfig,
+  snapshot: SettingsSnapshot,
+): { clientId: string; clientSecret: string; webUrl: string; apiUrl?: string } | null {
+  if (config.githubOAuth) return config.githubOAuth;
+  const app = storedGitHubApp(snapshot);
+  if (!app?.clientId || !app.clientSecret) return null;
+  return {
+    clientId: app.clientId,
+    clientSecret: app.clientSecret,
+    webUrl: app.webUrl,
+    apiUrl: app.apiUrl,
+  };
 }
 
 export interface EditorApp {
@@ -36,16 +61,31 @@ export interface EditorApp {
 /** Builds the editor app. The caller decides whether to `listen()` or `inject()`. */
 export async function createEditorApp(config: EditorConfig, deps: EditorDeps): Promise<EditorApp> {
   const fetchImpl = deps.fetch ?? fetch;
-  let clientFor = deps.clientFor;
-  if (!clientFor) {
-    const githubApp = new GitHubApp(config.github, fetchImpl);
-    clientFor = (repo) => new RestGitHubClient(githubApp, repo.fullName, repo.installationId);
-  }
+  const settings = new SettingsCache(
+    deps.pool,
+    config.secretKey ? new SecretBox(config.secretKey) : null,
+  );
+  await settings.reload();
+  const github = new GitHubConnection({
+    app: config.github ?? null,
+    broker: config.broker ?? null,
+    stored: () => {
+      const app = storedGitHubApp(settings.current);
+      return app ? { appId: app.appId, privateKey: app.privateKey, apiUrl: app.apiUrl } : null;
+    },
+    ...(config.githubApiUrl ? { apiUrl: config.githubApiUrl } : {}),
+    webUrl: config.githubWebUrl,
+    fetch: fetchImpl,
+  });
+  const clientFor = deps.clientFor ?? ((repo: Repo) => new RestGitHubClient(github, repo));
+  let oauthKey = '';
   const ctx: EditorContext = {
     config,
     pool: deps.pool,
     log: deps.log ?? jsonLog,
     service: new EditorService(deps.pool),
+    github,
+    settings,
     clientFor,
     drafts: new LRUCache<string, DraftBuild>({ max: 200, ttl: 30 * 60_000 }),
     oidc:
@@ -57,17 +97,22 @@ export async function createEditorApp(config: EditorConfig, deps: EditorDeps): P
               allowInsecure: !config.production && config.oidc.issuer.startsWith('http://'),
             })
           : null,
-    githubOAuth:
-      deps.githubOAuth !== undefined
-        ? deps.githubOAuth
-        : config.githubOAuth
-          ? createGitHubOAuth(config.githubOAuth, fetchImpl)
-          : null,
+    githubOAuth: deps.githubOAuth ?? null,
     repoContext: async () => {
       throw new Error('unreachable');
     },
   };
-  ctx.repoContext = repoResolver(config, deps.pool, clientFor);
+  ctx.repoContext = repoResolver(config, deps.pool, clientFor, () => github.mode() !== 'broker');
+  // Author sign-in follows Connect GitHub in the docs site's admin console, without a restart.
+  const applySettings = () => {
+    if (deps.githubOAuth !== undefined) return;
+    const oauth = storedOAuth(config, settings.current);
+    const key = oauth ? JSON.stringify(oauth) : '';
+    if (key === oauthKey) return;
+    oauthKey = key;
+    ctx.githubOAuth = oauth ? createGitHubOAuth(oauth, fetchImpl) : null;
+  };
+  applySettings();
 
   const app = Fastify({ logger: false, trustProxy: true, bodyLimit: 2 * 1024 * 1024 });
   await app.register(cookie, { secret: config.sessionSecret });
@@ -146,5 +191,16 @@ export async function createEditorApp(config: EditorConfig, deps: EditorDeps): P
   );
   registerAuth(app, ctx);
   registerRoutes(app, ctx);
+  const onError = (err: unknown) =>
+    ctx.log({ level: 'warn', msg: 'settings reload failed', error: String(err) });
+  app.addHook('onRequest', async () => {
+    settings.refreshIfStale(60_000, onError);
+    applySettings();
+  });
+  if (deps.listen !== false) {
+    const listener = settings.listen(config.databaseUrl, onError);
+    app.addHook('onReady', async () => listener.ready);
+    app.addHook('onClose', async () => listener.stop());
+  }
   return { app, ctx };
 }
