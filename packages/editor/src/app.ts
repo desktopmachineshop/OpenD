@@ -11,6 +11,7 @@ import {
 } from '@opend/store';
 import { GitHubConnection, jsonLog, type Log } from '@opend/worker';
 import { registerAuth, wantsJson } from './auth.js';
+import { visualScript } from './bundle.js';
 import { editorScript } from './client.js';
 import type { EditorConfig } from './config.js';
 import { repoResolver, type EditorContext } from './context.js';
@@ -227,6 +228,16 @@ export async function createEditorApp(config: EditorConfig, deps: EditorDeps): P
       .headers({ 'cache-control': 'public, max-age=300', 'x-content-type-options': 'nosniff' })
       .type('text/javascript; charset=utf-8')
       .send(script),
+  );
+  // Bundled on first use; started now so the first editor page does not wait for it.
+  visualScript().catch((err: unknown) =>
+    ctx.log({ level: 'error', msg: 'visual editor bundle failed', error: String(err) }),
+  );
+  app.get('/assets/visual.js', async (_request, reply) =>
+    reply
+      .headers({ 'cache-control': 'public, max-age=300', 'x-content-type-options': 'nosniff' })
+      .type('text/javascript; charset=utf-8')
+      .send(await visualScript()),
   );
   app.get('/assets/editor.css', async (_request, reply) =>
     reply

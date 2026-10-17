@@ -53,6 +53,8 @@ describe.skipIf(!url || !hasBrowser)('web editor in a browser', () => {
       if (/Content Security Policy|Refused to/i.test(msg.text())) violations.push(msg.text());
     });
     await page.goto(`${origin}/edit?path=topics/install.dita`);
+    // Topics open in the visual editor; the source is one tab away.
+    await page.getByRole('tab', { name: 'Source' }).click();
     const source = page.locator('#ed-source');
     await expect.poll(() => source.inputValue()).toContain('<task id="install">');
     const text = await source.inputValue();
@@ -84,5 +86,71 @@ describe.skipIf(!url || !hasBrowser)('web editor in a browser', () => {
       .toContain('not well-formed');
     expect(violations).toEqual([]);
     await context.close();
-  });
+  }, 60_000);
+
+  it('edits a topic visually and saves only what changed', async () => {
+    const user = await upsertEditorUser(h.db.pool, { email: 'vis@example.com', name: 'Vis Ual' });
+    const session = await createEditorSession(h.db.pool, user.id, 'oidc', 1);
+    const context = await browser.newContext();
+    await context.addCookies([
+      { name: EDITOR_COOKIE, value: h.app.signCookie(session.id), url: origin, httpOnly: true },
+    ]);
+    const page = await context.newPage();
+    const violations: string[] = [];
+    page.on('console', (msg) => {
+      if (/Content Security Policy|Refused to|Error/i.test(msg.text())) violations.push(msg.text());
+    });
+    page.on('pageerror', (err) => violations.push(err.message));
+    const original = h.gh.readFile(REPO, 'main', 'topics/overview.dita')!;
+    await page.goto(`${origin}/edit?path=topics/overview.dita`);
+    const editor = page.locator('.vx-editor');
+    await expect.poll(() => editor.isVisible()).toBe(true);
+    expect(await page.getByRole('tab', { name: 'Visual' }).getAttribute('aria-selected')).toBe(
+      'true',
+    );
+    expect(await page.locator('#ed-source').isVisible()).toBe(false);
+
+    // Type at the end of the first body paragraph, with a bold word.
+    const firstPara = editor.locator('p.vx-tb-p').nth(1);
+    await firstPara.click();
+    await page.keyboard.press('End');
+    await page.keyboard.type(' VISUAL-MARKER');
+    await page.keyboard.press('ControlOrMeta+b');
+    await page.keyboard.type(' BOLD-MARKER');
+    await page.keyboard.press('ControlOrMeta+b');
+    await expect
+      .poll(() => page.frameLocator('#ed-preview').locator('body').innerText(), {
+        timeout: 10_000,
+      })
+      .toContain('VISUAL-MARKER');
+
+    // A bulleted list from a new paragraph.
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('First point');
+    await page.getByRole('button', { name: 'Bulleted list' }).click();
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('Second point');
+
+    await page.getByRole('button', { name: 'Save' }).click();
+    await expect
+      .poll(() => page.locator('#ed-save-status').innerText(), { timeout: 10_000 })
+      .toMatch(/Saved as [0-9a-f]{7}/);
+    const branch = await page.locator('input[name="branch"]').inputValue();
+    const saved = h.gh.readFile(REPO, branch, 'topics/overview.dita')!;
+    expect(saved).toMatch(/VISUAL-MARKER ?<b> ?BOLD-MARKER<\/b>/);
+    expect(saved).toMatch(
+      /<ul>\s*<li>\s*(<p>)?First point(<\/p>)?\s*<\/li>\s*<li>\s*(<p>)?Second point/,
+    );
+    // Everything outside the edited body keeps its exact text.
+    const head = (text: string) => text.slice(0, text.indexOf('<conbody'));
+    expect(head(saved)).toBe(head(original));
+
+    // The source tab shows the same DITA, and the visual tab comes back.
+    await page.getByRole('tab', { name: 'Source' }).click();
+    expect(await page.locator('#ed-source').inputValue()).toContain('Second point');
+    await page.getByRole('tab', { name: 'Visual' }).click();
+    await expect.poll(() => editor.innerText()).toContain('Second point');
+    expect(violations).toEqual([]);
+    await context.close();
+  }, 60_000);
 });

@@ -681,7 +681,7 @@ describe.skipIf(!url)('web editor', () => {
         expect(csp, path).toContain("frame-ancestors 'none'");
         expect(res.headers['cache-control']).toBe('private, no-store');
         for (const tag of res.body.match(/<script[^>]*>/g) ?? [])
-          expect(tag, path).toMatch(/ src="\/assets\/editor\.js"/);
+          expect(tag, path).toMatch(/ src="\/assets\/(editor|visual)\.js"/);
         expect(res.body, path).not.toMatch(/ on[a-z]+="/);
         expect(res.body, path).not.toContain('style="');
       }

@@ -44,6 +44,8 @@ export interface Shell {
   current?: 'files' | 'publish' | 'activity' | 'conflicts';
   repo?: string;
   base?: string;
+  /** Extra page scripts (same-origin paths). */
+  scripts?: string[];
 }
 
 /** The page frame. `body` is trusted HTML built with `h()` for every value. */
@@ -69,6 +71,7 @@ ${shell.csrf ? `<meta name="opend-csrf" content="${h(shell.csrf)}">` : ''}
 <title>${h(shell.title)} · OpenD editor</title>
 <link rel="stylesheet" href="/assets/editor.css">
 <script src="/assets/editor.js" defer></script>
+${(shell.scripts ?? []).map((src) => `<script src="${h(src)}" defer></script>`).join('\n')}
 </head>
 <body>
 <a class="ed-skip" href="#main">Skip to content</a>
