@@ -1,10 +1,28 @@
+import { createHash, randomBytes } from 'node:crypto';
 import type { GitHubLogin } from '@opend/store';
 
-/** GitHub sign-in (OAuth web flow) for developers. */
+/** Who signed in with GitHub, with every email address GitHub has verified for them. */
+export interface GitHubSignIn extends GitHubLogin {
+  /** Verified addresses, the primary one first. Unverified addresses are never included. */
+  verifiedEmails: string[];
+}
+
+/**
+ * GitHub sign-in (OAuth web flow), for the editor's developers and for docs
+ * readers. Works with an OAuth App or a GitHub App's own client credentials.
+ * Callers protect the flow with `state`, and with PKCE (S256): GitHub checks
+ * the verifier when the authorization request carried a challenge.
+ */
 export interface GitHubOAuth {
-  authorizationUrl(redirectUri: string, state: string): string;
+  authorizationUrl(redirectUri: string, state: string, codeChallenge?: string): string;
   /** Exchanges the callback code and returns who signed in. */
-  exchange(code: string, redirectUri: string): Promise<GitHubLogin>;
+  exchange(code: string, redirectUri: string, codeVerifier?: string): Promise<GitHubSignIn>;
+}
+
+/** A fresh PKCE verifier and its S256 challenge. */
+export function newPkce(): { verifier: string; challenge: string } {
+  const verifier = randomBytes(32).toString('base64url');
+  return { verifier, challenge: createHash('sha256').update(verifier).digest('base64url') };
 }
 
 export function createGitHubOAuth(
@@ -24,16 +42,22 @@ export function createGitHubOAuth(
     return res.json() as Promise<unknown>;
   };
   return {
-    authorizationUrl(redirectUri, state) {
+    authorizationUrl(redirectUri, state, codeChallenge) {
       const url = new URL(`${options.webUrl}/login/oauth/authorize`);
       url.searchParams.set('client_id', options.clientId);
       url.searchParams.set('redirect_uri', redirectUri);
       url.searchParams.set('state', state);
+      // OAuth Apps need these scopes; GitHub Apps ignore scopes and use the
+      // app's permissions (Email addresses: read) instead.
       url.searchParams.set('scope', 'read:user user:email');
       url.searchParams.set('allow_signup', 'false');
+      if (codeChallenge) {
+        url.searchParams.set('code_challenge', codeChallenge);
+        url.searchParams.set('code_challenge_method', 'S256');
+      }
       return url.href;
     },
-    async exchange(code, redirectUri) {
+    async exchange(code, redirectUri, codeVerifier) {
       const res = await fetchImpl(`${options.webUrl}/login/oauth/access_token`, {
         method: 'POST',
         headers: { accept: 'application/json', 'content-type': 'application/json' },
@@ -42,6 +66,7 @@ export function createGitHubOAuth(
           client_secret: options.clientSecret,
           code,
           redirect_uri: redirectUri,
+          ...(codeVerifier ? { code_verifier: codeVerifier } : {}),
         }),
       });
       const body = (await res.json()) as { access_token?: string; error?: string };
@@ -57,12 +82,17 @@ export function createGitHubOAuth(
         primary: boolean;
         verified: boolean;
       }[];
-      const primary = emails.find((e) => e.primary && e.verified);
+      const verified = emails.filter((e) => e.verified === true);
+      const primary = verified.find((e) => e.primary);
       return {
         id: user.id,
         login: user.login,
         name: user.name || null,
         verifiedEmail: primary?.email ?? null,
+        verifiedEmails: [
+          ...(primary ? [primary.email] : []),
+          ...verified.filter((e) => e !== primary).map((e) => e.email),
+        ],
       };
     },
   };
