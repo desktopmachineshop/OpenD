@@ -81,7 +81,7 @@ export interface EditorServiceOptions {
   userClient?: (repo: Repo, source: UserTokenSource) => UserGitHubClient;
   /** Milliseconds to wait between checks while GitHub runs an update-branch. */
   updateBranchPolls?: number[];
-  /** How long signing requirements are cached, ms. */
+  /** How long signing requirements are cached, ms; 0 turns the cache off. */
   signingTtlMs?: number;
 }
 
@@ -282,14 +282,16 @@ export class EditorService {
   });
   private readonly builds = new LRUCache<string, DraftBuild>({ max: 16 });
   private readonly locks = new KeyedLock();
-  private readonly signing: LRUCache<string, SigningRequirement>;
+  private readonly signing: LRUCache<string, SigningRequirement> | null;
   private readonly polls: number[];
 
   constructor(
     private readonly pool: Pool,
     private readonly options: EditorServiceOptions = {},
   ) {
-    this.signing = new LRUCache({ max: 256, ttl: options.signingTtlMs ?? 60_000 });
+    // lru-cache reads a ttl of 0 as "never expires", so 0 means no cache at all.
+    const ttl = options.signingTtlMs ?? 60_000;
+    this.signing = ttl > 0 ? new LRUCache({ max: 256, ttl }) : null;
     this.polls = options.updateBranchPolls ?? [250, 500, 1000, 1000, 2000, 2000, 3000, 5000];
   }
 
@@ -486,7 +488,7 @@ export class EditorService {
    */
   async signingRequirement(rc: RepoContext, workBranch: string): Promise<SigningRequirement> {
     const key = `${rc.repo.id}\n${rc.baseBranch}\n${workBranch}`;
-    const cached = this.signing.get(key);
+    const cached = this.signing?.get(key);
     if (cached) return cached;
     const safe = async (lookup: Promise<RulesLookup<boolean>>): Promise<RulesLookup<boolean>> =>
       lookup.catch(() => ({ status: 'forbidden' as const }));
@@ -509,7 +511,7 @@ export class EditorService {
       : lookups.some((l) => l.status === 'forbidden')
         ? 'unknown'
         : 'not-required';
-    this.signing.set(key, result);
+    this.signing?.set(key, result);
     return result;
   }
 
