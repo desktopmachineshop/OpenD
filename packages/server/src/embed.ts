@@ -179,7 +179,8 @@ export function registerEmbed(app: FastifyInstance, ctx: AppContext): void {
     let html = result.html;
     if (result.topicId) {
       ctx.analytics.view(request, { ...event, topicId: result.topicId });
-      html = html.replace(FEEDBACK_MARKER, feedbackHtml(request, ctx, result.topicId, 'embed'));
+      const feedback = feedbackHtml(request, ctx, result.topicId, 'embed');
+      html = html.replace(FEEDBACK_MARKER, () => feedback);
     }
     if (result.search)
       ctx.analytics.search(request, {

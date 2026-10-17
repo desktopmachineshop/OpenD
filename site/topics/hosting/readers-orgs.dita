@@ -12,6 +12,11 @@
           the fields of a preview context. Without entitlements, its readers see "No access yet".</li>
         <li>A <b>reader</b> belongs to one organization and is identified by email. Sign-in links the email to
           the identity provider's account the first time.</li>
+        <li id="staff">A <b>staff</b> reader (you and your team) sees everything the build publishes, on the
+          newest release line or their organization's, with each condition marked, as in the previewer.
+          Content removed at build time stays removed. Only the admin API
+          (<codeph>PUT /admin/api/readers/:id/staff</codeph>) and seed files set it: entitlement sync from
+          billing or a CRM never grants or revokes it, and a reader cannot set it.</li>
       </ul>
     </context>
     <steps>
@@ -40,7 +45,12 @@ orgs:
       version: '0.1'
     readers:
       - email: gus@globex.example
-        name: Gus</codeblock>
+        name: Gus
+  - slug: docs-team                  # your own team
+    name: Docs team
+    readers:
+      - email: owner@example.com
+        staff: true                  # the unfiltered staff view</codeblock>
         </stepxmp>
       </step>
       <step>
@@ -64,7 +74,10 @@ curl -X PUT "$PUBLIC_URL/admin/api/orgs/acme/entitlements" -H "$H" -H 'content-t
   -d '{"products":["core","embed"],"features":[],"version":"0.1"}'
 # Add a reader, or move one to another organization
 curl -X POST "$PUBLIC_URL/admin/api/readers" -H "$H" -H 'content-type: application/json' \
-  -d '{"orgSlug":"acme","email":"bo@acme.example","name":"Bo"}'</codeblock>
+  -d '{"orgSlug":"acme","email":"bo@acme.example","name":"Bo"}'
+# Give a reader the staff view (reader id from GET /admin/api/readers)
+curl -X PUT "$PUBLIC_URL/admin/api/readers/7/staff" -H "$H" -H 'content-type: application/json' \
+  -d '{"staff":true}'</codeblock>
         </stepxmp>
       </step>
     </steps>

@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE task PUBLIC "-//OASIS//DTD DITA Task//EN" "task.dtd">
+<task id="access" product="core" audience="admin">
+  <title>Make a site public or private</title>
+  <shortdesc>A private site needs every reader to sign in. A public site also serves anonymous visitors,
+    filtered for a set of public entitlements you choose.</shortdesc>
+  <taskbody>
+    <context>
+      <p>The access mode belongs to the registered repository and is kept in the database, never in the docs
+        repository, so only an operator can change it. New repositories are private.</p>
+      <simpletable relcolwidth="2* 3* 3*">
+        <sthead><stentry>Who</stentry><stentry>Private site</stentry><stentry>Public site</stentry></sthead>
+        <strow><stentry>Anonymous visitor</stentry><stentry>Sent to the sign-in page</stentry><stentry>The public entitlements</stentry></strow>
+        <strow><stentry>Signed-in reader</stentry><stentry>Their organization's entitlements</stentry><stentry>Their entitlements together with the public ones, when both are for the same release line; otherwise only their own</stentry></strow>
+        <strow><stentry>Reader whose organization has no entitlements</stentry><stentry>"No access yet"</stentry><stentry>The public entitlements</stentry></strow>
+        <strow><stentry>Staff reader</stentry><stentry>Everything, conditions marked</stentry><stentry>Everything, conditions marked</stentry></strow>
+      </simpletable>
+    </context>
+    <steps>
+      <step>
+        <cmd>Decide what anonymous visitors may see, as an entitlement set: products, features and the version
+          whose docs they get.</cmd>
+        <info>
+          <p>Without a public set, a public site is fail-closed: anonymous visitors see only content with no
+            product, feature or release condition, on the newest release line.</p>
+        </info>
+      </step>
+      <step>
+        <cmd>Switch the repository to public through the admin API.</cmd>
+        <stepxmp>
+          <codeblock>H="authorization: Bearer $OPEND_ADMIN_TOKEN"
+curl "$PUBLIC_URL/admin/api/repos" -H "$H"          # find the repository's id
+curl -X PUT "$PUBLIC_URL/admin/api/repos/1/access" -H "$H" -H 'content-type: application/json' \
+  -d '{"access":"public","publicEntitlements":{"products":["core"],"features":[],"version":"0.1"}}'</codeblock>
+        </stepxmp>
+        <stepresult>
+          <p>Every replica drops its cached pages at once. The next anonymous request gets the public view
+            instead of the sign-in page.</p>
+        </stepresult>
+      </step>
+      <step>
+        <cmd>To go back, send <codeph>{"access":"private"}</codeph>.</cmd>
+        <info><p>The public set is kept for next time; send <codeph>"publicEntitlements": null</codeph> to clear
+          it.</p></info>
+      </step>
+      <step importance="optional">
+        <cmd>Or set the mode in a seed file, next to the repository.</cmd>
+        <stepxmp>
+          <codeblock>repos:
+  - fullName: acme/docs
+    sourceUrl: https://github.com/acme/docs.git
+    access: public
+    publicEntitlements: { products: [core], features: [], version: '0.1' }</codeblock>
+        </stepxmp>
+        <info><p>A seed without <parmname>access</parmname> leaves the mode as it is.</p></info>
+      </step>
+    </steps>
+    <result>
+      <ul>
+        <li><b>Everything follows the same rules.</b> Pages, navigation, search, images under
+          <filepath>/_assets/</filepath>, the logo, the theme and PDFs are all filtered for the viewer's set.
+          Hidden topics look missing.</li>
+        <li><b>Caching.</b> Pages are cached per entitlement set. Anonymous visitors share their own cache
+          entries, apart from readers', and staff have theirs. The account controls, edit links and
+          feedback form are added to each response after the cache.</li>
+        <li><b>Why the union only on the same line.</b> The public set opens one release line. A reader on
+          another line keeps their own entitlements, so the public set never opens gated content of a
+          line it was not meant for.</li>
+        <li><b>Feedback</b> needs sign-in. Anonymous page views and searches are counted without an
+          organization. The embedded help panel is unchanged: it always uses the reader from the host app's
+          signed token.</li>
+        <li>Anonymous visitors see <uicontrol>Sign in</uicontrol> in the header (and in the menu on narrow
+          screens), which returns them to the same page. See <xref href="oidc.dita"/> and
+          <xref href="github-sign-in.dita"/>.</li>
+      </ul>
+    </result>
+  </taskbody>
+</task>

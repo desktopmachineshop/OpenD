@@ -3,6 +3,7 @@ import { z } from 'zod';
 import {
   audit,
   setEntitlements,
+  setRepoAccess,
   upsertOrg,
   upsertReader,
   upsertRepo,
@@ -20,6 +21,9 @@ const seedSchema = z.object({
         installationId: z.number().int().positive().optional(),
         releaseRefs: z.array(z.string().min(1)).optional(),
         docsPath: z.string().optional(),
+        /** Omitted: keep the repo's current access (new repos: private). */
+        access: z.enum(['private', 'public']).optional(),
+        publicEntitlements: entitlementsSchema.nullable().optional(),
       }),
     )
     .default([]),
@@ -30,7 +34,16 @@ const seedSchema = z.object({
         name: z.string().min(1),
         entitlements: entitlementsSchema.optional(),
         readers: z
-          .array(z.union([z.email(), z.object({ email: z.email(), name: z.string().optional() })]))
+          .array(
+            z.union([
+              z.email(),
+              z.object({
+                email: z.email(),
+                name: z.string().optional(),
+                staff: z.boolean().optional(),
+              }),
+            ]),
+          )
           .default([]),
       }),
     )
@@ -53,16 +66,27 @@ export async function applySeed(
   const seed = parsed.data;
   let readers = 0;
   await withTransaction(pool, async (db) => {
-    for (const repo of seed.repos) await upsertRepo(db, repo);
+    for (const { access, publicEntitlements, ...input } of seed.repos) {
+      const repo = await upsertRepo(db, input);
+      if (access)
+        await setRepoAccess(
+          db,
+          repo.id,
+          access,
+          publicEntitlements === undefined ? repo.publicEntitlements : publicEntitlements,
+        );
+    }
     for (const org of seed.orgs) {
       await upsertOrg(db, org);
       if (org.entitlements) await setEntitlements(db, org.slug, org.entitlements);
       for (const r of org.readers) {
-        const reader = typeof r === 'string' ? { email: r } : r;
+        const reader: { email: string; name?: string; staff?: boolean } =
+          typeof r === 'string' ? { email: r } : r;
         await upsertReader(db, {
           orgSlug: org.slug,
           email: reader.email,
           name: reader.name ?? null,
+          ...(reader.staff === undefined ? {} : { staff: reader.staff }),
         });
         readers++;
       }

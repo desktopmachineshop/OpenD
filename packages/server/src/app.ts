@@ -1,8 +1,9 @@
 import cookie from '@fastify/cookie';
 import Fastify, { type FastifyInstance } from 'fastify';
+import { createGitHubOAuth } from '@opend/editor';
 import { createPdfRenderer, type PdfRenderer } from '@opend/pdf';
 import { CHANNELS, listen, type BlobStore, type Pool } from '@opend/store';
-import { jsonLog, type Log } from '@opend/worker';
+import { GitHubApp, jsonLog, type Log } from '@opend/worker';
 import { registerAdmin } from './admin.js';
 import { Analytics } from './analytics.js';
 import { registerAuth } from './auth.js';
@@ -26,6 +27,8 @@ export interface AppDeps {
   listen?: boolean;
   /** Override the PDF renderer (tests). Defaults to headless Chromium, launched on first use. */
   pdf?: PdfRenderer;
+  /** `fetch` for GitHub sign-in and the GitHub App (tests pass a fake GitHub's). */
+  githubFetch?: typeof fetch;
 }
 
 export interface OpendApp {
@@ -36,6 +39,8 @@ export interface OpendApp {
 /** Builds the hosted app. The caller decides whether to `listen()` or `inject()`. */
 export async function createApp(config: ServerConfig, deps: AppDeps): Promise<OpendApp> {
   const log = deps.log ?? jsonLog;
+  const githubFetch = deps.githubFetch ?? fetch;
+  const githubApp = config.github ? new GitHubApp(config.github, githubFetch) : null;
   const ctx: AppContext = {
     config,
     pool: deps.pool,
@@ -45,6 +50,21 @@ export async function createApp(config: ServerConfig, deps: AppDeps): Promise<Op
     analytics: new Analytics(deps.pool, (entry) => ctx.log(entry), config.analytics),
     caches: new Caches(),
     pdf: deps.pdf ?? createPdfRenderer(),
+    githubOAuth: config.githubOAuth ? createGitHubOAuth(config.githubOAuth, githubFetch) : null,
+    repoPermission: githubApp
+      ? async (repo, login) => {
+          if (repo.installationId === null) return null;
+          const res = await githubApp.installationRequest(
+            repo.installationId,
+            'GET',
+            `/repos/${repo.fullName}/collaborators/${encodeURIComponent(login)}/permission`,
+          );
+          if (res.status === 404) return null;
+          if (res.status !== 200) throw new Error(`GitHub permission check failed: ${res.status}`);
+          const permission = (res.data as { permission?: unknown } | null)?.permission;
+          return typeof permission === 'string' ? permission : null;
+        }
+      : null,
     oidc:
       deps.oidc !== undefined
         ? deps.oidc

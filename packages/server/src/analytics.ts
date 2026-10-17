@@ -50,7 +50,7 @@ export class Analytics {
 
   view(
     request: FastifyRequest,
-    e: { surface: AnalyticsSurface; orgSlug: string; releaseLine: string; topicId: string },
+    e: { surface: AnalyticsSurface; orgSlug: string | null; releaseLine: string; topicId: string },
   ): void {
     this.record(request, { kind: 'view', ...e });
   }
@@ -59,7 +59,8 @@ export class Analytics {
     request: FastifyRequest,
     e: {
       surface: AnalyticsSurface;
-      orgSlug: string;
+      /** `null` for anonymous visitors of a public site. */
+      orgSlug: string | null;
       releaseLine: string;
       query: string;
       resultCount: number;

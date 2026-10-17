@@ -101,9 +101,9 @@ button, input, textarea, select { font: inherit; color: inherit; }
 .site-pdfs + .site-search { margin-left: 0; }
 .site-search input { font-size: 14px; width: 15em; max-width: 100%; min-height: 36px; padding: 4px 12px; border: 1px solid var(--opend-border-strong); border-radius: 999px; background: var(--opend-surface-alt); }
 .site-search input:focus-visible { outline-offset: 0; border-color: var(--opend-accent); border-radius: 999px; }
-.site-search button, .opend-feedback button, .opend-user-bar button { min-height: 36px; padding: 4px 14px; border: 1px solid var(--opend-border-strong); border-radius: 999px; background: var(--opend-surface); font-size: 14px; font-weight: 600; cursor: pointer; }
-.site-search button:hover, .opend-feedback button:hover, .opend-user-bar button:hover { border-color: var(--opend-accent); color: var(--opend-link); }
-.site-search button:focus-visible, .opend-feedback button:focus-visible, .opend-user-bar button:focus-visible { border-radius: 999px; }
+.site-search button, .opend-feedback button, .site-account button { min-height: 36px; padding: 4px 14px; border: 1px solid var(--opend-border-strong); border-radius: 999px; background: var(--opend-surface); font-size: 14px; font-weight: 600; cursor: pointer; }
+.site-search button:hover, .opend-feedback button:hover, .site-account button:hover { border-color: var(--opend-accent); color: var(--opend-link); }
+.site-search button:focus-visible, .opend-feedback button:focus-visible, .site-account button:focus-visible { border-radius: 999px; }
 .site-menu { display: none; }
 .site-menu > summary { display: block; flex: none; list-style: none; cursor: pointer; user-select: none; border-radius: var(--opend-radius); }
 .site-menu > summary::-webkit-details-marker { display: none; }
@@ -115,16 +115,31 @@ button, input, textarea, select { font: inherit; color: inherit; }
 .site-menu-icon { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
 .site-menu-close, .site-menu[open] .site-menu-bars { display: none; }
 .site-menu[open] .site-menu-close { display: inline; }
-.opend-user-bar { display: flex; flex-wrap: wrap; gap: 4px 12px; justify-content: flex-end; align-items: center; padding: 6px max(16px, calc((100% - var(--opend-layout-max)) / 2 + 24px)); font-size: 14px; color: var(--opend-muted); background: var(--opend-surface-alt); border-bottom: 1px solid var(--opend-border); }
-.opend-user-bar form { margin: 0; }
-.opend-user-bar button { min-height: 30px; padding: 2px 12px; font-size: 13px; }
+/* Account: "Sign in", or the reader's name and "Sign out" (filled in per request). */
+.site-account { margin-left: auto; display: flex; align-items: center; gap: 10px; font-size: 14px; }
+.site-search + .site-account, .site-pdfs + .site-account { margin-left: 0; }
+.site-account form { margin: 0; }
+.site-account-who { display: inline-flex; align-items: center; gap: 8px; min-width: 0; max-width: 16rem; color: var(--opend-heading); font-weight: 600; }
+.site-account-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.site-avatar { display: inline-grid; place-items: center; flex: none; width: 28px; height: 28px; border-radius: 999px; background: var(--opend-accent-soft); color: var(--opend-link); font-size: 13px; font-weight: 700; text-transform: uppercase; }
+.site-signin, .site-menu-signin { display: inline-flex; align-items: center; justify-content: center; min-height: 36px; padding: 4px 16px; border: 1px solid var(--opend-accent); border-radius: 999px; background: var(--opend-accent); color: var(--opend-on-accent); font-size: 14px; font-weight: 600; text-decoration: none; white-space: nowrap; }
+.site-signin:hover, .site-menu-signin:hover { background: var(--opend-link-hover); border-color: var(--opend-link-hover); color: var(--opend-on-accent); }
+.site-signin:focus-visible, .site-menu-signin:focus-visible { border-radius: 999px; }
+.site-menu-account { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--opend-border); }
+.site-menu-who { margin: 0 0 10px; padding: 0 10px; color: var(--opend-muted); font-size: 14.5px; overflow-wrap: anywhere; }
+.site-menu-who strong { color: var(--opend-heading); }
+.site-menu-account form { margin: 0; padding: 0 10px; }
+.site-menu-account button { width: 100%; min-height: 44px; padding: 6px 16px; border: 1px solid var(--opend-border-strong); border-radius: 999px; background: var(--opend-surface); font-weight: 600; cursor: pointer; }
+.site-menu-account button:hover { border-color: var(--opend-accent); color: var(--opend-link); }
+.site-menu-account button:focus-visible { border-radius: 999px; }
+.site-menu-signin { display: flex; min-height: 44px; margin: 0 10px; font-size: 15px; }
 
 /* Layout: sticky header and sidebar on wide screens. */
 .layout { display: grid; grid-template-columns: var(--opend-sidebar-width) minmax(0, 1fr); max-width: var(--opend-layout-max); margin: 0 auto; }
 .opend-site .site-header { position: sticky; top: 0; z-index: 20; background: color-mix(in srgb, var(--opend-surface) 92%, transparent); backdrop-filter: saturate(1.4) blur(10px); -webkit-backdrop-filter: saturate(1.4) blur(10px); }
 .toc { position: sticky; top: var(--opend-header-height); align-self: start; height: calc(100vh - var(--opend-header-height)); overflow-y: auto; overscroll-behavior: contain; padding: 20px 12px 48px 16px; border-right: 1px solid var(--opend-border); font-size: 14.5px; line-height: 1.4; scrollbar-width: thin; }
 main { padding: 32px 48px 80px; min-width: 0; }
-main > article, main > .opend-feedback { max-width: var(--opend-measure); margin-left: auto; margin-right: auto; }
+main > article, main > .opend-topic-actions, main > .opend-feedback { max-width: var(--opend-measure); margin-left: auto; margin-right: auto; }
 
 /* Navigation tree: the sidebar and the menu panel's copy. */
 .opend-nav ul { list-style: none; margin: 0; padding: 0; }
@@ -153,14 +168,14 @@ main > article, main > .opend-feedback { max-width: var(--opend-measure); margin
 /*
  * Narrow screens: a compact sticky header. Search, the PDF links and the
  * sidebar move into the Menu panel, which overlays the page under the header
- * with its own scroll. Bars above the header (preview banner, user bar)
+ * with its own scroll. Bars above the header (such as the preview banner)
  * scroll away; the panel is positioned within the header, so it always starts
  * right under it.
  */
 @media (max-width: 60rem) {
   :root { --opend-header-height: 3.5rem; }
   .layout { display: block; }
-  .toc, .site-header > .site-search, .site-header > .site-pdfs { display: none; }
+  .toc, .site-header > .site-search, .site-header > .site-pdfs, .site-header > .site-account { display: none; }
   .opend-site .site-header { flex-wrap: nowrap; gap: 10px; height: var(--opend-header-height); min-height: 0; padding: 0 12px; background: var(--opend-surface); backdrop-filter: none; -webkit-backdrop-filter: none; }
   .site-menu { display: block; }
   .site-title { flex: 0 1 auto; font-size: 16px; gap: 8px; }
@@ -254,6 +269,13 @@ opend-cond { display: contents; }
 .search-hits a { font-weight: 650; font-size: 17px; text-decoration: none; }
 .search-hits a:hover { text-decoration: underline; }
 .search-snippet { margin: 4px 0 0; color: var(--opend-muted); font-size: 15px; }
+
+/* "Edit this page" and "View source" links under a topic (filled in per request). */
+.opend-topic-actions { display: flex; flex-wrap: wrap; gap: 8px 20px; margin: 40px 0 0; padding-top: 16px; border-top: 1px solid var(--opend-border); font-size: 14.5px; }
+.opend-topic-actions a { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; text-decoration: none; }
+.opend-topic-actions a:hover { text-decoration: underline; }
+.opend-topic-actions svg { flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.opend-topic-actions + .opend-feedback { margin-top: 24px; }
 
 /* Page feedback */
 .opend-feedback { margin-top: 48px; padding: 16px 20px; border: 1px solid var(--opend-border); border-radius: var(--opend-radius); background: var(--opend-surface-alt); font-size: 15px; }

@@ -28,8 +28,9 @@
     <refbody>
       <simpletable relcolwidth="3* 5*">
         <sthead><stentry>Route</stentry><stentry>What it does</stentry></sthead>
-        <strow><stentry><codeph>GET /admin/api/repos</codeph></stentry><stentry>Lists registered repositories: <codeph>id</codeph>, <codeph>fullName</codeph>, <codeph>sourceUrl</codeph>, <codeph>installationId</codeph>, <codeph>releaseRefs</codeph>, <codeph>docsPath</codeph>.</stentry></strow>
+        <strow><stentry><codeph>GET /admin/api/repos</codeph></stentry><stentry>Lists registered repositories: <codeph>id</codeph>, <codeph>fullName</codeph>, <codeph>sourceUrl</codeph>, <codeph>installationId</codeph>, <codeph>releaseRefs</codeph>, <codeph>docsPath</codeph>, <codeph>access</codeph> and <codeph>publicEntitlements</codeph>.</stentry></strow>
         <strow><stentry><codeph>POST /admin/api/repos</codeph></stentry><stentry>Registers a repository, or replaces the settings of the one with the same <codeph>fullName</codeph>. 201 with the repository.</stentry></strow>
+        <strow><stentry><codeph>PUT /admin/api/repos/:id/access</codeph></stentry><stentry>Makes the repository's site private or public. Body <codeph>{"access": "public", "publicEntitlements": {"products": [], "features": [], "version": "2.1"}}</codeph>. Leaving out <parmname>publicEntitlements</parmname> keeps the current set; <codeph>null</codeph> clears it. Every cached page is dropped at once, on every replica. 200 with the repository; 404 <codeph>{"error":"no such repo"}</codeph>. See <xref href="access.dita"/>.</stentry></strow>
         <strow><stentry><codeph>GET /admin/api/repos/:id/releases</codeph></stentry><stentry>The live release for each release line: <codeph>releaseId</codeph>, <codeph>releaseLine</codeph>, <codeph>release</codeph>, <codeph>sha</codeph>.</stentry></strow>
       </simpletable>
       <properties relcolwidth="2* 2* 5*">
@@ -40,7 +41,8 @@
         <property><proptype><parmname>releaseRefs</parmname></proptype><propvalue><codeph>["main"]</codeph></propvalue><propdesc>Branch and tag names that publish. Not empty. <codeph>*</codeph> matches any run of characters.</propdesc></property>
         <property><proptype><parmname>docsPath</parmname></proptype><propvalue><codeph>.</codeph></propvalue><propdesc>The folder holding <filepath>opend.config.yaml</filepath>, inside the repository: no leading <codeph>/</codeph> and no <codeph>..</codeph>.</propdesc></property>
       </properties>
-      <p>Omitted fields are reset to their defaults when a repository is registered again.</p>
+      <p>Omitted fields are reset to their defaults when a repository is registered again. The access mode is
+        not one of them: only <codeph>PUT /admin/api/repos/:id/access</codeph> (or a seed file) changes it.</p>
     </refbody>
   </reference>
 
@@ -88,8 +90,9 @@
     <refbody>
       <simpletable relcolwidth="3* 5*">
         <sthead><stentry>Route</stentry><stentry>What it does</stentry></sthead>
-        <strow><stentry><codeph>GET /admin/api/readers</codeph></stentry><stentry>Lists readers: <codeph>id</codeph>, <codeph>orgId</codeph>, <codeph>orgSlug</codeph>, <codeph>email</codeph>, <codeph>name</codeph>, and the linked <codeph>oidcIssuer</codeph> and <codeph>oidcSubject</codeph>.</stentry></strow>
-        <strow><stentry><codeph>POST /admin/api/readers</codeph></stentry><stentry>Adds a reader, or moves an existing email to another organization. Body <codeph>{"orgSlug", "email", "name"?}</codeph>. 201 with the reader; 404 <codeph>{"error":"no such org"}</codeph>.</stentry></strow>
+        <strow><stentry><codeph>GET /admin/api/readers</codeph></stentry><stentry>Lists readers: <codeph>id</codeph>, <codeph>orgId</codeph>, <codeph>orgSlug</codeph>, <codeph>email</codeph>, <codeph>name</codeph>, <codeph>staff</codeph>, and the linked <codeph>oidcIssuer</codeph> and <codeph>oidcSubject</codeph>.</stentry></strow>
+        <strow><stentry><codeph>POST /admin/api/readers</codeph></stentry><stentry>Adds a reader, or moves an existing email to another organization. Body <codeph>{"orgSlug", "email", "name"?, "staff"?}</codeph>; leaving out <parmname>staff</parmname> keeps it. 201 with the reader; 404 <codeph>{"error":"no such org"}</codeph>.</stentry></strow>
+        <strow><stentry><codeph>PUT /admin/api/readers/:id/staff</codeph></stentry><stentry>Grants or revokes the staff view. Body <codeph>{"staff": true}</codeph>. Takes effect on the reader's next request. 200 with the reader; 404 <codeph>{"error":"no such reader"}</codeph>. See <xref href="readers-orgs.dita#readers-orgs/staff"/>.</stentry></strow>
         <strow><stentry><codeph>DELETE /admin/api/readers/:id</codeph></stentry><stentry>Removes a reader. 204; 404 <codeph>{"error":"no such reader"}</codeph>.</stentry></strow>
       </simpletable>
       <p>Emails are unique without regard to case.</p>

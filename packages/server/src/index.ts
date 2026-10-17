@@ -18,3 +18,5 @@ export * from './reindex-command.js';
 export * from './analytics.js';
 export * from './analytics-purge.js';
 export * from './feedback.js';
+export * from './access.js';
+export * from './pages.js';

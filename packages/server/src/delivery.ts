@@ -2,7 +2,6 @@ import { posix } from 'node:path';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import {
   ASSET_ATTR,
-  entitlementKey,
   logoRoute,
   publicationSlug,
   walk,
@@ -10,8 +9,6 @@ import {
   type ReaderContext,
 } from '@opend/model';
 import {
-  readerPolicy,
-  releaseLine,
   viewPublication,
   viewRelease,
   type PublicationView,
@@ -33,14 +30,31 @@ import {
   findRepoByName,
   getLiveReleaseId,
   getRelease,
+  listLiveReleases,
   listRepos,
+  type ReaderAccess,
   type Repo,
   type StoredRelease,
 } from '@opend/store';
+import {
+  NOTHING_GATED,
+  audienceFilter,
+  audienceFor,
+  publicAudience,
+  readerAudience,
+  type Audience,
+} from './access.js';
 import { FEEDBACK_MARKER, feedbackHtml } from './analytics.js';
 import { currentAccess, redirectToLogin } from './auth.js';
 import type { AppContext } from './context.js';
-import { USER_BAR_MARKER, messagePage, userBar } from './pages.js';
+import {
+  ACCOUNT_MARKER,
+  MENU_ACCOUNT_MARKER,
+  TOPIC_ACTIONS_MARKER,
+  accountControls,
+  messagePage,
+  topicActions,
+} from './pages.js';
 import { searchRelease } from './search.js';
 
 /** Most hits on the site search page. */
@@ -76,14 +90,16 @@ export const ASSET_HEADERS = {
 export interface ReaderRelease {
   stored: StoredRelease;
   view: ReleaseView;
-  /** `releaseId|entitlementKey`: everything rendered from this view is cached under it. */
+  /** `releaseId|audienceKey`: everything rendered from this view is cached under it. */
   key: string;
-  /** The reader's release line, e.g. `2`. */
+  /** The release line served, e.g. `2`. */
   line: string;
-  reader: ReaderContext;
+  /** Who it is filtered for; see `Audience`. `audience.context` is null for the staff view. */
+  audience: Audience;
 }
 
-async function siteRepo(ctx: AppContext): Promise<Repo | null> {
+/** The repository the site serves, cached briefly and dropped when a release or access changes. */
+export async function siteRepo(ctx: AppContext): Promise<Repo | null> {
   const cached = ctx.caches.site;
   if (cached && Date.now() - cached.at < 60_000) return cached.repo;
   let repo: Repo | null;
@@ -117,26 +133,54 @@ async function storedRelease(ctx: AppContext, id: number): Promise<StoredRelease
   return stored;
 }
 
-/** The live release for the reader's line, filtered for their entitlement set. */
+/** The newest live release line of a repo, e.g. `2`, or null when nothing is live. */
+async function newestLine(ctx: AppContext, repoId: number): Promise<string | null> {
+  const cached = ctx.caches.newest.get(repoId);
+  if (cached) return cached.line;
+  const lines = (await listLiveReleases(ctx.pool, repoId))
+    .map((r) => Number(r.releaseLine))
+    .filter(Number.isInteger)
+    .sort((a, b) => b - a);
+  const line = lines.length ? String(lines[0]) : null;
+  ctx.caches.newest.set(repoId, { line });
+  return line;
+}
+
+/** The live release of the audience's line, filtered for the audience. */
+export async function audienceRelease(
+  ctx: AppContext,
+  repo: Repo,
+  audience: Audience,
+): Promise<ReaderRelease | string> {
+  // A reader context without a line has an unparseable version. The staff
+  // view and the "nothing gated" public view are served the newest line.
+  const servesNewest = audience.context === null || audience.context === NOTHING_GATED;
+  if (!audience.line && !servesNewest)
+    return 'Your account has no valid release version. Ask your administrator.';
+  const line = audience.line ?? (await newestLine(ctx, repo.id));
+  if (!line) return 'No documentation has been published yet.';
+  const id = await liveReleaseId(ctx, repo.id, line);
+  const stored = id === null ? null : await storedRelease(ctx, id);
+  if (!stored) return `No documentation has been published for release ${line}.x yet.`;
+  const key = `${stored.id}|${audience.key}`;
+  let view = ctx.caches.views.get(key);
+  if (!view) {
+    // Build-time filtering already happened in the worker; only the audience's policy remains.
+    const { policies, options } = audienceFilter(audience);
+    view = viewRelease(stored.snapshot, policies, options);
+    ctx.caches.views.set(key, view);
+  }
+  return { stored, view, key, line, audience };
+}
+
+/** The live release for the reader's line, filtered for their own entitlement set. */
 export async function readerRelease(
   ctx: AppContext,
   reader: ReaderContext,
 ): Promise<ReaderRelease | string> {
   const repo = await siteRepo(ctx);
   if (!repo) return 'No documentation site is configured yet.';
-  const line = releaseLine(reader.version);
-  if (!line) return 'Your account has no valid release version. Ask your administrator.';
-  const id = await liveReleaseId(ctx, repo.id, line);
-  const stored = id === null ? null : await storedRelease(ctx, id);
-  if (!stored) return `No documentation has been published for release ${line}.x yet.`;
-  const key = `${stored.id}|${entitlementKey(reader)}`;
-  let view = ctx.caches.views.get(key);
-  if (!view) {
-    // Build-time filtering already happened in the worker; only the reader's policy remains.
-    view = viewRelease(stored.snapshot, [readerPolicy(reader)]);
-    ctx.caches.views.set(key, view);
-  }
-  return { stored, view, key, line, reader };
+  return audienceRelease(ctx, repo, readerAudience(reader));
 }
 
 /** The reader's view of one publication, or `null` when the release has none from `file`. */
@@ -148,9 +192,8 @@ export function publicationView(
   const key = `${release.key}|${file}`;
   let cached = ctx.caches.publications.get(key);
   if (!cached) {
-    cached = {
-      view: viewPublication(release.stored.snapshot, file, [readerPolicy(release.reader)]),
-    };
+    const { policies, options } = audienceFilter(release.audience);
+    cached = { view: viewPublication(release.stored.snapshot, file, policies, options) };
     ctx.caches.publications.set(key, cached);
   }
   return cached.view;
@@ -165,20 +208,69 @@ export function readerPublications(ctx: AppContext, release: ReaderRelease): Pub
 }
 
 /**
- * Resolves the signed-in reader and their release, or answers the request
- * itself: sign-in redirect, no entitlements, or nothing published.
+ * The site title for the sign-in page, on public sites only: anonymous
+ * visitors could read it anyway. Private sites reveal nothing before sign-in.
  */
-export async function resolveReader(
+export async function publicSiteTitle(ctx: AppContext): Promise<string | undefined> {
+  const repo = await siteRepo(ctx);
+  if (repo?.access !== 'public') return undefined;
+  const release = await audienceRelease(ctx, repo, publicAudience(repo));
+  return typeof release === 'string' ? undefined : release.view.release.title || undefined;
+}
+
+/** Who is reading, and what they see. */
+export interface Viewer {
+  /** The signed-in reader, or null for an anonymous visitor of a public site. */
+  access: ReaderAccess | null;
+  repo: Repo;
+  release: ReaderRelease;
+  /** Analytics org: the reader's, or null for anonymous visitors. */
+  orgSlug: string | null;
+}
+
+/**
+ * The release a request sees, by the same rules for every route: the site's
+ * access mode, the session, staff and entitlements (see `audienceFor`).
+ * Returns why there is none instead when it cannot see one.
+ */
+export async function viewerRelease(
+  ctx: AppContext,
+  request: FastifyRequest,
+): Promise<
+  | Viewer
+  | { refused: 'sign-in' }
+  | { refused: 'no-entitlements' }
+  | { refused: 'unpublished'; message: string }
+> {
+  const access = await currentAccess(request, ctx);
+  const repo = await siteRepo(ctx);
+  // Without a site there is no access mode: fail closed, as a private site.
+  if (!repo)
+    return access
+      ? { refused: 'unpublished', message: 'No documentation site is configured yet.' }
+      : { refused: 'sign-in' };
+  const audience = audienceFor(repo, access);
+  if (audience === 'sign-in') return { refused: 'sign-in' };
+  if (audience === 'no-entitlements') return { refused: 'no-entitlements' };
+  const release = await audienceRelease(ctx, repo, audience);
+  if (typeof release === 'string') return { refused: 'unpublished', message: release };
+  return { access, repo, release, orgSlug: access?.orgSlug ?? null };
+}
+
+/**
+ * Resolves the viewer and their release, or answers the request itself:
+ * sign-in redirect (private sites), no entitlements, or nothing published.
+ */
+export async function resolveViewer(
   ctx: AppContext,
   request: FastifyRequest,
   reply: FastifyReply,
-): Promise<{ email: string; orgSlug: string; release: ReaderRelease } | null> {
-  const access = await currentAccess(request, ctx);
-  if (!access) {
+): Promise<Viewer | null> {
+  const r = await viewerRelease(ctx, request);
+  if ('release' in r) return r;
+  if (r.refused === 'sign-in') {
     await redirectToLogin(request, reply);
-    return null;
-  }
-  if (!access.context) {
+  } else if (r.refused === 'no-entitlements') {
     await reply
       .code(403)
       .headers(PAGE_HEADERS)
@@ -186,18 +278,14 @@ export async function resolveReader(
       .send(
         messagePage('No access yet', 'Your organization has no documentation entitlements yet.'),
       );
-    return null;
-  }
-  const release = await readerRelease(ctx, access.context);
-  if (typeof release === 'string') {
+  } else {
     await reply
       .code(404)
       .headers(PAGE_HEADERS)
       .type('text/html')
-      .send(messagePage('Not published', release));
-    return null;
+      .send(messagePage('Not published', r.message));
   }
-  return { email: access.reader.email, orgSlug: access.orgSlug, release };
+  return null;
 }
 
 const visibleAssetsCache = new WeakMap<ReleaseView, Set<string>>();
@@ -221,40 +309,55 @@ function visibleAssets(view: ReleaseView): Set<string> {
 export function registerDelivery(app: FastifyInstance, ctx: AppContext): void {
   const pageOptions = (release: ReaderRelease): PageOptions => {
     const options: PageOptions = {
-      banner: USER_BAR_MARKER,
-      topicEnd: FEEDBACK_MARKER,
+      account: { header: ACCOUNT_MARKER, menu: MENU_ACCOUNT_MARKER },
+      topicEnd: TOPIC_ACTIONS_MARKER + FEEDBACK_MARKER,
       search: { action: '/search' },
       publications: readerPublications(ctx, release).map((p) => ({
         title: p.title || publicationSlug(p.file),
         href: publicationHref(p),
       })),
     };
+    // The staff view marks conditional content, as the previewer and editor do.
+    if (release.audience.context === null) options.showConditions = true;
     if (release.view.release.theme) options.themeHref = '/_theme.css';
     if (release.view.release.logo) options.logoHref = `/${logoRoute(release.view.release.logo)}`;
     return options;
   };
   const resolve = (request: FastifyRequest, reply: FastifyReply) =>
-    resolveReader(ctx, request, reply);
+    resolveViewer(ctx, request, reply);
 
+  /** Fills the per-request markers of a (possibly cached) page and sends it. */
   const sendPage = (
+    request: FastifyRequest,
     reply: FastifyReply,
+    viewer: Viewer,
     status: number,
     html: string,
-    email: string,
-    feedback = '',
-  ) =>
-    reply
+    topic?: { id: string; file: string },
+  ) => {
+    const account = accountControls(request, ctx, viewer.access);
+    const actions = topic ? topicActions(ctx, viewer, topic.file) : '';
+    const feedback = topic ? feedbackHtml(request, ctx, topic.id, 'site') : '';
+    return reply
       .code(status)
       .headers(PAGE_HEADERS)
       .type('text/html; charset=utf-8')
-      .send(html.replace(USER_BAR_MARKER, userBar(email)).replace(FEEDBACK_MARKER, feedback));
+      .send(
+        // Function replacements: a `$` in a reader's name must not act as a replacement pattern.
+        html
+          .replace(ACCOUNT_MARKER, () => account.header)
+          .replace(MENU_ACCOUNT_MARKER, () => account.menu)
+          .replace(TOPIC_ACTIONS_MARKER, () => actions)
+          .replace(FEEDBACK_MARKER, () => feedback),
+      );
+  };
 
   app.get('/', async (request, reply) => {
     const r = await resolve(request, reply);
     if (!r) return reply;
     const first = r.release.view.topicIds()[0];
     if (first) return reply.headers(PAGE_HEADERS).redirect(pageHref(first));
-    return sendPage(reply, 200, renderIndex(r.release.view, pageOptions(r.release)), r.email);
+    return sendPage(request, reply, r, 200, renderIndex(r.release.view, pageOptions(r.release)));
   });
 
   app.get('/_theme.css', async (request, reply) => {
@@ -287,7 +390,7 @@ export function registerDelivery(app: FastifyInstance, ctx: AppContext): void {
     const r = await resolve(request, reply);
     if (!r) return reply;
     const path = (request.params as { '*': string })['*'];
-    // Fail closed: only files referenced by a topic this reader can see.
+    // Fail closed: only files referenced by a topic this viewer can see.
     const data = visibleAssets(r.release.view).has(path)
       ? await ctx.blobs.get(assetKey(r.release.stored.repoId, r.release.stored.sha, path))
       : null;
@@ -298,7 +401,7 @@ export function registerDelivery(app: FastifyInstance, ctx: AppContext): void {
       .send(data);
   });
 
-  // Never cached: the hits depend on the reader's entitlements and the query.
+  // Never cached: the hits depend on the viewer's entitlements and the query.
   app.get('/search', async (request, reply) => {
     const r = await resolve(request, reply);
     if (!r) return reply;
@@ -316,7 +419,7 @@ export function registerDelivery(app: FastifyInstance, ctx: AppContext): void {
       ...pageOptions(r.release),
       limit: SITE_SEARCH_LIMIT,
     });
-    return sendPage(reply, 200, html, r.email);
+    return sendPage(request, reply, r, 200, html);
   });
 
   app.get('/*', async (request, reply) => {
@@ -332,18 +435,18 @@ export function registerDelivery(app: FastifyInstance, ctx: AppContext): void {
         html = renderPage(view, topicId, pageOptions(r.release)) ?? '';
         ctx.caches.pages.set(cacheKey, html);
       }
-      if (html) {
+      const topic = html ? view.topic(topicId) : null;
+      if (html && topic) {
         ctx.analytics.view(request, {
           surface: 'site',
           orgSlug: r.orgSlug,
           releaseLine: r.release.line,
           topicId,
         });
-        const feedback = feedbackHtml(request, ctx, topicId, 'site');
-        return sendPage(reply, 200, html, r.email, feedback);
+        return sendPage(request, reply, r, 200, html, { id: topicId, file: topic.file });
       }
     }
     // Missing and hidden pages look the same.
-    return sendPage(reply, 404, renderNotFound(view, pageOptions(r.release)), r.email);
+    return sendPage(request, reply, r, 404, renderNotFound(view, pageOptions(r.release)));
   });
 }

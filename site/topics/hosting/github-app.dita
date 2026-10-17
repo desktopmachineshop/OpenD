@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE reference PUBLIC "-//OASIS//DTD DITA Reference//EN" "reference.dtd">
+<reference id="github-app" product="core" audience="admin">
+  <title>One GitHub App for the site, the editor and builds</title>
+  <shortdesc>The exact settings of a GitHub App that signs readers and authors in, lets the web editor
+    commit and open pull requests, and sends push webhooks for builds.</shortdesc>
+  <refbody>
+    <section id="settings">
+      <title>App settings</title>
+      <simpletable relcolwidth="2* 5*">
+        <sthead><stentry>Setting</stentry><stentry>Value</stentry></sthead>
+        <strow><stentry>GitHub App name</stentry><stentry>Any name not yet taken on GitHub, such as <codeph>Acme docs</codeph></stentry></strow>
+        <strow><stentry>Homepage URL</stentry><stentry><filepath>$PUBLIC_URL</filepath></stentry></strow>
+        <strow><stentry>Callback URLs</stentry><stentry><filepath>$PUBLIC_URL/auth/github/callback</filepath> (reader sign-in) and <filepath>$EDITOR_PUBLIC_URL/auth/github/callback</filepath> (author sign-in)</stentry></strow>
+        <strow><stentry>Request user authorization (OAuth) during installation</stentry><stentry>Off</stentry></strow>
+        <strow><stentry>Setup URL</stentry><stentry>Empty</stentry></strow>
+        <strow><stentry>Webhook</stentry><stentry>Active; URL <filepath>$PUBLIC_URL/webhooks/github</filepath>; secret: the value of <codeph>GITHUB_WEBHOOK_SECRET</codeph></stentry></strow>
+        <strow><stentry>Repository permissions</stentry><stentry>Contents: Read and write. Pull requests: Read and write. Administration: Read-only. Commit statuses: Read and write (the editor only reads them; builds report to them). Checks: Read-only. Metadata: Read-only.</stentry></strow>
+        <strow><stentry>Account permissions</stentry><stentry>Email addresses: Read-only</stentry></strow>
+        <strow><stentry>Subscribe to events</stentry><stentry>Push</stentry></strow>
+        <strow><stentry>Where can this GitHub App be installed?</stentry><stentry>Only on this account</stentry></strow>
+      </simpletable>
+      <p>After creating it, generate a client secret and a private key, install the App on the docs repository,
+        and note the installation id from the installation's URL. Register the repository with that
+        <parmname>installationId</parmname>.</p>
+    </section>
+    <section id="prefilled">
+      <title>A pre-filled registration link</title>
+      <p>GitHub opens the registration form pre-filled from query parameters. The repository's script prints
+        the link for your two hosts; open it while signed in to GitHub, set the webhook secret (the one value
+        GitHub does not take from a link), and create the App.</p>
+      <codeblock>node scripts/github-app-url.mjs https://docs.example.com https://edit.docs.example.com
+# for an organization's App:
+node scripts/github-app-url.mjs https://docs.example.com https://edit.docs.example.com "Acme docs" --org acme</codeblock>
+    </section>
+    <section id="variables">
+      <title>Which service gets which variable</title>
+      <simpletable relcolwidth="3* 2* 2* 2*">
+        <sthead><stentry>Variable</stentry><stentry>Docs site (web)</stentry><stentry>Worker</stentry><stentry>Editor</stentry></sthead>
+        <strow><stentry><codeph>GITHUB_APP_ID</codeph>, <codeph>GITHUB_APP_PRIVATE_KEY</codeph></stentry><stentry>Yes</stentry><stentry>Yes</stentry><stentry>Yes</stentry></strow>
+        <strow><stentry><codeph>GITHUB_OAUTH_CLIENT_ID</codeph>, <codeph>GITHUB_OAUTH_CLIENT_SECRET</codeph></stentry><stentry>Yes, for reader sign-in</stentry><stentry>No</stentry><stentry>Yes, for author sign-in</stentry></strow>
+        <strow><stentry><codeph>GITHUB_WEBHOOK_SECRET</codeph></stentry><stentry>Yes</stentry><stentry>No</stentry><stentry>No</stentry></strow>
+        <strow><stentry><codeph>EDITOR_PUBLIC_URL</codeph></stentry><stentry>Optional: <uicontrol>Edit this page</uicontrol> links</stentry><stentry>No</stentry><stentry>Required</stentry></strow>
+        <strow><stentry><codeph>PUBLIC_URL</codeph></stentry><stentry>Required</stentry><stentry>Same as web</stentry><stentry>Recommended: refuses to share the docs host</stentry></strow>
+      </simpletable>
+      <p>See <xref href="github-sign-in.dita"/>, <xref href="editor.dita"/> and <xref href="github.dita"/>.</p>
+    </section>
+  </refbody>
+</reference>

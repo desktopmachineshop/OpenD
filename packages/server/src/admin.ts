@@ -17,6 +17,8 @@ import {
   listReaders,
   listRepos,
   setEntitlements,
+  setReaderStaff,
+  setRepoAccess,
   upsertOrg,
   upsertReader,
   upsertRepo,
@@ -45,6 +47,19 @@ const readerSchema = z.object({
   orgSlug: slug,
   email: z.email(),
   name: z.string().min(1).optional(),
+  /** Omitted: keep (new readers: not staff). */
+  staff: z.boolean().optional(),
+});
+const staffSchema = z.object({ staff: z.boolean() });
+
+/**
+ * Who may read a site. `publicEntitlements` is what anonymous visitors of a
+ * public site see: omitted keeps the current set, `null` clears it (then they
+ * see only unconditioned content).
+ */
+export const accessSchema = z.object({
+  access: z.enum(['private', 'public']),
+  publicEntitlements: entitlementsSchema.nullable().optional(),
 });
 function urlWithProtocol(value: string, protocol: string): boolean {
   try {
@@ -170,6 +185,29 @@ export function registerAdmin(app: FastifyInstance, ctx: AppContext): void {
         });
         return reply.code(202).send(job);
       });
+      scope.put('/repos/:id/access', async (request, reply) => {
+        const id = Number((request.params as { id: string }).id);
+        const input = parse(accessSchema, request.body, reply);
+        if (!input) return reply;
+        const repo = await withTransaction(ctx.pool, async (db) => {
+          const current = Number.isInteger(id) ? await getRepo(db, id) : null;
+          if (!current) return null;
+          const pub =
+            input.publicEntitlements === undefined
+              ? current.publicEntitlements
+              : input.publicEntitlements;
+          const r = await setRepoAccess(db, id, input.access, pub);
+          await audit(db, ACTOR, 'repo.access', {
+            repo: current.fullName,
+            access: input.access,
+            publicEntitlements: pub,
+          });
+          return r;
+        });
+        // Every cached view, page and publication is dropped; NOTIFY does the same on other replicas.
+        ctx.caches.releaseChanged();
+        return repo ? reply.send(repo) : reply.code(404).send({ error: 'no such repo' });
+      });
       scope.get('/repos/:id/releases', async (request) =>
         listLiveReleases(ctx.pool, Number((request.params as { id: string }).id)),
       );
@@ -236,6 +274,18 @@ export function registerAdmin(app: FastifyInstance, ctx: AppContext): void {
         return reader
           ? reply.code(201).send(reader)
           : reply.code(404).send({ error: 'no such org' });
+      });
+      scope.put('/readers/:id/staff', async (request, reply) => {
+        const id = Number((request.params as { id: string }).id);
+        const input = parse(staffSchema, request.body, reply);
+        if (!input) return reply;
+        const reader = await withTransaction(ctx.pool, async (db) => {
+          const r = Number.isInteger(id) ? await setReaderStaff(db, id, input.staff) : null;
+          if (r) await audit(db, ACTOR, 'reader.staff', { id, email: r.email, staff: input.staff });
+          return r;
+        });
+        ctx.caches.entitlementsChanged();
+        return reader ? reply.send(reader) : reply.code(404).send({ error: 'no such reader' });
       });
       scope.delete('/readers/:id', async (request, reply) => {
         const id = Number((request.params as { id: string }).id);

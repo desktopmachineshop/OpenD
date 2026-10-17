@@ -4,7 +4,7 @@ import { MAX_FEEDBACK_COMMENT, recordFeedback } from '@opend/store';
 import { FEEDBACK_PATH } from './analytics.js';
 import { checkReaderCsrf, currentAccess, safeReturnTo } from './auth.js';
 import type { AppContext } from './context.js';
-import { PAGE_HEADERS, readerRelease } from './delivery.js';
+import { PAGE_HEADERS, viewerRelease } from './delivery.js';
 import { embedFrameHeaders } from './embed.js';
 import { messagePage } from './pages.js';
 
@@ -31,7 +31,7 @@ function thanksLocation(returnTo: unknown): string {
 
 /**
  * "Was this page helpful?" answers from topic pages and help panels. Only a
- * signed-in reader, from our own form, about a topic in their own view: a
+ * signed-in reader (anonymous visitors of public sites cannot send any), from our own form, about a topic in their own view: a
  * hidden topic gets the very same 404 as one that does not exist.
  */
 export function registerFeedback(app: FastifyInstance, ctx: AppContext): void {
@@ -56,7 +56,7 @@ export function registerFeedback(app: FastifyInstance, ctx: AppContext): void {
       return page(reply, 401, 'Signed out', 'Sign in again to send feedback about this page.');
     if (!checkReaderCsrf(request, ctx))
       return page(reply, 403, 'Form expired', 'Reload the page and send your feedback again.');
-    if (!ctx.analytics.enabled || !access.context) return notFound(reply);
+    if (!ctx.analytics.enabled) return notFound(reply);
     const parsed = feedbackSchema.safeParse(request.body ?? {});
     if (!parsed.success)
       return page(
@@ -66,9 +66,12 @@ export function registerFeedback(app: FastifyInstance, ctx: AppContext): void {
         `Choose Yes or No, and keep comments under ${MAX_FEEDBACK_COMMENT} characters.`,
       );
     const input = parsed.data;
-    const release = await readerRelease(ctx, access.context);
-    // Same answer for "no such topic" and "not in your view".
-    if (typeof release === 'string' || !release.view.topic(input.topic)) return notFound(reply);
+    // The same view the reader's pages come from (own entitlements, the public
+    // set on public sites, or the staff view). Same answer for "no such topic"
+    // and "not in your view".
+    const viewer = await viewerRelease(ctx, request);
+    if (!('release' in viewer) || !viewer.release.view.topic(input.topic)) return notFound(reply);
+    const release = viewer.release;
     try {
       await recordFeedback(ctx.pool, {
         surface: input.surface,

@@ -106,22 +106,30 @@ docker compose -f deploy/docker-compose.yml run --rm migrate seed /seed/seed.yam
 Then:
 
 1. Point a GitHub webhook (push events, JSON, your secret) at `${PUBLIC_URL}/webhooks/github`.
-2. Register `${PUBLIC_URL}/auth/callback` as the redirect URI with your OIDC provider.
+2. Register `${PUBLIC_URL}/auth/callback` as the redirect URI with your OIDC provider, and/or `${PUBLIC_URL}/auth/github/callback` on your GitHub App for GitHub sign-in.
 3. Readers sign in, and each is served the live release for their version's line (1.x or 2.x) through the same filter as the previewer.
 4. A push that fails validation never goes live. It shows as a failed `opend/build` status on the commit, and its diagnostics are available from `GET /admin/api/builds/:id`.
 
 Built images and theme files go to a blob store. By default that is a local folder (`BLOB_DIR`), so the app and the worker must share a volume, as they do in the Compose file. Where they cannot, as on Railway, where web and worker are separate services, set `S3_BUCKET`, `S3_ENDPOINT`, `S3_ACCESS_KEY_ID` and `S3_SECRET_ACCESS_KEY` (plus optional `S3_REGION`, default `auto`, `S3_FORCE_PATH_STYLE=1` for MinIO-style endpoints, and `S3_PREFIX`) on both services to use any S3-compatible bucket. On Railway, add a Bucket and map its variables with reference variables, for example `S3_BUCKET=${{Bucket.BUCKET}}` and `S3_ENDPOINT=${{Bucket.ENDPOINT}}`; see [`deploy/.env.example`](deploy/.env.example).
 
-To try it without an identity provider, set `NODE_ENV=development` and `OPEND_DEV_LOGIN=1` and sign in at `/auth/dev` as any seeded reader. The server refuses the development login in production.
+To try it without an identity provider, set `NODE_ENV=development` and `OPEND_DEV_LOGIN=1` and pick any seeded reader under **Demo readers** on the sign-in page. The server refuses the development login in production.
 
-| Admin API (`Authorization: Bearer $OPEND_ADMIN_TOKEN`)                                               |                                                     |
-| ---------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
-| `GET/POST /admin/api/repos`, `POST /admin/api/repos/:id/builds`                                      | Register docs repos; rebuild a commit               |
-| `GET /admin/api/repos/:id/releases`, `GET /admin/api/builds[/:id]`                                   | Live releases; builds and their diagnostics         |
-| `GET/POST /admin/api/orgs`, `PUT /admin/api/orgs/:slug/entitlements`, `DELETE /admin/api/orgs/:slug` | Orgs and entitlements                               |
-| `GET/POST /admin/api/readers`, `DELETE /admin/api/readers/:id`                                       | Readers, matched to OIDC sign-ins by verified email |
-| `GET /admin/api/audit`                                                                               | Audit log                                           |
-| `GET /admin/api/analytics/summary`, `GET /admin/api/analytics/feedback[.csv]`                        | Docs analytics and reader feedback                  |
+**Public or private sites.** A registered repo is private by default: every page needs a signed-in, registered reader. `PUT /admin/api/repos/:id/access` with `{"access":"public","publicEntitlements":{"products":[...],"features":[],"version":"2.1"}}` also serves anonymous visitors, filtered for that public set (without one they see only unconditioned content). Signed-in readers get their own entitlements together with the public set when both are for the same release line. Anonymous views have their own cache key, search, images, PDFs and the logo follow the same filter, and switching modes clears every replica's caches through `NOTIFY`. See [ADR 0010](docs/adr/0010-public-access-and-sign-in.md).
+
+**Sign-in.** `/auth/login` is a branded page listing every configured provider: **Sign in with GitHub** (`GITHUB_OAUTH_CLIENT_ID`/`GITHUB_OAUTH_CLIENT_SECRET`, the same values as the editor's; state + PKCE; readers matched by a verified email), **Sign in with** your OIDC provider (`OIDC_DISPLAY_NAME`), and demo readers in development. With one provider it goes straight there. Pages show **Sign in** for anonymous visitors of public sites, and the reader's name and **Sign out** (a CSRF-checked form) otherwise, in the header and the mobile menu. `OPEND_GITHUB_COLLABORATOR_ORG` (with `OPEND_GITHUB_COLLABORATOR_STAFF=1`) adds people who can push to the docs repo as readers on first GitHub sign-in.
+
+**Staff and edit links.** A staff reader (`PUT /admin/api/readers/:id/staff`, or `staff: true` in a seed) sees the unfiltered staff view with conditions marked; entitlement sync never sets it. With `EDITOR_PUBLIC_URL` set on the docs site, signed-in readers get **Edit this page** under each topic, opening it in the web editor; `OPEND_SOURCE_LINKS=1` adds **View source on GitHub**. One GitHub App serves the docs site, the editor and the build webhook: see [docs/github-app.md](docs/github-app.md) and `node scripts/github-app-url.mjs <docsUrl> <editorUrl>` for a pre-filled registration link.
+
+| Admin API (`Authorization: Bearer $OPEND_ADMIN_TOKEN`)                                               |                                                          |
+| ---------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| `GET/POST /admin/api/repos`, `POST /admin/api/repos/:id/builds`                                      | Register docs repos; rebuild a commit                    |
+| `PUT /admin/api/repos/:id/access`                                                                    | Make a site public (with public entitlements) or private |
+| `GET /admin/api/repos/:id/releases`, `GET /admin/api/builds[/:id]`                                   | Live releases; builds and their diagnostics              |
+| `GET/POST /admin/api/orgs`, `PUT /admin/api/orgs/:slug/entitlements`, `DELETE /admin/api/orgs/:slug` | Orgs and entitlements                                    |
+| `GET/POST /admin/api/readers`, `DELETE /admin/api/readers/:id`                                       | Readers, matched to OIDC sign-ins by verified email      |
+| `PUT /admin/api/readers/:id/staff`                                                                   | Grant or revoke the unfiltered staff view                |
+| `GET /admin/api/audit`                                                                               | Audit log                                                |
+| `GET /admin/api/analytics/summary`, `GET /admin/api/analytics/feedback[.csv]`                        | Docs analytics and reader feedback                       |
 
 See [ADR 0004](docs/adr/0004-hosted-architecture.md) for how it fits together.
 
@@ -344,7 +352,7 @@ opend-server editor disable-user writer@example.com
 | `EDITOR_REPO`, `EDITOR_BASE_BRANCH`                                        | The registered repo to edit (default `OPEND_SITE_REPO`, or the only one) and its base branch (default `main`)                                           |
 | `DATABASE_URL`, `PORT` (default 3001), `GITHUB_API_URL`, `GITHUB_WEB_URL`  | Shared database; GitHub Enterprise Server URLs                                                                                                          |
 
-At least one sign-in method is required. The repository must be registered (seed file or admin API) with its GitHub App `installationId`. See [ADR 0007](docs/adr/0007-web-editor.md) for the design and the open decision on a visual editor.
+At least one sign-in method is required. To run it on Railway, add an `editor` service from the same image with the start command `node dist/bin.js editor serve` ([docs/railway.md](docs/railway.md)); one GitHub App provides its sign-in, commits and the build webhook ([docs/github-app.md](docs/github-app.md)). The repository must be registered (seed file or admin API) with its GitHub App `installationId`. See [ADR 0007](docs/adr/0007-web-editor.md) for the design and the open decision on a visual editor.
 
 ## Development
 
@@ -370,6 +378,7 @@ The store, worker, server and editor integration tests need Postgres. Set `TEST_
 - [0007 Web editor: save to a branch, publish through a pull request](docs/adr/0007-web-editor.md)
 - [0008 Search: Postgres full-text search that cannot leak](docs/adr/0008-search.md)
 - [0009 Docs analytics and reader feedback, without tracking readers](docs/adr/0009-analytics.md)
+- [0010 Public sites, sign-in providers and staff readers](docs/adr/0010-public-access-and-sign-in.md)
 
 ## Licence
 

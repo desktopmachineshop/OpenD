@@ -120,7 +120,9 @@ describe.skipIf(!url)('site search page', () => {
     expect(hitsOf(res.body)).toContain('setup wizard');
     expect(res.body).toMatch(/\d+ results? for <q>wizard<\/q>/);
     expect(res.body).toContain('value="wizard"');
-    expect(res.body).toContain('Signed in as v2-pro@readers.example');
+    expect(res.body).toContain(
+      '<span class="opend-visually-hidden">Signed in as </span>v2-pro@readers.example',
+    );
   });
 
   it('searches the release line the reader would read', async () => {
@@ -167,10 +169,12 @@ describe.skipIf(!url)('site search page', () => {
     const res = await search(xss, 'v2-pro');
     expect(res.body).not.toMatch(/<script|<img/);
     expect(res.body).toContain(escapeHtml(xss));
-    // A query cannot inject the per-request marker: the user bar appears exactly once.
-    const marker = await search('<!--opend-user-bar--> wizard', 'v2-pro');
-    expect(marker.body.match(/Signed in as/g)).toHaveLength(1);
-    expect(marker.body).toContain('&lt;!--opend-user-bar--&gt;');
+    // A query cannot inject the per-request markers: the account controls appear
+    // exactly once in the header and once in the menu.
+    const marker = await search('<!--opend-account--><!--opend-menu-account--> wizard', 'v2-pro');
+    expect(marker.body.match(/class="site-account"/g)).toHaveLength(1);
+    expect(marker.body.match(/class="site-menu-account"/g)).toHaveLength(1);
+    expect(marker.body).toContain('&lt;!--opend-account--&gt;');
   });
 
   it('handles empty, missing, repeated and overlong queries', async () => {
