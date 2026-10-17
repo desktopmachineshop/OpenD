@@ -62,7 +62,10 @@ export const ADMIN_CSS = `
 
 .admin-form { display: grid; gap: 16px; margin: 0; }
 .admin-form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 16px; }
-.admin-field { display: grid; gap: 6px; min-width: 0; }
+.admin-field { display: grid; gap: 6px; min-width: 0; align-content: start; }
+.admin-form > .admin-choice { justify-self: start; }
+.admin-card.admin-form { margin: 0 0 20px; }
+.admin-card > .admin-details, .admin-card > form + .admin-details { margin-top: 16px; }
 .admin-field > label, .admin-legend { font-weight: 650; color: var(--opend-heading); font-size: 15px; }
 .admin-hint { margin: 0; font-size: 13.5px; color: var(--opend-muted); }
 .admin-field input[type="text"], .admin-field input[type="email"], .admin-field input[type="url"], .admin-field input[type="password"], .admin-field select { width: 100%; min-height: 42px; padding: 8px 12px; border: 1px solid var(--opend-border-strong); border-radius: var(--opend-radius); background: var(--opend-surface); box-sizing: border-box; }
@@ -122,11 +125,13 @@ export const ADMIN_CSS = `
 .admin-provider:first-of-type { border-top: 0; padding-top: 0; }
 .admin-provider-icon { display: grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: var(--opend-radius); background: var(--opend-accent-soft); color: var(--opend-link); }
 .admin-provider-icon svg { fill: currentColor; }
+.admin-provider-icon svg.admin-stroke, .admin-mark svg.admin-stroke { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .admin-provider-text { flex: 1 1 14rem; min-width: 0; }
 .admin-provider-text strong { display: block; color: var(--opend-heading); }
 .admin-provider-text span { color: var(--opend-muted); font-size: 14px; }
 
-.admin-setup { max-width: 30rem; }
+.opend-simple .admin-button { border-color: var(--opend-accent); background: var(--opend-accent); color: var(--opend-on-accent); }
+.opend-simple .admin-button:hover { border-color: var(--opend-link-hover); background: var(--opend-link-hover); color: var(--opend-on-accent); }
 .admin-muted { color: var(--opend-muted); }
 .admin-code { display: block; padding: 10px 12px; border: 1px solid var(--opend-border); border-radius: var(--opend-radius-sm); background: var(--opend-code-bg); font-family: var(--opend-mono); font-size: 13.5px; overflow-wrap: anywhere; }
 

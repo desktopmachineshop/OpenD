@@ -3,7 +3,7 @@ import type { Diagnostic } from '@opend/model';
 import type { BuildJob, EditorUser, LiveRelease, Org, Reader, Repo } from '@opend/store';
 import { ADMIN_CSS } from './admin-style.js';
 import type { PickableRepo } from './github-connect.js';
-import { GITHUB_ICON } from './pages.js';
+import { GITHUB_ICON, KEY_ICON } from './pages.js';
 import type { SettingSource } from './settings.js';
 
 // ---- a small escaping template tag ------------------------------------------
@@ -37,7 +37,7 @@ export function html(strings: TemplateStringsArray, ...values: unknown[]): Html 
 
 const icon = (d: string) =>
   raw(
-    `<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">${d}</svg>`,
+    `<svg class="admin-stroke" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">${d}</svg>`,
   );
 const ICONS = {
   overview: icon(
@@ -946,7 +946,7 @@ export function signInSettingsPage(d: SignInPageData): Html {
     </div>
     <div class="admin-provider">
       <span class="admin-provider-icon"
-        >${o?.icon === 'github' ? raw(GITHUB_ICON) : ICONS.signIn}</span
+        >${o?.icon === 'github' ? raw(GITHUB_ICON) : raw(KEY_ICON)}</span
       ><span class="admin-provider-text"
         ><strong>${o?.displayName || 'Company sign-in (OIDC)'}</strong
         ><span>${o ? o.issuer : 'Not configured.'}</span></span
@@ -1059,9 +1059,7 @@ export function githubPage(d: GitHubPageData): Html {
       ? html`<ul>
             ${d.repos.map((r) => html`<li><code>${r.fullName}</code>${r.private ? ' (private)' : ''}</li>`)}
           </ul>
-          <p>
-            <a class="admin-button is-secondary" href="/admin/source">Choose the docs repository</a>
-          </p>`
+          ${d.source?.picker?.length ? '' : html`<p><a class="admin-button is-secondary" href="/admin/source">Choose the docs repository</a></p>`}`
       : html`<p class="admin-empty">
           No repositories yet: install the app on your docs repository.
         </p>`

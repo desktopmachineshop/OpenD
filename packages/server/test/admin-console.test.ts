@@ -152,9 +152,15 @@ describe.skipIf(!url)('the admin console', () => {
       const token = new URL((minted.json() as { url: string }).url).searchParams.get('token')!;
       const page = await get(`/admin/setup?token=${token}`);
       expect(page.statusCode).toBe(200);
-      expect(page.headers['referrer-policy']).toBe('no-referrer');
+      expect(page.headers['referrer-policy']).toBe('same-origin');
       expect(page.body).toContain('Become the first administrator');
-      const res = await post('/admin/setup', { token, email: 'owner@docs.example', name: 'Olive' });
+      // As a browser sends it: with this site's Origin.
+      const res = await post(
+        '/admin/setup',
+        { token, email: 'owner@docs.example', name: 'Olive' },
+        '',
+        { origin: 'http://docs.test' },
+      );
       expect(res.statusCode).toBe(303);
       owner = cookiesFrom(res);
       const home = await get('/admin?done=welcome', owner);

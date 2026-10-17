@@ -1019,10 +1019,12 @@ export function registerAdminConsole(app: FastifyInstance, ctx: AppContext): voi
 
   // ---- the first staff reader: one-time setup links ------------------------
 
+  // Referrer-Policy stays same-origin (not no-referrer): browsers then send the Origin
+  // header the POST is checked against, and the page links nowhere else.
   const setupPage = (reply: FastifyReply, status: number, body: string) =>
     reply
       .code(status)
-      .headers({ ...adminHeaders(), 'referrer-policy': 'no-referrer' })
+      .headers(adminHeaders())
       .type('text/html; charset=utf-8')
       .send(simplePage('Admin setup', body, ADMIN_CSS));
   const badLink = (reply: FastifyReply) =>

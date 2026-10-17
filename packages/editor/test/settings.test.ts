@@ -50,8 +50,9 @@ describe.skipIf(!url)('the editor with GitHub connected in the admin console', (
       },
       'test',
     );
-    await putSecret(h.db.pool, box, SECRET.githubPrivateKey, privateKey, 'test');
+    // The client secret first: the app counts as connected once its private key is readable.
     await putSecret(h.db.pool, box, SECRET.githubClientSecret, 'client-secret', 'test');
+    await putSecret(h.db.pool, box, SECRET.githubPrivateKey, privateKey, 'test');
     // The editor listens: no restart.
     await expect.poll(() => h.ctx.github.mode(), { timeout: 15_000 }).toBe('stored');
     login = await h.app.inject({ method: 'GET', url: '/auth/login' });
