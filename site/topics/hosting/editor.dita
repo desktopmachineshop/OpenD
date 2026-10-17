@@ -136,10 +136,22 @@ opend-server editor disable-user writer@example.com</codeblock>
           <xref href="github-app.dita"/>.</li>
         <li><b>Separate accounts.</b> Editors are not readers. A reader session never opens the editor, and
           an editor session grants nothing on the docs site.</li>
-        <li><b>Commits.</b> Each save is a commit by the App to the author's branch
-          <codeph>editor/&lt;user-id&gt;/&lt;name&gt;</codeph>, with the author's name and email and a
-          <codeph>Co-authored-by</codeph> line. The editor refuses to write to any other branch, including
-          the main branch.</li>
+        <li><b>Commits.</b> Each save is a commit to the author's branch
+          <codeph>editor/&lt;user-id&gt;/&lt;name&gt;</codeph>. Authors who signed in with GitHub commit as
+          themselves: the editor keeps their GitHub user access token, sealed with the same key as the
+          admin console's secrets, and GitHub signs their commits (Verified). Other authors' commits are made
+          by the App, with the author's name and email and a <codeph>Co-authored-by</codeph> line. The
+          editor refuses to write to any other branch, including the main branch.</li>
+        <li id="signed-commits"><b>Requiring signed commits.</b> If branch protection or a ruleset requires
+          signed commits on the base branch or on <codeph>editor/**</codeph>, only authors who signed in with
+          GitHub can save and publish; authors who use company sign-in are asked to sign in with GitHub.
+          For that, GitHub sign-in must use a GitHub App's client id and secret (the app connected in the
+          admin console, or a <codeph>GITHUB_OAUTH_CLIENT_ID</codeph> starting with <codeph>Iv</codeph>):
+          an OAuth app's tokens are never kept. A secret key is needed too (<codeph>SESSION_SECRET</codeph>
+          or <codeph>OPEND_SECRET_KEY</codeph>), and the App needs Administration read so the editor can
+          see the rule. Managed hosting signs authors in with OIDC, which carries no GitHub token, so those
+          authors cannot save to such repositories. Tokens are kept per session, refreshed before
+          they expire, and deleted on sign-out and by <codeph>disable-user</codeph>.</li>
         <li><b>Preview as an org.</b> Any signed-in editor can preview their branch as an org that has
           entitlements. Each preview is tied to that editor, one commit and the org's entitlements at that
           moment, expires after 30 minutes, and is logged. There are no editor roles yet.</li>

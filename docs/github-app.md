@@ -7,7 +7,7 @@ The manual route below remains as a fallback, for example to keep the credential
 One GitHub App serves the whole managed install:
 
 - **Reader sign-in** on the docs site (`/auth/github/callback` on the docs host).
-- **Author sign-in** in the web editor (`/auth/github/callback` on the editor host).
+- **Author sign-in** in the web editor (`/auth/github/callback` on the editor host). The editor keeps each author's user access token (sealed, per session) and commits as them, so GitHub signs their commits ([ADR 0012](adr/0012-signed-commits-from-the-editor.md)).
 - **Installation tokens** for the worker (private clones, `opend/build` commit statuses) and the editor (commits, pull requests, branch protection).
 - **The push webhook** that starts builds (`/webhooks/github` on the docs host).
 
@@ -20,7 +20,7 @@ A GitHub App accepts up to ten callback URLs, so the docs site and the editor sh
 | GitHub App name                                        | Any name not yet taken on GitHub (at most 34 characters), e.g. `Acme docs`                    |
 | Homepage URL                                           | `https://DOCS_HOST`                                                                           |
 | Callback URLs                                          | `https://DOCS_HOST/auth/github/callback` and `https://EDITOR_HOST/auth/github/callback`       |
-| Expire user authorization tokens                       | On (the default; OpenD uses the token once, at sign-in)                                       |
+| Expire user authorization tokens                       | On (the default; the editor keeps authors' tokens sealed and refreshes them)                  |
 | Request user authorization (OAuth) during installation | **Off**                                                                                       |
 | Enable Device Flow                                     | Off                                                                                           |
 | Setup URL                                              | Empty (Connect GitHub uses `https://DOCS_HOST/admin/github/installed`)                        |

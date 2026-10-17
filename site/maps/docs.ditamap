@@ -69,6 +69,7 @@
     <topicref href="../topics/editor/editor-edit.dita"/>
     <topicref href="../topics/editor/editor-publish.dita"/>
     <topicref href="../topics/editor/editor-conflicts.dita"/>
+    <topicref href="../topics/editor/editor-signed-commits.dita"/>
   </topichead>
 
   <!-- Self-hosting guides are for core; publishing to a managed site is for hosted. -->

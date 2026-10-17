@@ -14,6 +14,8 @@
         one file, merge on their own. When the same lines changed on both sides, the editor shows
         <systemoutput>The main branch has changes that conflict with yours</systemoutput>, and you cannot
         publish until you resolve them.</p>
+      <p>On a repository that requires signed commits, GitHub does the merging instead, through your pull
+        request; see <xref href="editor-signed-commits.dita"/>.</p>
     </context>
     <steps>
       <step>
