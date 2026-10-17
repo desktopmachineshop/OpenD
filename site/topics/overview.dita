@@ -8,10 +8,7 @@
     <resourceid appname="opend-console" appid="overview"/>
   </prolog>
   <conbody>
-    <p>Authors write DITA in a Git repository. The build compiles it into a release snapshot that keeps
-      every element's applicability, and each reader is served only what their release and entitlements
-      allow: on the docs site, in the help panel inside your apps, in search, and in PDF manuals.</p>
-
+    <p>Authors write DITA in a Git repository or in a visual editor on the web. The build compiles it into a release snapshot that keeps every element's applicability, and each reader is served only what their release and entitlements allow: on the docs site, in the help panel inside your apps, in search, and in PDF manuals.</p>
     <section id="one-rule">
       <title>One rule for release and entitlement</title>
       <p>Most documentation tools filter by release when they build, then handle access in a separate
@@ -38,7 +35,6 @@
         reader cannot see renders as plain text, and a hidden page answers with the same 404 as a missing
         one. See <xref keyref="applicability"/>.</p>
     </section>
-
     <section id="architecture">
       <title>Architecture</title>
       <p>The same packages run on an author's laptop and on the server, so what an author previews is what
@@ -65,7 +61,6 @@
         </image>
       </fig>
     </section>
-
     <section id="what-is-in-0-1">
       <title>What release <keyword keyref="current-release"/> includes</title>
       <ul>
@@ -79,7 +74,6 @@
       <p>Multi-tenancy and an operator console come later and reuse the same packages. See
         <xref href="notes/release-0.1.dita"/>.</p>
     </section>
-
     <section id="where-next">
       <title>Where to go next</title>
       <ul>
