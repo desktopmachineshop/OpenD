@@ -12,6 +12,10 @@ import {
   hasConflictMarkers,
   loadEditorConfig,
   merge3,
+  FakeGitHub,
+  createGitHubOAuth,
+  graphqlUrl,
+  isGitHubAppClientId,
   rulesFromRulesets,
   topicTemplate,
   wellFormedness,
@@ -140,7 +144,41 @@ describe('review rules', () => {
           parameters: { required_status_checks: [{ context: 'ci' }] },
         },
       ]),
-    ).toEqual({ requiredApprovals: 2, codeOwnerReview: true, requiredChecks: ['ci'] });
+    ).toEqual({
+      requiredApprovals: 2,
+      codeOwnerReview: true,
+      requiredChecks: ['ci'],
+      requiredSignatures: false,
+    });
+    expect(rulesFromRulesets([{ type: 'required_signatures' }]).requiredSignatures).toBe(true);
+  });
+});
+
+describe('signed commits', () => {
+  it('finds the GraphQL endpoint on GitHub and GitHub Enterprise Server', () => {
+    expect(graphqlUrl('https://api.github.com')).toBe('https://api.github.com/graphql');
+    expect(graphqlUrl('https://ghe.example/api/v3/')).toBe('https://ghe.example/api/graphql');
+    expect(graphqlUrl('https://api.acme.ghe.com')).toBe('https://api.acme.ghe.com/graphql');
+  });
+
+  it('keeps user tokens only for GitHub App credentials', () => {
+    expect(isGitHubAppClientId('Iv1.0123456789abcdef')).toBe(true);
+    expect(isGitHubAppClientId('Iv23liAbCdEf')).toBe(true);
+    expect(isGitHubAppClientId('Ov23liAbCdEf')).toBe(false);
+    expect(isGitHubAppClientId('0123456789abcdef0123')).toBe(false);
+  });
+
+  it('never exposes the token of a GitHub sign-in when it is logged or serialised', async () => {
+    const gh = new FakeGitHub();
+    const oauth = createGitHubOAuth(
+      { clientId: 'Iv1.x', clientSecret: 's', webUrl: gh.webUrl, apiUrl: gh.apiUrl },
+      gh.fetch,
+    );
+    gh.addOAuthCode('c', { id: 7, login: 'ada', name: 'Ada', email: 'ada@example.com' });
+    const signIn = await oauth.exchange('c', 'http://editor.test/cb');
+    expect(signIn.grant?.accessToken).toMatch(/^ghu_/);
+    expect(JSON.stringify(signIn)).not.toContain(signIn.grant!.accessToken);
+    expect(Object.keys(signIn)).not.toContain('grant');
   });
 });
 

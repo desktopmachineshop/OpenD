@@ -17,32 +17,75 @@ import {
   type Pool,
   type Repo,
 } from '@opend/store';
+import { EditorError } from './errors.js';
 import type {
   GitHubClient,
   GitIdentity,
   PullRequest,
+  RulesLookup,
   TreeChange,
   TreeEntry,
+  UserGitHubClient,
 } from './github/client.js';
+import type { UserTokenSource } from './github/user.js';
 import { elementIds, hasConflictMarkers, merge3 } from './merge.js';
 import { evaluateReview, readRequirements, type ReviewState } from './rules.js';
 
-/** An error with an HTTP status and a message fit to show the author. */
-export class EditorError extends Error {
-  constructor(
-    readonly status: number,
-    message: string,
-    readonly detail: Record<string, unknown> = {},
-  ) {
-    super(message);
-  }
-}
+export { EditorError };
+
+/** Shown to authors without a GitHub token when the repository requires signed commits. */
+export const SIGNED_COMMITS_REQUIRED =
+  'This repository requires signed commits. Sign in with GitHub to save and publish.';
 
 /** Who is acting: the signed-in editor and their session, both from the server side. */
 export interface Actor {
   user: EditorUser;
   sessionId: string;
+  /** The author's own GitHub token, when they signed in with GitHub and the editor keeps it. */
+  github?: UserTokenSource | null;
 }
+
+/**
+ * Whether commits to the author's branch, or merges into the base branch,
+ * need verified signatures: from branch protection or rulesets. `unknown`
+ * when GitHub hides the rules from the app.
+ */
+export type SigningRequirement = 'required' | 'not-required' | 'unknown';
+
+/** How the author's saves reach GitHub, shown in the editor. */
+export interface CommitIdentity {
+  requirement: SigningRequirement;
+  /**
+   * `user`: as the author's own GitHub account, signed by GitHub ("Verified").
+   * `app`: the OpenD app on their behalf, crediting them as co-author.
+   * `blocked`: signed commits are required and the author has no GitHub token.
+   */
+  via: 'user' | 'app' | 'blocked';
+  login: string | null;
+}
+
+interface WriteMode extends CommitIdentity {
+  /** The client for writes: the author's own token, else the installation. */
+  writer: GitHubClient;
+  user: UserGitHubClient | null;
+  /**
+   * Only GitHub-signed commits: saves through createCommitOnBranch, merges of
+   * the base branch through update-branch. Used for authors with a token
+   * unless the repository is known not to require signatures.
+   */
+  signedFlow: boolean;
+}
+
+export interface EditorServiceOptions {
+  /** The client for an author's own token (the REST/GraphQL client in production). */
+  userClient?: (repo: Repo, source: UserTokenSource) => UserGitHubClient;
+  /** Milliseconds to wait between checks while GitHub runs an update-branch. */
+  updateBranchPolls?: number[];
+  /** How long signing requirements are cached, ms. */
+  signingTtlMs?: number;
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** The repository being edited. */
 export interface RepoContext {
@@ -124,7 +167,8 @@ export interface DraftBuild {
 }
 
 export interface SyncResult {
-  status: 'up-to-date' | 'merged' | 'conflict';
+  /** `behind`: the base branch has newer changes that merge cleanly; GitHub merges them in on publish. */
+  status: 'up-to-date' | 'merged' | 'conflict' | 'behind';
   sha?: string;
 }
 
@@ -146,8 +190,12 @@ export interface ConflictSet {
   oursSha: string;
   theirsSha: string;
   baseSha: string;
-  /** Files that merged on their own, relative to the current version of main. */
-  automatic: { path: string; sha?: string | null; content?: string }[];
+  /**
+   * Files that merged on their own, relative to the current version of main:
+   * the author's blob (`sha`), or a line-by-line merge (`content`) of the
+   * author's text and main's (`theirs`).
+   */
+  automatic: { path: string; sha?: string | null; content?: string; theirs?: string }[];
   conflicts: FileConflict[];
   structural: StructuralConflict[];
 }
@@ -234,8 +282,16 @@ export class EditorService {
   });
   private readonly builds = new LRUCache<string, DraftBuild>({ max: 16 });
   private readonly locks = new KeyedLock();
+  private readonly signing: LRUCache<string, SigningRequirement>;
+  private readonly polls: number[];
 
-  constructor(private readonly pool: Pool) {}
+  constructor(
+    private readonly pool: Pool,
+    private readonly options: EditorServiceOptions = {},
+  ) {
+    this.signing = new LRUCache({ max: 256, ttl: options.signingTtlMs ?? 60_000 });
+    this.polls = options.updateBranchPolls ?? [250, 500, 1000, 1000, 2000, 2000, 3000, 5000];
+  }
 
   private async audit(
     rc: RepoContext,
@@ -396,12 +452,16 @@ export class EditorService {
   }
 
   /** The author's branch, created from the base branch's head on first use. */
-  private async ensureBranch(rc: RepoContext, actor: Actor): Promise<EditorBranch> {
-    const existing = await this.activeBranch(rc, actor.user);
+  private async ensureBranch(
+    rc: RepoContext,
+    actor: Actor,
+    writer: GitHubClient,
+    existing: EditorBranch | null,
+  ): Promise<EditorBranch> {
     if (existing) return existing;
     const base = await this.workingHead(rc, null);
     const name = `editor/${actor.user.id}/${slugify(actor.user.name || actor.user.email.split('@')[0]!)}-${randomBytes(3).toString('hex')}`;
-    await rc.gh.createBranch(name, base);
+    await writer.createBranch(name, base);
     const created = await createEditorBranch(this.pool, {
       repoId: rc.repo.id,
       userId: actor.user.id,
@@ -416,12 +476,244 @@ export class EditorService {
     return winner;
   }
 
+  // ---- signed commits --------------------------------------------------------
+
+  /**
+   * Whether the base branch or the author's branch requires signed commits:
+   * classic protection (`required_signatures`) or a ruleset rule of that type.
+   * Rulesets are read for the branch name even before it exists, so a rule on
+   * `editor/**` counts. Cached briefly.
+   */
+  async signingRequirement(rc: RepoContext, workBranch: string): Promise<SigningRequirement> {
+    const key = `${rc.repo.id}\n${rc.baseBranch}\n${workBranch}`;
+    const cached = this.signing.get(key);
+    if (cached) return cached;
+    const safe = async (lookup: Promise<RulesLookup<boolean>>): Promise<RulesLookup<boolean>> =>
+      lookup.catch(() => ({ status: 'forbidden' as const }));
+    const rules = (branch: string) =>
+      safe(
+        rc.gh
+          .branchRulesets(branch)
+          .then((r) =>
+            r.status === 'ok' ? { status: 'ok' as const, rules: r.rules.requiredSignatures } : r,
+          ),
+      );
+    const lookups = await Promise.all([
+      safe(rc.gh.requiredSignatures(rc.baseBranch)),
+      safe(rc.gh.requiredSignatures(workBranch)),
+      rules(rc.baseBranch),
+      rules(workBranch),
+    ]);
+    const result: SigningRequirement = lookups.some((l) => l.status === 'ok' && l.rules)
+      ? 'required'
+      : lookups.some((l) => l.status === 'forbidden')
+        ? 'unknown'
+        : 'not-required';
+    this.signing.set(key, result);
+    return result;
+  }
+
+  /**
+   * How this author writes: with their own GitHub token when they have one
+   * (commits GitHub signs as them), else as the app. On a repository that
+   * requires signed commits an author without a token may not write at all;
+   * with `write`, that refusal is thrown before any GitHub write.
+   */
+  private async mode(
+    rc: RepoContext,
+    actor: Actor,
+    branch: EditorBranch | null,
+    write: boolean,
+  ): Promise<WriteMode> {
+    const requirement = await this.signingRequirement(
+      rc,
+      branch?.branch ?? `editor/${actor.user.id}/new`,
+    );
+    const user =
+      actor.github && this.options.userClient
+        ? this.options.userClient(rc.repo, actor.github)
+        : null;
+    if (requirement === 'required' && !user) {
+      if (write)
+        throw new EditorError(403, SIGNED_COMMITS_REQUIRED, { signedCommitsRequired: true });
+      return {
+        requirement,
+        via: 'blocked',
+        login: null,
+        writer: rc.gh,
+        user: null,
+        signedFlow: true,
+      };
+    }
+    return {
+      requirement,
+      via: user ? 'user' : 'app',
+      login: user?.login ?? null,
+      writer: user ?? rc.gh,
+      user,
+      signedFlow: user !== null && requirement !== 'not-required',
+    };
+  }
+
+  /** How the author's saves reach GitHub, for the editor to show. Never throws the refusal. */
+  async identity(
+    rc: RepoContext,
+    actor: Actor,
+    branch: EditorBranch | null,
+  ): Promise<CommitIdentity> {
+    const { requirement, via, login } = await this.mode(rc, actor, branch, false);
+    return { requirement, via, login };
+  }
+
+  /** One commit on the author's branch through createCommitOnBranch (signed by GitHub). */
+  private async commitAs(
+    user: UserGitHubClient,
+    branch: EditorBranch,
+    expectedHeadOid: string,
+    message: { headline: string; body?: string },
+    additions: { path: string; content: string }[],
+    stale: string,
+  ): Promise<string> {
+    const result = await user.commitOnBranch({
+      branch: branch.branch,
+      expectedHeadOid,
+      ...message,
+      additions,
+      deletions: [],
+    });
+    if (result.status === 'stale') throw new EditorError(409, stale, { stale: true });
+    return result.sha;
+  }
+
+  /** The branch's open pull request, if any. */
+  private async openPull(rc: RepoContext, branch: EditorBranch): Promise<PullRequest | null> {
+    if (branch.prNumber === null) return null;
+    const pull = await rc.gh.getPull(branch.prNumber);
+    return pull && pull.state === 'open' ? pull : null;
+  }
+
+  /** GitHub merges the base branch into the pull request's branch (update-branch); waits for it. */
+  private async updateOnGitHub(
+    rc: RepoContext,
+    writer: GitHubClient,
+    branch: EditorBranch,
+    pull: PullRequest,
+    expected: string,
+  ): Promise<string> {
+    const result = await writer.updatePullBranch(pull.number, expected);
+    if (result.status === 'conflict')
+      throw new EditorError(
+        409,
+        `GitHub could not merge ${rc.baseBranch} into your branch (${result.message}). Resolve the conflicts first.`,
+        { conflicts: true },
+      );
+    if (result.status === 'refused')
+      throw new EditorError(
+        409,
+        `GitHub did not update your branch (${result.message}). Reload and try again.`,
+        { stale: true },
+      );
+    for (const delay of [0, ...this.polls]) {
+      if (delay) await sleep(delay);
+      const sha = await rc.gh.branchSha(branch.branch);
+      if (sha && sha !== expected) return sha;
+    }
+    throw new EditorError(
+      503,
+      `GitHub is still merging ${rc.baseBranch} into your branch. Reload in a moment.`,
+    );
+  }
+
+  /**
+   * Merges the base branch into the author's branch with only GitHub-signed
+   * commits. createCommitOnBranch cannot make a merge commit, so:
+   * 1. commit main's version of every file changed on both sides (signed), so
+   *    GitHub's merge has nothing to conflict on;
+   * 2. GitHub merges main in through update-branch (a merge commit GitHub signs);
+   * 3. commit the author's resolutions and the line-by-line merges (signed).
+   * The branch never loses history; squash-merging on publish keeps main tidy.
+   */
+  private async signedMerge(
+    rc: RepoContext,
+    actor: Actor,
+    branch: EditorBranch,
+    mode: WriteMode,
+    set: ConflictSet,
+    choices: Choice[],
+    pull: PullRequest,
+  ): Promise<string> {
+    const user = mode.user!;
+    const stale = 'Something changed while merging. Review the files again.';
+    let head = set.oursSha;
+    const theirsFirst = [
+      ...set.conflicts.map((c) => ({ path: c.path, content: c.theirs })),
+      ...set.automatic
+        .filter((a) => a.content !== undefined)
+        .map((a) => ({ path: a.path, content: a.theirs! })),
+    ];
+    if (theirsFirst.length)
+      head = await this.commitAs(
+        user,
+        branch,
+        head,
+        {
+          headline: `Take ${rc.baseBranch}'s version of ${theirsFirst.length} file${theirsFirst.length === 1 ? '' : 's'} before merging`,
+          body: 'Made by the OpenD web editor so GitHub can merge without conflicts; the next commits put the resolved text back.',
+        },
+        theirsFirst,
+        stale,
+      );
+    head = await this.updateOnGitHub(rc, mode.writer, branch, pull, head);
+    const resolved = [
+      ...set.automatic
+        .filter((a) => a.content !== undefined)
+        .map((a) => ({ path: a.path, content: a.content! })),
+      ...choices.flatMap((c) => {
+        if (c.take === 'theirs') return [];
+        const conflict = set.conflicts.find((x) => x.path === c.path)!;
+        return [{ path: c.path, content: c.take === 'mine' ? conflict.mine : c.content }];
+      }),
+    ];
+    if (resolved.length)
+      head = await this.commitAs(
+        user,
+        branch,
+        head,
+        {
+          headline: choices.length
+            ? `Resolve conflicts with ${rc.baseBranch}`
+            : `Merge ${rc.baseBranch} line by line`,
+          body: [
+            choices.length
+              ? 'Conflicts resolved in the OpenD web editor:'
+              : 'Merged automatically.',
+            ...choices.map((c) => `- ${c.path}: ${describeChoice(c)}`),
+          ].join('\n'),
+        },
+        resolved,
+        stale,
+      );
+    await updateEditorBranch(this.pool, branch.id, { headSha: head });
+    await this.audit(rc, actor, choices.length ? 'resolve' : 'sync', {
+      branch: branch.branch,
+      commitSha: head,
+      prNumber: pull.number,
+      detail: {
+        resolved: choices.map((c) => ({ path: c.path, take: c.take })),
+        via: 'user',
+        signed: true,
+      },
+    });
+    return head;
+  }
+
   // ---- save ----------------------------------------------------------------
 
   /**
    * Commits files to the author's branch (creating it if needed), then merges
-   * the base branch in. The commit's author and trailer come from the
-   * session's user, never from the request.
+   * the base branch in. With the author's GitHub token the commit is made by
+   * GitHub as them (createCommitOnBranch, signed); otherwise by the app, with
+   * the author and trailer from the session's user, never from the request.
    */
   async save(
     rc: RepoContext,
@@ -443,9 +735,16 @@ export class EditorService {
           diagnostics: problems,
         });
     }
-    const branch = input.branch
+    const existing = input.branch
       ? await this.ownBranch(rc, actor.user, input.branch)
-      : await this.ensureBranch(rc, actor);
+      : await this.activeBranch(rc, actor.user);
+    // Refused here, before any write, when signed commits are required and the author has no token.
+    const mode = await this.mode(rc, actor, existing, true);
+    const branch = await this.ensureBranch(rc, actor, mode.writer, existing);
+    const staleMessage =
+      files.length === 1
+        ? `${files[0]!.path} changed since you opened it (another save or a merge from ${rc.baseBranch}). Copy your text, reload, and apply it again.`
+        : 'Your branch changed while saving. Reload and try again.';
     return this.locks.run(branch.branch, async () => {
       const head = await this.workingHead(rc, branch);
       if (input.expectSha !== undefined && files.length === 1) {
@@ -454,35 +753,47 @@ export class EditorService {
           (current?.sha ?? null) !== (input.expectSha || null) &&
           current?.text !== files[0]!.content
         ) {
-          throw new EditorError(
-            409,
-            `${files[0]!.path} changed since you opened it (another save or a merge from ${rc.baseBranch}). Copy your text, reload, and apply it again.`,
-            { stale: true },
-          );
+          throw new EditorError(409, staleMessage, { stale: true });
         }
       }
-      const { tree } = await this.commitTree(rc, head);
-      const changes: TreeChange[] = [];
-      for (const f of files)
-        changes.push({ path: rc.docsPrefix + f.path, sha: await rc.gh.createBlob(f.content) });
-      const newTree = await rc.gh.createTree(tree, changes);
       const summary = input.message?.trim() || `Update ${files.map((f) => f.path).join(', ')}`;
-      const sha = await rc.gh.createCommit({
-        message: `${summary.split('\n')[0]!.slice(0, 120)}\n\nSaved in the OpenD web editor.\n\n${coAuthorTrailer(actor.user)}`,
-        tree: newTree,
-        parents: [head],
-        author: authorOf(actor.user),
-      });
-      if (!(await rc.gh.updateBranch(branch.branch, sha)))
-        throw new EditorError(409, 'The branch moved while saving; try again.');
+      const headline = summary.split('\n')[0]!.slice(0, 120);
+      let sha: string;
+      if (mode.user) {
+        sha = await this.commitAs(
+          mode.user,
+          branch,
+          head,
+          { headline, body: 'Saved in the OpenD web editor.' },
+          files.map((f) => ({ path: rc.docsPrefix + f.path, content: f.content })),
+          staleMessage,
+        );
+      } else {
+        const { tree } = await this.commitTree(rc, head);
+        const changes: TreeChange[] = [];
+        for (const f of files)
+          changes.push({
+            path: rc.docsPrefix + f.path,
+            sha: await mode.writer.createBlob(f.content),
+          });
+        const newTree = await mode.writer.createTree(tree, changes);
+        sha = await mode.writer.createCommit({
+          message: `${headline}\n\nSaved in the OpenD web editor.\n\n${coAuthorTrailer(actor.user)}`,
+          tree: newTree,
+          parents: [head],
+          author: authorOf(actor.user),
+        });
+        if (!(await mode.writer.updateBranch(branch.branch, sha)))
+          throw new EditorError(409, 'The branch moved while saving; try again.');
+      }
       await updateEditorBranch(this.pool, branch.id, { headSha: sha });
       await this.audit(rc, actor, 'save', {
         branch: branch.branch,
         commitSha: sha,
         prNumber: branch.prNumber,
-        detail: { files: files.map((f) => f.path) },
+        detail: { files: files.map((f) => f.path), via: mode.via },
       });
-      const sync = await this.syncLocked(rc, actor, branch);
+      const sync = await this.syncWith(rc, actor, branch, mode);
       const draft = await this.build(rc, sync.sha ?? sha);
       return { branch, sha: sync.sha ?? sha, sync, diagnostics: draft.diagnostics };
     });
@@ -490,17 +801,64 @@ export class EditorService {
 
   // ---- merge from the base branch --------------------------------------------
 
-  /** Merges the base branch into the author's branch (never a rebase). */
+  /**
+   * Merges the base branch into the author's branch (never a rebase). Authors
+   * who may not write (signed commits required, no token) only get the state.
+   */
   sync(rc: RepoContext, actor: Actor, branch: EditorBranch): Promise<SyncResult> {
-    return this.locks.run(branch.branch, () => this.syncLocked(rc, actor, branch));
+    return this.locks.run(branch.branch, async () => {
+      const mode = await this.mode(rc, actor, branch, false);
+      if (mode.via === 'blocked') return this.mergeState(rc, branch);
+      return this.syncWith(rc, actor, branch, mode);
+    });
+  }
+
+  private syncWith(
+    rc: RepoContext,
+    actor: Actor,
+    branch: EditorBranch,
+    mode: WriteMode,
+  ): Promise<SyncResult> {
+    return mode.signedFlow
+      ? this.syncSigned(rc, actor, branch, mode)
+      : this.syncLocked(rc, actor, branch, mode.writer);
+  }
+
+  /** Where the branch stands against the base branch, without writing anything. */
+  private async mergeState(rc: RepoContext, branch: EditorBranch): Promise<SyncResult> {
+    const { behindBy } = await rc.gh.compare(rc.baseBranch, branch.branch);
+    if (behindBy === 0) return { status: 'up-to-date' };
+    const set = await this.conflicts(rc, branch);
+    return { status: set.conflicts.length || set.structural.length ? 'conflict' : 'behind' };
+  }
+
+  /**
+   * The signed flow: GitHub merges the base branch in (update-branch), which
+   * needs the branch's pull request. Before there is one, the branch simply
+   * stays behind; publishing merges it.
+   */
+  private async syncSigned(
+    rc: RepoContext,
+    actor: Actor,
+    branch: EditorBranch,
+    mode: WriteMode,
+  ): Promise<SyncResult> {
+    const state = await this.mergeState(rc, branch);
+    if (state.status !== 'behind') return state;
+    const pull = await this.openPull(rc, branch);
+    if (!pull) return state;
+    const set = await this.conflicts(rc, branch);
+    const sha = await this.signedMerge(rc, actor, branch, mode, set, [], pull);
+    return { status: 'merged', sha };
   }
 
   private async syncLocked(
     rc: RepoContext,
     actor: Actor,
     branch: EditorBranch,
+    writer: GitHubClient,
   ): Promise<SyncResult> {
-    const result = await rc.gh.merge(
+    const result = await writer.merge(
       branch.branch,
       rc.baseBranch,
       `Merge ${rc.baseBranch} into ${branch.branch}`,
@@ -519,7 +877,15 @@ export class EditorService {
     // may still merge line by line; if everything does, commit that merge.
     const set = await this.conflicts(rc, branch);
     if (set.conflicts.length === 0 && set.structural.length === 0) {
-      const sha = await this.commitMerge(rc, actor, branch, set, [], 'Merged automatically');
+      const sha = await this.commitMerge(
+        rc,
+        actor,
+        branch,
+        writer,
+        set,
+        [],
+        'Merged automatically',
+      );
       return { status: 'merged', sha };
     }
     return { status: 'conflict' };
@@ -582,7 +948,7 @@ export class EditorService {
       const [bt, ot, tt] = await Promise.all([text(b), text(o), text(t)]);
       const merged = merge3(bt ?? '', ot!, tt!);
       if (merged.clean) {
-        set.automatic.push({ path, content: merged.text });
+        set.automatic.push({ path, content: merged.text, theirs: tt! });
         continue;
       }
       if (bt !== null) {
@@ -608,6 +974,7 @@ export class EditorService {
     rc: RepoContext,
     actor: Actor,
     branch: EditorBranch,
+    writer: GitHubClient,
     set: ConflictSet,
     choices: Choice[],
     note: string,
@@ -615,28 +982,25 @@ export class EditorService {
     const changes: TreeChange[] = [];
     for (const a of set.automatic) {
       if (a.content !== undefined)
-        changes.push({ path: a.path, sha: await rc.gh.createBlob(a.content) });
+        changes.push({ path: a.path, sha: await writer.createBlob(a.content) });
       else changes.push({ path: a.path, sha: a.sha ?? null });
     }
     for (const c of choices) {
       const conflict = set.conflicts.find((x) => x.path === c.path)!;
       if (c.take === 'theirs') continue;
       const content = c.take === 'mine' ? conflict.mine : c.content;
-      changes.push({ path: c.path, sha: await rc.gh.createBlob(content) });
+      changes.push({ path: c.path, sha: await writer.createBlob(content) });
     }
     const { tree: theirsTree } = await this.commitTree(rc, set.theirsSha);
-    const tree = changes.length ? await rc.gh.createTree(theirsTree, changes) : theirsTree;
-    const resolved = choices.map(
-      (c) =>
-        `- ${c.path}: ${c.take === 'mine' ? 'your version' : c.take === 'theirs' ? 'current version' : 'edited by hand'}`,
-    );
-    const sha = await rc.gh.createCommit({
+    const tree = changes.length ? await writer.createTree(theirsTree, changes) : theirsTree;
+    const resolved = choices.map((c) => `- ${c.path}: ${describeChoice(c)}`);
+    const sha = await writer.createCommit({
       message: `Merge ${rc.baseBranch} into ${branch.branch}\n\n${note}${resolved.length ? `:\n${resolved.join('\n')}` : '.'}\n\n${coAuthorTrailer(actor.user)}`,
       tree,
       parents: [set.oursSha, set.theirsSha],
       author: authorOf(actor.user),
     });
-    if (!(await rc.gh.updateBranch(branch.branch, sha)))
+    if (!(await writer.updateBranch(branch.branch, sha)))
       throw new EditorError(409, 'The branch moved while merging; reload and try again.');
     await updateEditorBranch(this.pool, branch.id, { headSha: sha });
     await this.audit(rc, actor, choices.length ? 'resolve' : 'sync', {
@@ -660,6 +1024,7 @@ export class EditorService {
     input: { oursSha: string; theirsSha: string; choices: Choice[] },
   ): Promise<string> {
     return this.locks.run(branch.branch, async () => {
+      const mode = await this.mode(rc, actor, branch, true);
       const set = await this.conflicts(rc, branch);
       if (set.oursSha !== input.oursSha || set.theirsSha !== input.theirsSha)
         throw new EditorError(
@@ -687,10 +1052,23 @@ export class EditorService {
         }
         choices.push(choice);
       }
+      if (mode.signedFlow) {
+        // GitHub's update-branch works on a pull request: open a draft one if there is none yet.
+        const pull =
+          (await this.openPull(rc, branch)) ??
+          (
+            await this.upsertPull(rc, actor, branch, mode, {
+              draft: true,
+              note: `Draft opened by the OpenD web editor so GitHub can merge ${rc.baseBranch} into this branch. ${authorOf(actor.user).name} publishes it from the editor.`,
+            })
+          ).pull;
+        return this.signedMerge(rc, actor, branch, mode, set, choices, pull);
+      }
       return this.commitMerge(
         rc,
         actor,
         branch,
+        mode.writer,
         set,
         choices,
         'Conflicts resolved in the OpenD web editor',
@@ -727,23 +1105,30 @@ export class EditorService {
     rc: RepoContext,
     actor: Actor,
     branch: EditorBranch,
-    note?: string,
+    mode: WriteMode,
+    options: { note?: string; draft?: boolean } = {},
   ): Promise<{ pull: PullRequest; created: boolean; files: string[] }> {
     const comparison = await rc.gh.compare(rc.baseBranch, branch.branch);
     const files = comparison.files.map((f) => f.path);
     if (comparison.aheadBy === 0 || files.length === 0)
       throw new EditorError(400, 'There is nothing to publish yet: your branch has no changes.');
     const title = `Docs: changes by ${authorOf(actor.user).name}`;
-    const body = this.pullBody(rc, actor.user, branch, files, note);
+    const body = this.pullBody(rc, actor.user, branch, files, options.note);
     let pull =
       (branch.prNumber !== null ? await rc.gh.getPull(branch.prNumber) : null) ??
       (await rc.gh.findOpenPull(branch.branch, rc.baseBranch));
     if (pull && pull.state !== 'open') pull = null;
     let created = false;
     if (pull) {
-      await rc.gh.updatePull(pull.number, { title, body });
+      await mode.writer.updatePull(pull.number, { title, body });
     } else {
-      pull = await rc.gh.createPull({ title, body, head: branch.branch, base: rc.baseBranch });
+      pull = await mode.writer.createPull({
+        title,
+        body,
+        head: branch.branch,
+        base: rc.baseBranch,
+        ...(options.draft ? { draft: true } : {}),
+      });
       created = true;
     }
     if (branch.prNumber !== pull.number) {
@@ -770,10 +1155,15 @@ export class EditorService {
   /**
    * Publishes everything saved on the branch: one pull request, merged at once
    * (squash, crediting the author) when the base branch's rules allow it.
+   * GitHub makes and signs the squash commit.
    */
   publish(rc: RepoContext, actor: Actor, branch: EditorBranch): Promise<PublishOutcome> {
     return this.locks.run(branch.branch, async () => {
-      const sync = await this.syncLocked(rc, actor, branch);
+      const mode = await this.mode(rc, actor, branch, true);
+      // The signed flow merges main in through the pull request, once it exists.
+      const sync = mode.signedFlow
+        ? await this.mergeState(rc, branch)
+        : await this.syncLocked(rc, actor, branch, mode.writer);
       if (sync.status === 'conflict')
         throw new EditorError(
           409,
@@ -782,23 +1172,34 @@ export class EditorService {
             conflicts: true,
           },
         );
-      const head = await this.workingHead(rc, branch);
+      let head = await this.workingHead(rc, branch);
       const draft = await this.build(rc, head);
       if (hasErrors(draft.diagnostics))
         throw new EditorError(422, 'Fix the validation errors before publishing.', {
           diagnostics: draft.diagnostics.filter((d) => d.severity === 'error'),
         });
-      const { pull, created, files } = await this.upsertPull(rc, actor, branch);
+      const { pull, created, files } = await this.upsertPull(rc, actor, branch, mode);
+      if (pull.draft && mode.user) await mode.user.markReadyForReview(pull);
+      if (mode.signedFlow && sync.status === 'behind')
+        head = await this.signedMerge(
+          rc,
+          actor,
+          branch,
+          mode,
+          await this.conflicts(rc, branch),
+          [],
+          pull,
+        );
       await this.audit(rc, actor, 'publish', {
         branch: branch.branch,
         commitSha: head,
         prNumber: pull.number,
-        detail: { created, files },
+        detail: { created, files, via: mode.via },
       });
       const { pull: fresh, review } = await this.reviewState(rc, branch);
       const outcome: PublishOutcome = { pull: fresh ?? pull, created, merged: false, review };
       if (!review.canMerge) return outcome;
-      const result = await rc.gh.mergePull(pull.number, {
+      const result = await mode.writer.mergePull(pull.number, {
         title: `${pull.title} (#${pull.number})`,
         message: `${files.map((f) => `* ${f}`).join('\n')}\n\n${coAuthorTrailer(actor.user)}`,
         sha: head,
@@ -812,7 +1213,7 @@ export class EditorService {
         branch: branch.branch,
         commitSha: result.sha,
         prNumber: pull.number,
-        detail: { method: 'squash' },
+        detail: { method: 'squash', via: mode.via },
       });
       return { ...outcome, merged: true, mergeSha: result.sha };
     });
@@ -821,12 +1222,14 @@ export class EditorService {
   /** Opens (or updates) the pull request for a developer to resolve what the editor cannot. */
   escalate(rc: RepoContext, actor: Actor, branch: EditorBranch): Promise<PullRequest> {
     return this.locks.run(branch.branch, async () => {
+      const mode = await this.mode(rc, actor, branch, true);
       const set = await this.conflicts(rc, branch);
       const note = `Needs a developer: merging ${rc.baseBranch} into this branch conflicts in ${[
         ...set.structural.map((s) => s.path),
         ...set.conflicts.map((c) => c.path),
       ].join(', ')}.`;
-      const { pull } = await this.upsertPull(rc, actor, branch, note);
+      const { pull } = await this.upsertPull(rc, actor, branch, mode, { note });
+      if (pull.draft && mode.user) await mode.user.markReadyForReview(pull);
       await this.audit(rc, actor, 'escalate', {
         branch: branch.branch,
         commitSha: set.oursSha,
@@ -836,4 +1239,12 @@ export class EditorService {
       return pull;
     });
   }
+}
+
+function describeChoice(c: Choice): string {
+  return c.take === 'mine'
+    ? 'your version'
+    : c.take === 'theirs'
+      ? 'current version'
+      : 'edited by hand';
 }

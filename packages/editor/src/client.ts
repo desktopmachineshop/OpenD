@@ -131,9 +131,16 @@ export function installEditor(win: Window): void {
           diagnostics?: Diagnostic[];
           previewUrl?: string;
           error?: string;
+          signInUrl?: string;
         };
         if (!res.ok) {
           if (data.diagnostics) showDiagnostics(data.diagnostics);
+          if (data.signInUrl) {
+            // Signed commits need GitHub sign-in; come back to this file afterwards.
+            const back = `/auth/github?returnTo=${encodeURIComponent(win.location.pathname + win.location.search)}`;
+            setStatus(data.error ?? 'Save failed', { href: back, label: 'Sign in with GitHub' });
+            return;
+          }
           throw new Error(data.error ?? 'Save failed');
         }
         dirty = false;

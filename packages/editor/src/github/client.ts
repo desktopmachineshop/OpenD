@@ -29,13 +29,22 @@ export interface GitHubClient {
     body: string;
     head: string;
     base: string;
+    draft?: boolean;
   }): Promise<PullRequest>;
   updatePull(number: number, input: { title?: string; body?: string }): Promise<void>;
   listReviews(number: number): Promise<Review[]>;
   /** Squash-merges a pull request at exactly `sha`. */
   mergePull(number: number, input: SquashMerge): Promise<PullMergeResult>;
+  /**
+   * Merges the base branch into a pull request's branch on GitHub
+   * (`PUT /pulls/{n}/update-branch`, the "Update branch" button), which GitHub
+   * signs. Asynchronous: GitHub accepts it, then moves the branch.
+   */
+  updatePullBranch(number: number, expectedHeadSha: string): Promise<UpdateBranchResult>;
   /** Classic branch protection on a branch. */
   branchProtection(branch: string): Promise<RulesLookup<ProtectionRules>>;
+  /** Whether classic branch protection requires signed commits on a branch. */
+  requiredSignatures(branch: string): Promise<RulesLookup<boolean>>;
   /** Repository rulesets that apply to a branch. */
   branchRulesets(branch: string): Promise<RulesLookup<ProtectionRules>>;
   /** Commit statuses and check runs on a commit, one entry per context, latest wins. */
@@ -70,6 +79,40 @@ export interface TreeChange {
   mode?: string;
 }
 
+/**
+ * The GitHub operations made with an author's own GitHub user access token:
+ * commits through GraphQL `createCommitOnBranch`, which GitHub authors as the
+ * token's user and signs ("Verified").
+ */
+export interface UserGitHubClient extends GitHubClient {
+  /** The GitHub login the token belongs to. */
+  readonly login: string;
+  /** Appends one commit to `branch`, only if its head is still `expectedHeadOid`. */
+  commitOnBranch(input: BranchCommit): Promise<BranchCommitResult>;
+  /** Marks a draft pull request ready for review. */
+  markReadyForReview(pull: PullRequest): Promise<void>;
+}
+
+export interface BranchCommit {
+  branch: string;
+  expectedHeadOid: string;
+  headline: string;
+  body?: string;
+  /** Files to add or replace, as text. */
+  additions: { path: string; content: string }[];
+  deletions: string[];
+}
+
+/** `stale`: the branch head was no longer `expectedHeadOid`. */
+export type BranchCommitResult = { status: 'committed'; sha: string } | { status: 'stale' };
+
+export type UpdateBranchResult =
+  | { status: 'accepted' }
+  /** GitHub cannot merge the base branch in without conflicts. */
+  | { status: 'conflict'; message: string }
+  /** The branch head moved, or there is nothing to merge. */
+  | { status: 'refused'; message: string };
+
 export interface NewCommit {
   message: string;
   tree: string;
@@ -94,6 +137,9 @@ export interface PullRequest {
   merged: boolean;
   /** `null` while GitHub is still computing it. */
   mergeable: boolean | null;
+  draft: boolean;
+  /** GraphQL node id. */
+  nodeId: string;
   headSha: string;
   headRef: string;
   baseRef: string;
@@ -119,6 +165,8 @@ export interface ProtectionRules {
   requiredApprovals: number;
   codeOwnerReview: boolean;
   requiredChecks: string[];
+  /** Commits must carry verified signatures (`required_signatures`). */
+  requiredSignatures: boolean;
 }
 
 /** Rules are readable (`ok`), absent (`none`, a 404), or hidden from the app (`forbidden`, a 403). */
