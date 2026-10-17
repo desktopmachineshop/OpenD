@@ -316,10 +316,12 @@ describe('collapsible navigation', () => {
   it('puts a Menu control for the contents in the header, and the logo when there is one', () => {
     const page = renderPage(view, 'a', { logoHref: '/_logo.svg' })!;
     const header = /<header class="site-header">.*<\/header>/.exec(page)![0];
-    expect(header).toContain('<details class="site-menu"><summary aria-controls="opend-toc">');
-    expect(header).toContain('<span>Menu</span></summary></details>');
+    expect(header).toContain(
+      '<details class="site-menu"><summary aria-controls="opend-menu-panel"><span class="site-menu-button">',
+    );
+    expect(header).toContain('<span>Menu</span></span></summary>');
     expect(header).toContain('<img class="site-logo" src="/_logo.svg" alt="">');
-    expect(page).toContain('<nav class="toc" id="opend-toc" aria-label="Contents">');
+    expect(page).toContain('<nav class="toc opend-nav" id="opend-toc" aria-label="Contents">');
     expect(page).toContain('<a class="opend-skip" href="#opend-main">');
     expect(page).toContain('<main id="opend-main">');
     expect(page).not.toMatch(/<script|onclick|onchange/);
@@ -327,6 +329,39 @@ describe('collapsible navigation', () => {
     // No contents, no menu.
     const empty = viewRelease({ ...rel, nav: [] }, [widgetV1]);
     expect(renderIndex(empty)).not.toContain('<details class="site-menu"');
+    // Search alone still gets a menu on narrow screens.
+    expect(renderIndex(empty, { search: { action: '/search' } })).toContain(
+      '<details class="site-menu">',
+    );
+  });
+
+  it('copies search, the contents and the PDF links into the menu panel, with unique ids', () => {
+    const page = renderPage(view, 'b', {
+      search: { action: '/search', query: 'q<' },
+      publications: [{ title: 'Guide <&>', href: '/pdf/guide.pdf' }],
+    })!;
+    const panel = /<div class="site-menu-panel" id="opend-menu-panel">(.*?)<\/div><\/details>/.exec(
+      page,
+    )![1]!;
+    // Search comes first, then the contents, then the publications.
+    expect(panel.startsWith('<form class="site-menu-search" role="search"')).toBe(true);
+    expect(panel).toContain('<label class="opend-visually-hidden" for="opend-menu-search-q">');
+    expect(panel).toContain('id="opend-menu-search-q" name="q" value="q&lt;"');
+    expect(panel).toContain(
+      '<nav class="opend-nav site-menu-nav" aria-label="Contents"><ul><li class="nav-group"><details open>',
+    );
+    expect(panel).toContain('<a href="/b.html" aria-current="page">Beta</a>');
+    expect(panel).toMatch(
+      /<nav class="site-menu-pdfs" aria-label="Download PDF"><p class="site-menu-heading">Publications<\/p><ul><li><a href="\/pdf\/guide\.pdf">Guide &lt;&amp;&gt; \(PDF\)<\/a><\/li><\/ul><\/nav>$/,
+    );
+    // Each copy exists exactly twice: the wide layout's and the menu's, one hidden by CSS at each width.
+    expect(page.match(/role="search"/g)).toHaveLength(2);
+    expect(page.match(/href="\/pdf\/guide\.pdf"/g)).toHaveLength(2);
+    expect(page.match(/ aria-current="page"/g)).toHaveLength(2);
+    const ids = [...page.matchAll(/ id="([^"]+)"/g)].map((m) => m[1]);
+    expect(new Set(ids).size).toBe(ids.length);
+    // The menu copy never shows more than the sidebar.
+    expect(panel).not.toMatch(/Gadget|Secret/);
   });
 });
 

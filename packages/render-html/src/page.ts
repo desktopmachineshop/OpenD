@@ -101,10 +101,33 @@ function publicationLinks(options: PageOptions): string {
   return links ? `<nav class="site-pdfs" aria-label="Download PDF">${links}</nav>` : '';
 }
 
-function searchBox(options: PageOptions): string {
+/** The search form; `id` must be unique in the page, as the header and the menu each have one. */
+function searchBox(options: PageOptions, className = 'site-search', id = 'opend-search-q'): string {
   if (!options.search) return '';
   const { action, query = '' } = options.search;
-  return `<form class="site-search" role="search" method="get" action="${escapeHtml(action)}"><label class="opend-visually-hidden" for="opend-search-q">Search the documentation</label><input type="search" id="opend-search-q" name="q" value="${escapeHtml(query)}" maxlength="${MAX_SEARCH_QUERY}" placeholder="Search the docs"><button type="submit">Search</button></form>`;
+  return `<form class="${className}" role="search" method="get" action="${escapeHtml(action)}"><label class="opend-visually-hidden" for="${id}">Search the documentation</label><input type="search" id="${id}" name="q" value="${escapeHtml(query)}" maxlength="${MAX_SEARCH_QUERY}" placeholder="Search the docs"><button type="submit">Search</button></form>`;
+}
+
+/**
+ * The narrow-screen menu: a `<details>` in the sticky header whose panel holds
+ * search, the contents and the PDF links. These duplicate the header's search
+ * and PDF links and the sidebar, which the stylesheet hides (`display: none`)
+ * on narrow screens, while the menu is hidden on wide ones; so each is in the
+ * accessibility tree only once.
+ */
+function menu(nav: string, options: PageOptions): string {
+  const search = searchBox(options, 'site-menu-search', 'opend-menu-search-q');
+  const pdfs = (options.publications ?? [])
+    .map((p) => `<li><a href="${escapeHtml(p.href)}">${escapeHtml(p.title)} (PDF)</a></li>`)
+    .join('');
+  if (!nav && !search && !pdfs) return '';
+  const contents = nav
+    ? `<nav class="opend-nav site-menu-nav" aria-label="Contents">${nav}</nav>`
+    : '';
+  const publications = pdfs
+    ? `<nav class="site-menu-pdfs" aria-label="Download PDF"><p class="site-menu-heading">Publications</p><ul>${pdfs}</ul></nav>`
+    : '';
+  return `<details class="site-menu"><summary aria-controls="opend-menu-panel"><span class="site-menu-button">${MENU_ICON}<span>Menu</span></span></summary><div class="site-menu-panel" id="opend-menu-panel">${search}${contents}${publications}</div></details>`;
 }
 
 /** Three bars, and a cross shown instead while the menu is open. */
@@ -112,9 +135,9 @@ const MENU_ICON =
   '<svg class="site-menu-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><path class="site-menu-bars" d="M4 7h16M4 12h16M4 17h16"/><path class="site-menu-close" d="M6 6l12 12M18 6L6 18"/></svg>';
 
 /**
- * The page frame. On narrow screens the contents collapse behind the header's
- * "Menu" control: a `<details>` whose state the stylesheet reads with `:has()`,
- * so it works without scripts. Wider screens show the contents as a sidebar.
+ * The page frame. Wide screens show the contents as a sidebar and search and
+ * PDF links in the header. Narrow screens have a compact sticky header whose
+ * "Menu" `<details>` opens a panel with all three, so it works without scripts.
  */
 function shell(
   view: ReleaseView,
@@ -132,9 +155,6 @@ function shell(
     ? `<img class="site-logo" src="${escapeHtml(options.logoHref)}" alt="">`
     : '';
   const nav = renderNav(view, currentId, options);
-  const menu = nav
-    ? `<details class="site-menu"><summary aria-controls="opend-toc">${MENU_ICON}<span>Menu</span></summary></details>`
-    : '';
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -147,9 +167,9 @@ ${theme}
 <body class="opend-site">
 <a class="opend-skip" href="#opend-main">Skip to content</a>
 ${options.banner ?? ''}
-<header class="site-header">${menu}<a class="site-title" href="${escapeHtml(base)}">${logo}<span>${escapeHtml(release.title)}</span></a><span class="site-release">Release ${escapeHtml(release.release)}</span>${publicationLinks(options)}${searchBox(options)}</header>
+<header class="site-header">${menu(nav, options)}<a class="site-title" href="${escapeHtml(base)}">${logo}<span>${escapeHtml(release.title)}</span></a><span class="site-release">Release ${escapeHtml(release.release)}</span>${publicationLinks(options)}${searchBox(options)}</header>
 <div class="layout">
-<nav class="toc" id="opend-toc" aria-label="Contents">${nav}</nav>
+<nav class="toc opend-nav" id="opend-toc" aria-label="Contents">${nav}</nav>
 <main id="opend-main">${main}</main>
 </div>
 ${options.bodyEnd ?? ''}

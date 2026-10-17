@@ -73,8 +73,9 @@
       <p>The theme loads after the built-in styles, and in PDFs after the print styles, so its rules win.
         This site's theme is <filepath>site/theme/site.css</filepath>. Custom rules
         can use the page's class names, such as <codeph>.site-header</codeph>, <codeph>.toc</codeph>
-        (the contents, a sidebar on wide screens and behind the <uicontrol>Menu</uicontrol> button on narrow
-        ones) and <codeph>main</codeph>.</p>
+        (the sidebar on wide screens), <codeph>.site-menu-panel</codeph> (the panel the
+        <uicontrol>Menu</uicontrol> button opens on narrow screens, with search, the contents and the PDF
+        links), <codeph>.opend-nav</codeph> (both copies of the contents) and <codeph>main</codeph>.</p>
       <note type="restriction">In PDFs the theme is inlined into a document without a base URL, so
         <codeph>url()</codeph> references to fonts or images in it are not loaded. Use fonts installed on the
         server, or the system font stack.</note>
