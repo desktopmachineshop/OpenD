@@ -46,4 +46,5 @@ ADR 0007 shipped the web editor with a DITA source textarea and a live preview. 
 
 - **More authors:** people without DITA or Git knowledge can edit topics, and the round-trip check and minimal writes protect the source.
 - **Bundle size:** the editor ships a larger script, about 150 KB minified. It loads only on topic edit pages.
-- **Later work:** visual editing of tables, images shown inline and uploads, resolved key text in chips, and a visual map editor.
+- **What the page passes in:** images show inline from the draft preview's `_assets/`. Key references without text show the site map's key text, and links without text show the target topic's title. The edit page passes both as data attributes.
+- **Later work:** visual editing of tables, image upload, and a visual map editor.

@@ -25,7 +25,7 @@ import {
   toggleTag,
   unwrap,
 } from './commands.js';
-import { blocksOf, escapeAttr } from './convert.js';
+import { blocksOf, escapeAttr, inlineContent } from './convert.js';
 import { CONDITION_ATTRS, CONDITION_HINTS, schema, type MarkTag, type XmlAttrs } from './schema.js';
 import { VisualTopic } from './topic.js';
 
@@ -73,6 +73,8 @@ const NAMES: Record<string, string> = {
   dlentry: 'Definition',
   dd: 'Description',
 };
+
+const MAIN_CONDITIONS = new Set(['release', 'product', 'feature', 'audience']);
 
 const NOTE_TYPES = [
   'note',
@@ -407,9 +409,9 @@ export function installVisualEditor(win: Window): void {
     external.checked = attrs.scope === 'external';
     const ext = el(
       'p',
-      {},
+      { class: 'vx-check' },
       external,
-      el('label', { for: 'vx-external', class: 'vx-inline' }, ' Opens another website'),
+      el('label', { for: 'vx-external', class: 'vx-inline' }, 'Opens another website'),
     );
     const actions: [string, string][] = [['apply', 'Apply']];
     if (existing) actions.push(['remove', 'Remove link']);
@@ -504,6 +506,11 @@ export function installVisualEditor(win: Window): void {
     // The blocks around the cursor, outermost first; pick which one to change.
     const chain: { node: PMNode; pos: number }[] = [];
     const sel = state.selection;
+    if (sel instanceof NodeSelection && sel.node.type === schema.nodes.raw_inline) {
+      props.append(el('p', {}, el('strong', {}, String(sel.node.attrs.label))));
+      props.append(rawEditor(sel.from, sel.node));
+      return;
+    }
     if (sel instanceof NodeSelection && sel.node.isBlock)
       chain.push({ node: sel.node, pos: sel.from });
     const $from = sel.$from;
@@ -583,6 +590,9 @@ export function installVisualEditor(win: Window): void {
         'Leave empty to show to everyone. Separate several values with spaces.',
       ),
     );
+    // The conditions most sites use first; the rest, unless set, behind "More conditions".
+    const main = el('div', { class: 'vx-cond-grid' });
+    const extra = el('div', { class: 'vx-cond-grid' });
     for (const a of CONDITION_ATTRS) {
       const f = field(`vx-cond-${a}`, `${a}: ${CONDITION_HINTS[a]}`, attrs[a] ?? '');
       f.input.addEventListener('change', () => {
@@ -592,8 +602,11 @@ export function installVisualEditor(win: Window): void {
         else delete next[a];
         apply(next);
       });
-      fs.append(f.row);
+      (MAIN_CONDITIONS.has(a) || attrs[a] ? main : extra).append(f.row);
     }
+    fs.append(main);
+    if (extra.childElementCount)
+      fs.append(el('details', {}, el('summary', {}, 'More conditions'), extra));
     props.append(fs);
     if (attrs.id) props.append(el('p', { class: 'vx-muted' }, `Element id: ${attrs.id}`));
   }
@@ -613,10 +626,15 @@ export function installVisualEditor(win: Window): void {
         return;
       }
       if (!view) return;
-      const nodes = blocksOf(
-        parsed.documentElement,
-        view.state.doc.resolve(pos).parent.attrs.tag as string,
-      );
+      const kids: Node[] = [];
+      for (let k = parsed.documentElement.firstChild; k; k = k.nextSibling) kids.push(k);
+      const nodes =
+        node.type === schema.nodes.raw_inline
+          ? inlineContent(kids)
+          : blocksOf(
+              parsed.documentElement,
+              view.state.doc.resolve(pos).parent.attrs.tag as string,
+            );
       view.dispatch(replaceRaw(view.state.tr, pos, nodes));
       view.focus();
     });
@@ -632,6 +650,81 @@ export function installVisualEditor(win: Window): void {
       el('p', {}, save),
     );
     return box;
+  }
+
+  // ---- inline chips: images and key references -----------------------------------
+  let keyText: Record<string, string> = {};
+  try {
+    keyText = JSON.parse(visualPane.dataset.keys ?? '{}') as Record<string, string>;
+  } catch {
+    // No key texts: key references show their key names.
+  }
+  let topicTitle: Record<string, string> = {};
+  try {
+    topicTitle = JSON.parse(visualPane.dataset.titles ?? '{}') as Record<string, string>;
+  } catch {
+    // No titles: links without text show their target.
+  }
+  const assetBase = visualPane.dataset.assets ?? '';
+  const topicDir = (form.dataset.path ?? '').split('/').slice(0, -1);
+
+  /** A docs-relative path for an `href` relative to this topic, or null when it leaves the docs. */
+  const resolveHref = (href: string): string | null => {
+    if (/^[a-z]+:|^\/|^#/i.test(href)) return null;
+    const parts = [...topicDir];
+    for (const seg of href.split('#')[0]!.split('/')) {
+      if (seg === '..') {
+        if (!parts.length) return null;
+        parts.pop();
+      } else if (seg && seg !== '.') parts.push(seg);
+    }
+    return parts.join('/');
+  };
+
+  /** How a raw inline node shows: the image itself, a key's text, or a labelled chip. */
+  function rawInlineView(node: PMNode) {
+    const dom = el('span', { class: 'vx-raw-inline', title: String(node.attrs.label) });
+    dom.textContent = String(node.attrs.label);
+    const parsed = parser(`<w>${String(node.attrs.xml)}</w>`).documentElement.firstElementChild;
+    if (!parsed) return { dom };
+    const keyref = parsed.getAttribute('keyref');
+    const textless = !(parsed.textContent ?? '').trim();
+    if (parsed.nodeName === 'image') {
+      const href = parsed.getAttribute('href');
+      const path = href ? resolveHref(href) : null;
+      if (path && assetBase) {
+        const alt =
+          parsed.getElementsByTagName('alt')[0]?.textContent?.trim() ||
+          parsed.getAttribute('alt') ||
+          '';
+        const img = el('img', {
+          src: `${assetBase}${path.split('/').map(encodeURIComponent).join('/')}`,
+          alt,
+        });
+        img.addEventListener('error', () => {
+          img.replaceWith(String(node.attrs.label));
+          dom.className = 'vx-raw-inline';
+        });
+        dom.textContent = '';
+        dom.className = `vx-image${parsed.getAttribute('placement') === 'break' ? ' vx-image-break' : ''}`;
+        dom.title = alt || path;
+        dom.append(img);
+      }
+    } else if (parsed.nodeName === 'xref' && textless && !keyref) {
+      const href = parsed.getAttribute('href') ?? '';
+      const path = resolveHref(href);
+      const title = path ? topicTitle[path] : undefined;
+      if (title || /^https?:/i.test(href)) {
+        dom.className = 'vx-link';
+        dom.textContent = title ?? href;
+        dom.title = `Link to ${href} (text from the target)`;
+      }
+    } else if (keyref && textless && keyText[keyref]) {
+      dom.className = 'vx-key';
+      dom.textContent = keyText[keyref]!;
+      dom.title = `Key: ${keyref} (defined in the map)`;
+    }
+    return { dom };
   }
 
   // ---- editor ------------------------------------------------------------------
@@ -717,8 +810,10 @@ export function installVisualEditor(win: Window): void {
         refreshTools();
         renderProps();
       },
+      nodeViews: { raw_inline: (node) => rawInlineView(node) },
       handleDoubleClickOn(_view, _pos, node, nodePos) {
-        if (node.type !== schema.nodes.raw_block) return false;
+        if (node.type !== schema.nodes.raw_block && node.type !== schema.nodes.raw_inline)
+          return false;
         target = nodePos;
         props.hidden = false;
         renderProps();
