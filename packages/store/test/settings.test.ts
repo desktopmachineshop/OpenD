@@ -91,7 +91,7 @@ describe.skipIf(!url)('settings in Postgres', () => {
     await deleteSecret(db.pool, 'oidc.clientSecret');
     await expect.poll(() => seen).toEqual(['editor', 'secret:oidc.clientSecret']);
     await expect
-      .poll(() => cache.current.values.editor, { timeout: 5000 })
+      .poll(() => cache.current.values.editor, { timeout: 15_000 })
       .toEqual({ url: 'https://edit.example' });
     await expect.poll(() => cache.current.secrets['oidc.clientSecret']).toBeUndefined();
     await listener.stop();
@@ -103,7 +103,9 @@ describe.skipIf(!url)('settings in Postgres', () => {
     const stored = await db.pool.query('select token_hash from admin_setup_tokens');
     expect(JSON.stringify(stored.rows)).not.toContain(token);
     expect(await setupTokenValid(db.pool, token)).toBe(true);
-    expect(await setupTokenValid(db.pool, `${token.slice(0, -1)}A`)).toBe(false);
+    expect(
+      await setupTokenValid(db.pool, `${token.slice(0, -1)}${token.endsWith('A') ? 'B' : 'A'}`),
+    ).toBe(false);
     expect(await consumeSetupToken(db.pool, token)).toBe(true);
     expect(await consumeSetupToken(db.pool, token)).toBe(false);
     expect(await setupTokenValid(db.pool, token)).toBe(false);

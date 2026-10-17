@@ -2,8 +2,18 @@
 import { readFile } from 'node:fs/promises';
 import { Command } from 'commander';
 import { editorCommand } from '@opend/editor';
-import { createBlobStore, createPool, migrate, purgeAnalytics } from '@opend/store';
-import { GitHubApp, jsonLog, startPoller, startWorker } from '@opend/worker';
+import {
+  SecretBox,
+  SettingsCache,
+  createBlobStore,
+  createPool,
+  deriveSecretKey,
+  migrate,
+  purgeAnalytics,
+  storedGitHubApp,
+} from '@opend/store';
+import { GitHubConnection, jsonLog, startPoller, startWorker } from '@opend/worker';
+import { mintSetupLink } from './admin.js';
 import { startAnalyticsPurge } from './analytics-purge.js';
 import { createApp } from './app.js';
 import { DEFAULT_ANALYTICS, loadConfig } from './config.js';
@@ -32,15 +42,16 @@ program
   .action(async () => {
     const config = loadConfig();
     const pool = createPool(config.databaseUrl);
-    const { app } = await createApp(config, { pool, blobs: createBlobStore(config.blobs) });
+    const { app, ctx } = await createApp(config, { pool, blobs: createBlobStore(config.blobs) });
     await app.listen({ port: config.port, host: config.host });
     jsonLog({
       level: 'info',
       msg: 'serving',
       url: config.publicUrl,
-      oidc: Boolean(config.oidc),
-      devLogin: config.devLogin,
-      webhook: Boolean(config.webhookSecret),
+      oidc: Boolean(ctx.config.oidc),
+      devLogin: ctx.config.devLogin,
+      webhook: Boolean(ctx.config.webhookSecret),
+      github: ctx.github.mode(),
       admin: Boolean(config.adminToken),
       blobs: config.blobs.kind,
     });
@@ -59,7 +70,31 @@ program
   .action(async () => {
     const config = loadConfig();
     const pool = createPool(config.databaseUrl);
-    const github = config.github ? new GitHubApp(config.github) : null;
+    // The GitHub App from the environment, the broker, or the one Connect GitHub stored.
+    const key = deriveSecretKey({
+      secretKey: config.secretKey,
+      sessionSecret: config.sessionSecret,
+    });
+    const settings = new SettingsCache(pool, key ? new SecretBox(key) : null);
+    await settings
+      .reload()
+      .catch((err: unknown) =>
+        jsonLog({ level: 'warn', msg: 'settings not loaded', error: String(err) }),
+      );
+    const settingsListener = settings.listen(config.databaseUrl, (err) =>
+      jsonLog({ level: 'warn', msg: 'settings reload failed', error: String(err) }),
+    );
+    const github = new GitHubConnection({
+      app: config.github ?? null,
+      broker: config.broker ?? null,
+      stored: () => {
+        const app = storedGitHubApp(settings.current);
+        return app ? { appId: app.appId, privateKey: app.privateKey, apiUrl: app.apiUrl } : null;
+      },
+      ...(config.githubApiUrl ? { apiUrl: config.githubApiUrl } : {}),
+      ...(config.githubWebUrl ? { webUrl: config.githubWebUrl } : {}),
+      log: jsonLog,
+    });
     const worker = startWorker({
       pool,
       blobs: createBlobStore(config.blobs),
@@ -76,7 +111,7 @@ program
     jsonLog({
       level: 'info',
       msg: 'worker started',
-      github: Boolean(github),
+      github: github.mode(),
       blobs: config.blobs.kind,
       pollSeconds,
       analyticsRetentionDays: retentionDays,
@@ -85,11 +120,41 @@ program
       await poller?.stop();
       await purge.stop();
       await worker.stop();
+      await settingsListener.stop();
       await pool.end();
       process.exit(0);
     };
     process.once('SIGTERM', () => void shutdown());
     process.once('SIGINT', () => void shutdown());
+  });
+
+program
+  .command('admin-link')
+  .description('print a one-time link that makes its visitor the first staff reader')
+  .option('--minutes <n>', 'minutes the link stays valid', '30')
+  .option('--force', 'mint one even though a staff reader exists')
+  .action(async (options: { minutes: string; force?: boolean }) => {
+    const config = loadConfig();
+    const minutes = Number(options.minutes);
+    if (!Number.isInteger(minutes) || minutes < 5 || minutes > 1440)
+      throw new Error('--minutes must be a whole number from 5 to 1440');
+    const pool = createPool(config.databaseUrl);
+    try {
+      const link = await mintSetupLink(pool, config.publicUrl, {
+        minutes,
+        actor: 'cli',
+        force: options.force === true,
+      });
+      if (!link)
+        throw new Error(
+          'a staff reader already exists: sign in as staff and open /admin (or pass --force)',
+        );
+      process.stdout.write(
+        `Open this link within ${minutes} minutes to become the first staff reader (it works once):\n${link.url}\n`,
+      );
+    } finally {
+      await pool.end();
+    }
   });
 
 program

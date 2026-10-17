@@ -118,20 +118,21 @@ describe('GitHubBroker', () => {
     ).toEqual(['ghe.example']);
   });
 
-  it('reports commit statuses with a write token', async () => {
+  it('posts no commit statuses (broker tokens have no statuses permission), saying so once', async () => {
     const fake = fakeBroker();
-    const broker = new GitHubBroker({ url: BROKER, secret: SECRET }, fake.fetch);
-    await broker.report(
-      { fullName: 'acme/docs', installationId: null, sourceUrl: 'https://github.com/acme/docs' },
-      'a'.repeat(40),
-      'success',
-      'Published 1.0',
+    const logs: unknown[] = [];
+    const broker = new GitHubBroker({ url: BROKER, secret: SECRET }, fake.fetch, (e) =>
+      logs.push(e),
     );
-    expect(fake.calls.map((c) => `${c.method} ${c.path}`)).toEqual([
-      'POST /broker/v1/token',
-      `POST /repos/acme/docs/statuses/${'a'.repeat(40)}`,
-    ]);
-    expect(fake.calls[0]!.body).toMatchObject({ permissions: 'write' });
+    const repo = {
+      fullName: 'acme/docs',
+      installationId: null,
+      sourceUrl: 'https://github.com/acme/docs',
+    };
+    await broker.report(repo, 'a'.repeat(40), 'success', 'Published 1.0');
+    await broker.report(repo, 'b'.repeat(40), 'failure', 'Broken');
+    expect(fake.calls).toEqual([]);
+    expect(logs).toHaveLength(1);
   });
 });
 

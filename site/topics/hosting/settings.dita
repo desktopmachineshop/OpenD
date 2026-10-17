@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE reference PUBLIC "-//OASIS//DTD DITA Reference//EN" "reference.dtd">
+<reference id="settings" product="core" audience="admin">
+  <title>Console settings, environment variables and the secret key</title>
+  <shortdesc>Which settings the admin console stores, how environment variables override them, how changes
+    reach every service, and how stored secrets are protected.</shortdesc>
+  <refbody>
+    <section id="precedence">
+      <title>Environment variables win</title>
+      <p>Each group of settings comes from its environment variables when they are set, and from the admin
+        console otherwise. A group never mixes the two: setting <codeph>OIDC_ISSUER</codeph> replaces the whole
+        OIDC setup stored in the console. The console shows such a group as <uicontrol>Set by
+        environment</uicontrol>, read-only; remove the variables to manage it in the console.</p>
+      <simpletable relcolwidth="3* 4*">
+        <sthead><stentry>Setting</stentry><stentry>Variables that override it</stentry></sthead>
+        <strow><stentry>Company sign-in (OIDC)</stentry><stentry><codeph>OIDC_ISSUER</codeph>, <codeph>OIDC_CLIENT_ID</codeph>, <codeph>OIDC_CLIENT_SECRET</codeph>, <codeph>OIDC_DISPLAY_NAME</codeph>, <codeph>OIDC_ICON</codeph></stentry></strow>
+        <strow><stentry>The GitHub App (tokens, statuses)</stentry><stentry><codeph>GITHUB_APP_ID</codeph> and <codeph>GITHUB_APP_PRIVATE_KEY</codeph>, or <codeph>OPEND_GITHUB_BROKER_URL</codeph> (managed hosting)</stentry></strow>
+        <strow><stentry>GitHub sign-in</stentry><stentry><codeph>GITHUB_OAUTH_CLIENT_ID</codeph> and <codeph>GITHUB_OAUTH_CLIENT_SECRET</codeph></stentry></strow>
+        <strow><stentry>Webhook secret</stentry><stentry><codeph>GITHUB_WEBHOOK_SECRET</codeph></stentry></strow>
+        <strow><stentry>Editor address</stentry><stentry><codeph>EDITOR_PUBLIC_URL</codeph></stentry></strow>
+        <strow><stentry><uicontrol>View source on GitHub</uicontrol></stentry><stentry><codeph>OPEND_SOURCE_LINKS</codeph></stentry></strow>
+        <strow><stentry>Demo readers</stentry><stentry>Only ever on where <codeph>OPEND_DEV_LOGIN</codeph> allows them; the console can turn them off</stentry></strow>
+      </simpletable>
+      <p>Site access, the docs repository, organizations and readers live in their own tables, as before, and
+        the admin API changes the same records.</p>
+    </section>
+    <section id="reload">
+      <title>Changes apply without a restart</title>
+      <p>Every change sends a Postgres notification. The web service (every replica), the worker and the
+        editor reload their settings when it arrives, and re-read them at least once a minute in case a
+        notification is missed. Sign-in providers are rebuilt only when their own settings change.</p>
+    </section>
+    <section id="secret-key">
+      <title>The secret key</title>
+      <p>Client secrets, the GitHub App's private key and its webhook secret are sealed with AES-256-GCM
+        before they reach the database, bound to their names so one cannot be swapped for another. No page,
+        API route, log line or audit entry ever contains one; the console only says whether each is set.</p>
+      <p>The key comes from <codeph>OPEND_SECRET_KEY</codeph> when it is set. Otherwise it is derived from
+        <codeph>SESSION_SECRET</codeph> with HKDF under a label of its own, so it is never the session key
+        itself. Either way, every service that reads the settings needs the same value: give the worker and
+        the editor the web service's <codeph>SESSION_SECRET</codeph> (or <codeph>OPEND_SECRET_KEY</codeph>).</p>
+      <note type="important">Without <codeph>OPEND_SECRET_KEY</codeph>, changing <codeph>SESSION_SECRET</codeph>
+        makes the stored secrets unreadable. Nothing breaks silently: the console warns about them, and the
+        settings behave as if unset until you enter the client secret again or reconnect GitHub. Set
+        <codeph>OPEND_SECRET_KEY</codeph> before you store secrets if you rotate session secrets.</note>
+    </section>
+  </refbody>
+</reference>

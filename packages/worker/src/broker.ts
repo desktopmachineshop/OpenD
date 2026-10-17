@@ -1,7 +1,6 @@
 import {
   gitHostsFor,
   readBody,
-  type CommitState,
   type GitHubAccess,
   type GitHubResponse,
   type RepoRef,
@@ -54,10 +53,12 @@ export class GitHubBroker implements GitHubAccess {
   private readonly apiUrl: string;
   private readonly tokens = new Map<string, { token: string; expiresAt: number }>();
   private readonly pending = new Map<string, Promise<string>>();
+  private statusesNoted = false;
 
   constructor(
     private readonly config: BrokerConfig,
     private readonly fetchImpl: typeof fetch = fetch,
+    private readonly log?: (entry: Record<string, unknown>) => void,
   ) {
     this.url = config.url.replace(/\/+$/, '');
     this.apiUrl = (config.apiUrl ?? 'https://api.github.com').replace(/\/$/, '');
@@ -163,20 +164,17 @@ export class GitHubBroker implements GitHubAccess {
     return { status: res.status, data: await readBody(res) };
   }
 
-  /** Commit statuses need write access, so they use a `write` token. */
-  async report(repo: RepoRef, sha: string, state: CommitState, description: string): Promise<void> {
-    if (repo.sourceUrl !== undefined && !onTokenHost(repo.sourceUrl, this.gitHosts)) return;
-    const res = await this.request(
-      repo,
-      'POST',
-      `/repos/${repo.fullName}/statuses/${sha}`,
-      {
-        state,
-        context: 'opend/build',
-        description: description.length > 140 ? `${description.slice(0, 139)}…` : description,
-      },
-      'write',
-    );
-    if (res.status >= 300) throw new Error(`GitHub commit status failed: ${res.status}`);
+  /**
+   * Broker tokens carry contents, pull requests and metadata only, not commit
+   * statuses, so builds report no `opend/build` status in broker mode. Said
+   * once in the log rather than failing every build.
+   */
+  async report(): Promise<void> {
+    if (this.statusesNoted) return;
+    this.statusesNoted = true;
+    this.log?.({
+      level: 'info',
+      msg: 'commit statuses are not posted in broker mode (broker tokens have no statuses permission)',
+    });
   }
 }

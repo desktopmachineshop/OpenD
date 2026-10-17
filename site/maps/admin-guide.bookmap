@@ -16,7 +16,9 @@
     <topicref href="../topics/hosting/docker-compose.dita"/>
     <topicref href="../topics/hosting/railway.dita"/>
     <topicref href="../topics/hosting/env-vars.dita"/>
+    <topicref href="../topics/hosting/settings.dita"/>
     <topicref href="../topics/hosting/blob-storage.dita"/>
+    <topicref href="../topics/hosting/connect-github.dita"/>
     <topicref href="../topics/hosting/github.dita"/>
     <topicref href="../topics/hosting/github-app.dita"/>
     <topicref href="../topics/hosting/access.dita"/>
@@ -26,6 +28,8 @@
   </chapter>
 
   <chapter href="../topics/hosting/managed-site.dita" product="hosted"/>
+
+  <chapter href="../topics/hosting/admin-console.dita" product="core hosted"/>
 
   <chapter navtitle="Readers and administration" product="core">
     <topicref href="../topics/hosting/readers-orgs.dita"/>

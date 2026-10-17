@@ -55,6 +55,27 @@ export async function upsertRepo(db: Db, input: RepoInput): Promise<Repo> {
   return rows[0]!;
 }
 
+/**
+ * Points an existing repo row at another repository (the admin console's
+ * "change the docs repository"), keeping its access settings and history.
+ */
+export async function updateRepo(db: Db, id: number, input: RepoInput): Promise<Repo | null> {
+  const { rows } = await db.query<Repo>(
+    `update repos set full_name = $2, source_url = $3, installation_id = $4, release_refs = $5,
+       docs_path = $6 where id = $1 returning ${COLUMNS}`,
+    [
+      id,
+      input.fullName,
+      input.sourceUrl,
+      input.installationId ?? null,
+      input.releaseRefs ?? ['main'],
+      input.docsPath ?? '.',
+    ],
+  );
+  await notify(db, CHANNELS.releaseChanged, String(id));
+  return rows[0] ?? null;
+}
+
 export async function getRepo(db: Db, id: number): Promise<Repo | null> {
   const { rows } = await db.query<Repo>(`select ${COLUMNS} from repos where id = $1`, [id]);
   return rows[0] ?? null;

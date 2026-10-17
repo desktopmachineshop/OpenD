@@ -76,6 +76,7 @@ export async function createEditorApp(config: EditorConfig, deps: EditorDeps): P
     ...(config.githubApiUrl ? { apiUrl: config.githubApiUrl } : {}),
     webUrl: config.githubWebUrl,
     fetch: fetchImpl,
+    log: (entry) => ctx.log(entry),
   });
   const clientFor = deps.clientFor ?? ((repo: Repo) => new RestGitHubClient(github, repo));
   let oauthKey = '';

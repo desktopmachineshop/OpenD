@@ -1,8 +1,15 @@
 import { LRUCache } from 'lru-cache';
 import type { PublicationView, ReleaseView } from '@opend/filter';
 import type { PdfRenderer } from '@opend/pdf';
-import type { BlobStore, Pool, ReaderAccess, Repo, StoredRelease } from '@opend/store';
-import type { Log } from '@opend/worker';
+import type {
+  BlobStore,
+  Pool,
+  ReaderAccess,
+  Repo,
+  SettingsCache,
+  StoredRelease,
+} from '@opend/store';
+import type { GitHubConnection, Log } from '@opend/worker';
 import type { Analytics } from './analytics.js';
 import type { ServerConfig } from './config.js';
 import type { GitHubOAuth } from '@opend/editor';
@@ -56,7 +63,22 @@ export class Caches {
 }
 
 export interface AppContext {
+  /**
+   * The effective configuration: environment variables, and the admin
+   * console's settings where no variable is set. Replaced when settings
+   * change, so read it per request rather than keeping a copy.
+   */
   config: ServerConfig;
+  /** The configuration from the environment alone. */
+  env: ServerConfig;
+  /** The admin console's settings and secrets, reloaded on NOTIFY. */
+  settings: SettingsCache;
+  /** Installation tokens: the environment's GitHub App, the broker, or the connected app. */
+  github: GitHubConnection;
+  /** `fetch` for GitHub (tests pass a fake). */
+  githubFetch: typeof fetch;
+  /** Re-reads settings now and applies them (after a change in this process). */
+  reloadSettings(): Promise<void>;
   pool: Pool;
   blobs: BlobStore;
   log: Log;

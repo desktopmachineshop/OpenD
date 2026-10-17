@@ -325,7 +325,8 @@ const str = (v: unknown): string | undefined => (typeof v === 'string' && v ? v 
 /** The connected GitHub App with its secrets, or null when none is stored (or unreadable). */
 export function storedGitHubApp(
   snapshot: SettingsSnapshot,
-): (StoredGitHubApp & { privateKey: string; clientSecret?: string; webhookSecret?: string }) | null {
+):
+  (StoredGitHubApp & { privateKey: string; clientSecret?: string; webhookSecret?: string }) | null {
   const v = snapshot.values[SETTING.githubApp];
   const privateKey = snapshot.secrets[SECRET.githubPrivateKey];
   if (!isRecord(v) || !str(v.appId) || !privateKey) return null;

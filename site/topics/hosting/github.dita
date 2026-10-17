@@ -6,6 +6,9 @@
     repositories and commit statuses.</shortdesc>
   <taskbody>
     <context>
+      <p>The quickest way is <uicontrol>Connect GitHub</uicontrol> in the admin console, which creates and
+        installs the GitHub App, webhook included, without any variables: see <xref href="connect-github.dita"/>.
+        This page is the manual route.</p>
       <p>A public repository needs only the webhook. Add the GitHub App when a docs repository is private, or
         when you want each commit to show whether it published.</p>
     </context>

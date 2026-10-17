@@ -37,6 +37,11 @@
           <xref href="../start/search.dita"/>.</li>
         <li>An admin API with an audit log, a seed command, one Docker image for every role, a Compose file,
           S3-compatible blob storage, published images, and a Railway runbook.</li>
+        <li>An admin console for staff readers at <filepath>/admin</filepath>: site access, the docs repository
+          and builds, people, sign-in, the GitHub connection and the editor, from the browser. See
+          <xref href="../hosting/admin-console.dita"/>.</li>
+        <li product="core"><uicontrol>Connect GitHub</uicontrol>: the console creates and installs a GitHub App for
+          the site, its credentials stored encrypted. See <xref href="../hosting/connect-github.dita"/>.</li>
       </ul>
     </section>
     <section id="editor">

@@ -5,6 +5,20 @@
   <shortdesc>When another team or a provider runs the <keyword keyref="product-name"/> server, connecting
     your docs repository takes a few details and one webhook.</shortdesc>
   <taskbody>
+    <context>
+      <p>On a managed site you are usually a staff reader yourself, and do all of this in the admin console at
+        <filepath>/admin</filepath> (<xref href="admin-console.dita"/>):</p>
+      <ul>
+        <li><uicontrol>GitHub</uicontrol> says <uicontrol>Managed by your hosting provider</uicontrol>. Its
+          <uicontrol>Connect GitHub</uicontrol> button installs the provider's GitHub App on the repositories
+          you choose; there is no app to create and no key to handle.</li>
+        <li><uicontrol>Docs source</uicontrol> lists the repositories you installed it on: pick yours and the
+          first build starts. Pushes reach the site through the provider, already verified.</li>
+        <li>Readers and staff sign in with <uicontrol>Sign in with GitHub</uicontrol>, which goes through the
+          provider's sign-in service; the web editor signs authors in the same way.</li>
+      </ul>
+      <p>Otherwise, ask the operator to do these steps for you.</p>
+    </context>
     <steps>
       <step>
         <cmd>Send the operator your repository details.</cmd>

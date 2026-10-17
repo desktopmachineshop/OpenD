@@ -8,8 +8,9 @@
     <prereq>
       <ul>
         <li>A running <keyword keyref="product-name"/> server, with the docs repository registered and the
-          GitHub App installed on it (<parmname>installationId</parmname> set). See
-          <xref href="github.dita"/>.</li>
+          GitHub App installed on it (<parmname>installationId</parmname> set). <uicontrol>Connect
+          GitHub</uicontrol> in the admin console does both (<xref href="connect-github.dita"/>); the manual
+          route is <xref href="github.dita"/>.</li>
         <li>A host name for the editor that is not the docs site's, such as
           <codeph>edit.docs.example.com</codeph>. Cookies ignore ports, so in production a different port on
           the same host is refused.</li>

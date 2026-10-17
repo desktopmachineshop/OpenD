@@ -4,6 +4,8 @@ import { z } from 'zod';
 import {
   analyticsSummary,
   audit,
+  countStaffReaders,
+  createSetupToken,
   deleteOrg,
   deleteReader,
   enqueueJob,
@@ -23,8 +25,10 @@ import {
   upsertReader,
   upsertRepo,
   withTransaction,
+  type Pool,
 } from '@opend/store';
 import type { AppContext } from './context.js';
+import { settingSources } from './settings.js';
 
 const ACTOR = 'admin-token';
 export const slug = z
@@ -89,7 +93,7 @@ export function sourceUrlSchema(production: boolean) {
     );
 }
 
-const repoSchema = (production: boolean) =>
+export const repoSchema = (production: boolean) =>
   z.object({
     fullName: z.string().regex(/^[\w.-]+\/[\w.-]+$/, 'owner/name'),
     sourceUrl: sourceUrlSchema(production),
@@ -122,6 +126,35 @@ export function csvField(value: unknown): string {
   let text = value instanceof Date ? value.toISOString() : String(value ?? '');
   if (/^[=+\-@\t\r]/.test(text)) text = `'${text}`;
   return `"${text.replaceAll('"', '""')}"`;
+}
+
+const setupLinkSchema = z.object({
+  minutes: z
+    .number()
+    .int()
+    .min(5)
+    .max(24 * 60)
+    .default(30),
+});
+
+/**
+ * A one-time link that makes its visitor the first staff reader. Refused once
+ * a staff reader exists (unless `force`), so it cannot quietly add more.
+ */
+export async function mintSetupLink(
+  pool: Pool,
+  publicUrl: string,
+  options: { minutes: number; actor: string; force?: boolean },
+): Promise<{ url: string; expiresAt: Date } | null> {
+  if (!options.force && (await countStaffReaders(pool)) > 0) return null;
+  return withTransaction(pool, async (db) => {
+    const { token, expiresAt } = await createSetupToken(db, options);
+    await audit(db, options.actor, 'admin.setup-link', {
+      expiresAt,
+      force: options.force === true,
+    });
+    return { url: `${publicUrl}/admin/setup?token=${token}`, expiresAt };
+  });
 }
 
 const buildSchema = z.object({
@@ -299,6 +332,29 @@ export function registerAdmin(app: FastifyInstance, ctx: AppContext): void {
       });
 
       scope.get('/audit', async () => listAudit(ctx.pool));
+
+      // The admin console's settings. Secrets are never returned: only whether each is set.
+      scope.get('/settings', async () => {
+        const snap = ctx.settings.current;
+        return {
+          values: snap.values,
+          secrets: Object.fromEntries(Object.keys(snap.secrets).map((name) => [name, 'set'])),
+          unreadable: snap.unreadable,
+          sources: settingSources(ctx.env, snap),
+          github: ctx.github.mode(),
+        };
+      });
+      scope.post('/setup-links', async (request, reply) => {
+        const input = parse(setupLinkSchema, request.body ?? {}, reply);
+        if (!input) return reply;
+        const link = await mintSetupLink(ctx.pool, ctx.env.publicUrl, {
+          minutes: input.minutes,
+          actor: ACTOR,
+        });
+        return link
+          ? reply.code(201).send(link)
+          : reply.code(409).send({ error: 'a staff reader exists; sign in as staff instead' });
+      });
 
       // Analytics: read-only, and still readable after OPEND_ANALYTICS=0 stops recording.
       const feedbackFilter = (q: z.infer<typeof feedbackQuery>) => ({

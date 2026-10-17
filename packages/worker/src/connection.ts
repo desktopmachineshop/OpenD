@@ -24,6 +24,7 @@ export interface GitHubConnectionOptions {
   apiUrl?: string;
   webUrl?: string;
   fetch?: typeof fetch;
+  log?: (entry: Record<string, unknown>) => void;
 }
 
 /**
@@ -41,7 +42,9 @@ export class GitHubConnection implements GitHubAccess {
     this.fetchImpl = options.fetch ?? fetch;
     this.envApp = options.app ? new GitHubApp(options.app, this.fetchImpl) : null;
     this.broker =
-      !this.envApp && options.broker ? new GitHubBroker(options.broker, this.fetchImpl) : null;
+      !this.envApp && options.broker
+        ? new GitHubBroker(options.broker, this.fetchImpl, options.log)
+        : null;
   }
 
   mode(): GitHubMode {

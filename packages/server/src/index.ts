@@ -20,3 +20,7 @@ export * from './analytics-purge.js';
 export * from './feedback.js';
 export * from './access.js';
 export * from './pages.js';
+export * from './settings.js';
+export * from './github-connect.js';
+export * from './admin-console.js';
+export * from './admin-pages.js';
