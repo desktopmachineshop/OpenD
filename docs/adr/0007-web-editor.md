@@ -64,7 +64,7 @@ The content is DITA XML, so a Markdown editor is out of scope.
   - a section (element `id`) the author still has that was deleted on main.
 - **Stale choices:** if either head moved since the choices were shown, the resolution is refused.
 
-**DITA source editing in v1.**
+**DITA source editing in v1.** (Visual editing was added later; see ADR 0013.)
 
 - **Editing:** authors edit a topic's or map's source in a plain textarea. They can also create a topic from a template (concept, task, reference or topic), optionally adding it to a map.
 - **Checks:** the server checks well-formedness before every save and refuses broken XML. OpenD validation shows inline but does not block saving; it does block publishing.

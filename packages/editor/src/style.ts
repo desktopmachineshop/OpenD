@@ -86,4 +86,112 @@ caption { text-align: left; font-weight: 600; }
 .ed-blocked p { margin: 6px 0; }
 .ed-blocked .ed-hint { color: var(--ed-fg); }
 @media (prefers-reduced-motion: no-preference) { button, .ed-button { transition: background-color .15s ease, border-color .15s ease; } }
+/* Visual editor (visual/main.ts): the topic edited as it reads, with a toolbar. */
+.vx-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--ed-border); margin-bottom: 12px; }
+.vx-tabs [role="tab"] { background: none; color: var(--ed-muted); border: 0; border-bottom: 3px solid transparent; border-radius: 0; padding: 8px 14px; font-weight: 600; }
+.vx-tabs [role="tab"][aria-selected="true"] { color: var(--ed-fg); border-bottom-color: var(--ed-accent); }
+.vx-tabs [role="tab"][disabled] { opacity: .5; }
+.vx-notice { background: var(--ed-warn-bg); color: var(--ed-fg); border-left: 4px solid var(--ed-warn); padding: 8px 12px; border-radius: var(--ed-radius-sm); }
+.ed-workspace > * { min-width: 0; }
+.vx-pane { min-width: 0; border: 1px solid var(--ed-border); border-radius: var(--ed-radius); background: var(--ed-bg); box-shadow: var(--ed-shadow); margin-bottom: 12px; }
+.vx-toolbar { position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 8px; background: var(--ed-soft);
+  border-bottom: 1px solid var(--ed-border); border-radius: var(--ed-radius) var(--ed-radius) 0 0; }
+.vx-group { display: contents; }
+.vx-group + .vx-group > :first-child { margin-left: 8px; }
+.vx-tool { background: var(--ed-bg); color: var(--ed-fg); border: 1px solid var(--ed-border); padding: 4px 10px; min-width: 36px; min-height: 36px; font-size: 14px; }
+.vx-tool:hover:not([disabled]) { border-color: var(--ed-accent); }
+.vx-tool[aria-pressed="true"], .vx-tool[aria-expanded="true"] { background: var(--ed-accent-soft); border-color: var(--ed-accent); color: var(--ed-fg); }
+.vx-tool[disabled] { opacity: .4; }
+.vx-b { font-weight: 800; }
+.vx-i { font-style: italic; }
+.vx-mono { font-family: var(--ed-mono); }
+select.vx-more { min-width: 0; min-height: 36px; padding: 4px 8px; }
+.vx-surface { padding: 8px 0; }
+.vx-editor { max-width: 760px; margin: 0 auto; padding: 16px 24px 48px; min-height: 50vh; font-size: 16px; line-height: 1.65; outline: none; white-space: pre-wrap; word-wrap: break-word; }
+.vx-editor:focus-visible { box-shadow: inset 0 0 0 2px var(--ed-accent-soft); }
+.vx-title { font-size: 30px; line-height: 1.25; margin: 8px 0 4px; }
+.vx-shortdesc { font-size: 18px; color: var(--ed-muted); margin: 0 0 24px; }
+.vx-empty::before { content: attr(data-placeholder); color: var(--ed-muted); opacity: .7; pointer-events: none; float: left; height: 0; }
+.vx-editor p { margin: 0 0 12px; }
+.vx-editor h2.vx-tb-title { font-size: 22px; margin: 24px 0 8px; }
+.vx-c-section, .vx-c-example { margin: 0 0 8px; }
+.vx-c-prereq, .vx-c-context, .vx-c-result, .vx-c-postreq { border-left: 3px solid var(--ed-border); padding-left: 12px; margin: 0 0 16px; }
+.vx-c-prereq::before, .vx-c-context::before, .vx-c-result::before, .vx-c-postreq::before, .vx-c-info::before, .vx-c-stepresult::before, .vx-c-example:not(:has(> h2))::before {
+  display: block; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--ed-muted); margin-bottom: 4px; }
+.vx-c-prereq::before { content: "Before you begin"; }
+.vx-c-context::before { content: "Context"; }
+.vx-c-result::before { content: "Result"; }
+.vx-c-postreq::before { content: "What to do next"; }
+.vx-c-info::before { content: "Details"; }
+.vx-c-stepresult::before { content: "Result of this step"; }
+.vx-c-example:not(:has(> h2))::before { content: "Example"; }
+.vx-c-note { display: block; border: 1px solid var(--ed-border); border-left: 4px solid var(--ed-accent); background: var(--ed-accent-soft); border-radius: var(--ed-radius-sm); padding: 8px 12px; margin: 0 0 12px; }
+.vx-c-note::before { content: attr(data-note); display: block; font-weight: 700; text-transform: capitalize; margin-bottom: 2px; }
+.vx-c-note[data-note="caution"], .vx-c-note[data-note="warning"], .vx-c-note[data-note="danger"], .vx-c-note[data-note="attention"], .vx-c-note[data-note="restriction"] {
+  border-left-color: var(--ed-warn); background: var(--ed-warn-bg); }
+.vx-c-note > :last-child, .vx-item > :last-child { margin-bottom: 0; }
+.vx-c-lq { border-left: 3px solid var(--ed-border); margin: 0 0 12px; padding-left: 12px; color: var(--ed-muted); }
+.vx-c-fig { margin: 0 0 12px; }
+.vx-c-info, .vx-c-stepresult, .vx-c-stepxmp { margin: 4px 0 8px; font-size: 15px; }
+.vx-list { margin: 0 0 12px; padding-left: 28px; }
+.vx-list-steps > .vx-item { margin-bottom: 12px; }
+.vx-list-steps > .vx-item::marker { font-weight: 700; color: var(--ed-accent); }
+.vx-tb-cmd { font-weight: 600; }
+.vx-item > p { margin-bottom: 4px; }
+.vx-code { background: var(--ed-soft); border: 1px solid var(--ed-border); border-radius: var(--ed-radius-sm); padding: 10px 12px; font: 14px/1.5 var(--ed-mono); white-space: pre-wrap; margin: 0 0 12px; }
+.vx-m-codeph, .vx-m-tt, .vx-m-filepath, .vx-m-cmdname, .vx-m-userinput, .vx-m-systemoutput, .vx-m-varname, .vx-m-parmname, .vx-m-apiname, .vx-m-option {
+  font-family: var(--ed-mono); font-size: .9em; background: var(--ed-soft); border-radius: 4px; padding: 0 3px; }
+.vx-m-varname { font-style: italic; }
+.vx-m-uicontrol, .vx-m-wintitle { font-weight: 600; }
+.vx-m-term { font-style: italic; }
+.vx-m-xref { color: var(--ed-accent); text-decoration: underline; }
+[data-cond] { position: relative; outline: 1px dashed color-mix(in srgb, var(--ed-warn) 60%, transparent); outline-offset: 3px; border-radius: 2px; }
+.vx-tb[data-cond]::after, .vx-c[data-cond]::after, .vx-item[data-cond]::after, .vx-list[data-cond]::after, .vx-code[data-cond]::after {
+  content: "Only for " attr(data-cond); display: block; width: fit-content; font: 600 11px/1.6 var(--ed-font); color: var(--ed-warn); background: var(--ed-warn-bg);
+  border-radius: 999px; padding: 0 8px; margin-top: 2px; white-space: normal; }
+.vx-raw, .vx-raw-inline { font: 13px/1.4 var(--ed-font); color: var(--ed-muted); background: var(--ed-soft); border: 1px dashed var(--ed-border); border-radius: var(--ed-radius-sm); cursor: default; white-space: normal; }
+.vx-raw { display: block; padding: 10px 12px; margin: 0 0 12px; }
+.vx-raw::before { content: "\\1F512\\FE0E  "; }
+.vx-raw-inline { display: inline-block; padding: 0 6px; margin: 0 1px; }
+.vx-image { display: inline-block; max-width: 100%; vertical-align: middle; }
+.vx-image img { max-width: 100%; height: auto; border-radius: var(--ed-radius-sm); }
+.vx-image-break { display: block; margin: 4px 0 8px; }
+.vx-image-break img { max-height: 420px; }
+.vx-key { border-bottom: 1px dotted var(--ed-accent); cursor: default; }
+.vx-link { color: var(--ed-accent); text-decoration: underline; text-decoration-style: dotted; cursor: default; }
+@media (max-width: 1000px) { .ed-workspace > .ed-tree { order: 3; } }
+.ProseMirror-selectednode { outline: 2px solid var(--ed-accent) !important; outline-offset: 2px; }
+.ProseMirror-gapcursor { display: none; pointer-events: none; position: absolute; }
+.ProseMirror-gapcursor::after { content: ""; display: block; position: absolute; top: -2px; width: 20px; border-top: 1px solid var(--ed-fg); }
+.ProseMirror-focused .ProseMirror-gapcursor { display: block; }
+.ProseMirror-hideselection *::selection { background: transparent; }
+.vx-props { border-top: 1px solid var(--ed-border); padding: 12px 16px; background: var(--ed-soft); border-radius: 0 0 var(--ed-radius) var(--ed-radius); }
+.vx-props h2 { font-size: 16px; }
+.vx-props input:not([type="checkbox"]), .vx-props select { min-width: 0; width: 100%; max-width: 28em; }
+.vx-props textarea { min-height: 10em; }
+.vx-crumbs { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 12px; }
+.vx-crumb { background: var(--ed-bg); color: var(--ed-fg); border: 1px solid var(--ed-border); padding: 2px 10px; font-size: 13px; }
+.vx-crumb[aria-current="true"] { border-color: var(--ed-accent); background: var(--ed-accent-soft); font-weight: 600; }
+.vx-conds { border: 1px solid var(--ed-border); border-radius: var(--ed-radius-sm); padding: 8px 12px; }
+.vx-conds label { display: block; font-weight: 600; margin: 0; font-size: 14px; }
+.vx-cond-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(14em, 1fr)); gap: 0 16px; }
+.vx-cond-grid p { margin: 6px 0; }
+.vx-conds details summary { cursor: pointer; color: var(--ed-accent); font-size: 14px; margin: 6px 0; }
+.vx-muted { color: var(--ed-muted); font-size: 13px; }
+.vx-error { color: var(--ed-err); }
+.vx-dialog { border: 1px solid var(--ed-border); border-radius: var(--ed-radius); background: var(--ed-bg); color: var(--ed-fg); box-shadow: var(--ed-shadow); width: min(32em, calc(100vw - 32px)); padding: 16px 20px; }
+.vx-dialog::backdrop { background: color-mix(in srgb, var(--ed-fg) 35%, transparent); }
+.vx-dialog input:not([type="checkbox"]) { width: 100%; min-width: 0; }
+.vx-dialog label.vx-inline { display: inline; font-weight: normal; }
+.vx-check { display: flex; gap: 8px; align-items: center; }
+.vx-check input[type="checkbox"] { min-width: 0; width: auto; margin: 0; }
+.vx-dialog-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.vx-secondary, .vx-dialog button.vx-secondary { background: var(--ed-bg); color: var(--ed-fg); border-color: var(--ed-border); }
+@media (max-width: 600px) {
+  .vx-editor { padding: 12px 12px 32px; font-size: 16px; }
+  .vx-title { font-size: 24px; }
+  .vx-toolbar { flex-wrap: nowrap; overflow-x: auto; gap: 6px; -webkit-overflow-scrolling: touch; }
+  .vx-toolbar > *, .vx-group > * { flex-shrink: 0; }
+  .ed-main { padding: 12px; }
+}
 `;

@@ -25,12 +25,25 @@
     "@opend/validate": "workspace:*",
     "@opend/worker": "workspace:*",
     "commander": "^15.0.0",
+    "esbuild": "^0.28.2",
     "fastify": "^5.12.7",
     "lru-cache": "^11.5.3",
     "openid-client": "^6.8.8",
+    "prosemirror-commands": "^1.7.2",
+    "prosemirror-dropcursor": "^1.8.4",
+    "prosemirror-gapcursor": "^1.4.1",
+    "prosemirror-history": "^1.5.1",
+    "prosemirror-keymap": "^1.2.3",
+    "prosemirror-model": "^1.25.12",
+    "prosemirror-schema-list": "^1.5.1",
+    "prosemirror-state": "^1.4.4",
+    "prosemirror-view": "^1.42.6",
     "zod": "^4.6.7"
   },
   "bin": {
     "opend-editor": "./dist/bin.js"
+  },
+  "devDependencies": {
+    "@xmldom/xmldom": "^0.9.12"
   }
 }

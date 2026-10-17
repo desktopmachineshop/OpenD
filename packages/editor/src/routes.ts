@@ -1,6 +1,7 @@
 import { posix } from 'node:path';
 import type { FastifyInstance, FastifyReply } from 'fastify';
-import { topicPageId } from '@opend/dita';
+import { loadMap, topicPageId } from '@opend/dita';
+import { displayText } from '@opend/model';
 import { encodePath } from '@opend/render-html';
 import {
   createEditorPreview,
@@ -45,6 +46,31 @@ const str = (v: unknown): string => (typeof v === 'string' ? v : '');
 
 function page(reply: FastifyReply, html: string, status = 200) {
   return reply.code(status).headers(PAGE_HEADERS).type('text/html; charset=utf-8').send(html);
+}
+
+/**
+ * What each key in the site map says (`<keyword keyref="product-name"/>` → "Widget
+ * Platform"), so the visual editor can show key references as their text. Keys
+ * with conditional definitions show every variant, as the staff preview does.
+ */
+function keyTexts(draft: DraftBuild): Record<string, string> {
+  const { config, workspace } = draft.result;
+  if (!config) return {};
+  const out: Record<string, string> = {};
+  for (const [key, defs] of loadMap(workspace, config.map).keys) {
+    const texts = defs
+      .map((d) => (d.text ?? []).map(displayText).join('').replace(/\s+/g, ' ').trim())
+      .filter((t, i, all) => t && all.indexOf(t) === i);
+    if (texts.length) out[key] = texts.join(' | ');
+  }
+  return out;
+}
+
+/** Each topic file's title, so the visual editor can show links without text as the page will. */
+function topicTitles(draft: DraftBuild): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const t of Object.values(draft.result.release?.topics ?? {})) out[t.file] = t.title;
+  return out;
 }
 
 function shellFor(
@@ -262,8 +288,11 @@ ${csrfField(editor.csrf)}
 <input type="hidden" name="path" value="${h(path)}">
 <input type="hidden" name="branch" value="${h(branch?.branch ?? '')}">
 <input type="hidden" name="expectSha" value="${h(file.sha)}">
+<div id="ed-visual-pane" class="vx-pane" hidden data-keys="${h(JSON.stringify(keyTexts(draft)))}" data-titles="${h(JSON.stringify(topicTitles(draft)))}" data-assets="/preview/draft/_assets/"></div>
+<div id="ed-source-pane">
 <label id="source-label" for="ed-source">DITA source</label>
 <textarea id="ed-source" name="content" spellcheck="false" autocapitalize="off" autocomplete="off" rows="30" aria-describedby="ed-diagnostics-h">${h(file.text)}</textarea>
+</div>
 <p><label for="ed-message">Note about this change (optional)</label><input id="ed-message" name="message" maxlength="200"></p>
 <p class="ed-actions"><button type="submit"${write.blocked ? ' disabled aria-describedby="signed-h"' : ''}>Save</button> <span id="ed-save-status" role="status" aria-live="polite"></span></p>
 </form>
@@ -275,7 +304,9 @@ ${csrfField(editor.csrf)}
 <label for="as-org">Preview this page as</label> <select id="as-org" name="org">${orgs.map((o) => `<option value="${h(o.slug)}">${h(o.name)}</option>`).join('')}</select> <button type="submit"${orgs.length ? '' : ' disabled'}>Open</button></form>
 </section>
 </div>`;
-    return page(reply, layout(shellFor(editor, rc, path, 'files'), body));
+    const shell = shellFor(editor, rc, path, 'files');
+    if (path.endsWith('.dita')) shell.scripts = ['/assets/visual.js'];
+    return page(reply, layout(shell, body));
   });
 
   // ---- save -------------------------------------------------------------------
