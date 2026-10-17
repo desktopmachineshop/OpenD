@@ -6,14 +6,14 @@ import {
   type BuildJob,
   type Pool,
 } from '@opend/store';
-import type { GitHubApp } from './github.js';
+import type { GitHubAccess } from './github.js';
 import { listRemoteRefs, type RemoteRef } from './source.js';
 import { jsonLog, type Log } from './worker.js';
 
 export interface PollerDeps {
   pool: Pool;
-  /** Mints installation tokens for private repos; omit for public or local sources. */
-  github?: GitHubApp | null;
+  /** Installation tokens for private repos; omit for public or local sources. */
+  github?: GitHubAccess | null;
   log?: Log;
   /** Override for tests. */
   listRefs?: typeof listRemoteRefs;
@@ -54,10 +54,7 @@ export async function pollOnce(deps: PollerDeps): Promise<PollSummary> {
   const summary: PollSummary = { repos: repos.length, queued: [], errors: [] };
   for (const repo of repos) {
     try {
-      const token =
-        repo.installationId !== null && deps.github
-          ? await deps.github.installationToken(repo.installationId)
-          : undefined;
+      const token = await deps.github?.repoToken(repo, 'read');
       const refs = releaseRefsToPoll(
         await listRefs(repo.sourceUrl, token, deps.github?.gitHosts),
         repo.releaseRefs,

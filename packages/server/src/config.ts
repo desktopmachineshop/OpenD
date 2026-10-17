@@ -1,4 +1,5 @@
 import type { BlobStoreConfig } from '@opend/store';
+import type { BrokerConfig } from '@opend/worker';
 import { z } from 'zod';
 import {
   selfHostingConfig,
@@ -33,6 +34,9 @@ const envSchema = z
     PORT: z.coerce.number().int().min(0).max(65535).default(3000),
     HOST: z.string().default('0.0.0.0'),
     SESSION_SECRET: z.string().min(32, 'SESSION_SECRET must be at least 32 characters'),
+    OPEND_SECRET_KEY: optional(
+      z.string().min(32, 'OPEND_SECRET_KEY must be at least 32 characters'),
+    ),
     GITHUB_WEBHOOK_SECRET: z.string().min(1).optional(),
     GITHUB_APP_ID: z.string().min(1).optional(),
     GITHUB_APP_PRIVATE_KEY: z.string().min(1).optional(),
@@ -42,9 +46,15 @@ const envSchema = z
     OIDC_CLIENT_SECRET: z.string().min(1).optional(),
     OIDC_SCOPES: z.string().default('openid email profile'),
     OIDC_DISPLAY_NAME: optional(z.string().min(1).max(60)),
+    OIDC_ICON: optional(z.enum(['github', 'key'])),
     GITHUB_OAUTH_CLIENT_ID: optional(z.string().min(1)),
     GITHUB_OAUTH_CLIENT_SECRET: optional(z.string().min(1)),
     GITHUB_WEB_URL: optional(z.url()),
+    OPEND_GITHUB_BROKER_URL: optional(z.url()),
+    OPEND_GITHUB_BROKER_SECRET: optional(
+      z.string().min(16, 'OPEND_GITHUB_BROKER_SECRET must be at least 16 characters'),
+    ),
+    OPEND_GITHUB_INSTALL_URL: optional(z.url()),
     OPEND_GITHUB_COLLABORATOR_ORG: optional(
       z.string().regex(/^[a-z0-9][a-z0-9-]{0,62}$/, 'an org slug'),
     ),
@@ -123,6 +133,14 @@ const envSchema = z
     message: 'GITHUB_APP_ID and GITHUB_APP_PRIVATE_KEY must be set together',
     path: ['GITHUB_APP_ID'],
   })
+  .refine((e) => !e.OPEND_GITHUB_BROKER_URL === !e.OPEND_GITHUB_BROKER_SECRET, {
+    message: 'OPEND_GITHUB_BROKER_URL and OPEND_GITHUB_BROKER_SECRET must be set together',
+    path: ['OPEND_GITHUB_BROKER_URL'],
+  })
+  .refine((e) => !(e.OPEND_GITHUB_BROKER_URL && e.GITHUB_APP_ID), {
+    message: 'set either GITHUB_APP_ID (your own GitHub App) or OPEND_GITHUB_BROKER_URL, not both',
+    path: ['OPEND_GITHUB_BROKER_URL'],
+  })
   .refine(
     (e) => {
       const set = [e.S3_BUCKET, e.S3_ENDPOINT, e.S3_ACCESS_KEY_ID, e.S3_SECRET_ACCESS_KEY];
@@ -149,8 +167,18 @@ export interface ServerConfig {
   port: number;
   host: string;
   sessionSecret: string;
+  /** `OPEND_SECRET_KEY`: seals stored secrets. Without it, a key derived from `sessionSecret`. */
+  secretKey?: string;
   webhookSecret?: string;
   github?: { appId: string; privateKey: string; apiUrl?: string };
+  /** GitHub (or GitHub Enterprise Server) web and API URLs. */
+  githubWebUrl?: string;
+  githubApiUrl?: string;
+  /**
+   * Managed hosting: installation tokens come from the control plane's broker,
+   * and `installUrl` is the shared app's installation page.
+   */
+  broker?: BrokerConfig & { installUrl?: string };
   oidc?: {
     issuer: string;
     clientId: string;
@@ -158,6 +186,8 @@ export interface ServerConfig {
     scopes: string;
     /** Shown on the sign-in page as "Sign in with <displayName>". */
     displayName?: string;
+    /** The sign-in button's icon; `github` when the provider is GitHub (managed hosting). */
+    icon?: 'github' | 'key';
   };
   /**
    * Reader sign-in with GitHub: the same OAuth credentials as the editor's
@@ -178,6 +208,8 @@ export interface ServerConfig {
   };
   /** The web editor's origin: signed-in readers get "Edit this page" links. */
   editorUrl?: string;
+  /** "Edit this page" links on (the default) or off, when the editor is configured. */
+  editLinks?: boolean;
   /** "View source on GitHub" links on topic pages of repositories hosted on GitHub. */
   sourceLinks?: boolean;
   /** S3-compatible storage when S3_BUCKET is set, otherwise the BLOB_DIR folder. */
@@ -234,6 +266,15 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     };
     if (e.S3_PREFIX) config.blobs.prefix = e.S3_PREFIX;
   }
+  if (e.OPEND_SECRET_KEY) config.secretKey = e.OPEND_SECRET_KEY;
+  if (e.GITHUB_WEB_URL) config.githubWebUrl = e.GITHUB_WEB_URL.replace(/\/$/, '');
+  if (e.GITHUB_API_URL) config.githubApiUrl = e.GITHUB_API_URL.replace(/\/$/, '');
+  if (e.OPEND_GITHUB_BROKER_URL && e.OPEND_GITHUB_BROKER_SECRET) {
+    config.broker = { url: e.OPEND_GITHUB_BROKER_URL, secret: e.OPEND_GITHUB_BROKER_SECRET };
+    if (e.GITHUB_API_URL) config.broker.apiUrl = e.GITHUB_API_URL;
+    if (e.GITHUB_WEB_URL) config.broker.webUrl = e.GITHUB_WEB_URL;
+    if (e.OPEND_GITHUB_INSTALL_URL) config.broker.installUrl = e.OPEND_GITHUB_INSTALL_URL;
+  }
   if (e.GITHUB_WEBHOOK_SECRET) config.webhookSecret = e.GITHUB_WEBHOOK_SECRET;
   if (e.GITHUB_APP_ID && e.GITHUB_APP_PRIVATE_KEY) {
     config.github = { appId: e.GITHUB_APP_ID, privateKey: e.GITHUB_APP_PRIVATE_KEY };
@@ -247,6 +288,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
       scopes: e.OIDC_SCOPES,
     };
     if (e.OIDC_DISPLAY_NAME) config.oidc.displayName = e.OIDC_DISPLAY_NAME;
+    const icon =
+      e.OIDC_ICON ??
+      (e.OIDC_DISPLAY_NAME?.trim().toLowerCase() === 'github' ? 'github' : undefined);
+    if (icon) config.oidc.icon = icon;
   }
   if (e.GITHUB_OAUTH_CLIENT_ID && e.GITHUB_OAUTH_CLIENT_SECRET) {
     config.githubOAuth = {

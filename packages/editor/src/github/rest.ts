@@ -1,4 +1,4 @@
-import type { GitHubApp } from '@opend/worker';
+import type { GitHubAccess, RepoRef } from '@opend/worker';
 import {
   GitHubError,
   type CheckResult,
@@ -41,20 +41,27 @@ function asPull(data: Json): PullRequest {
   };
 }
 
-/** The editor's GitHub operations over the REST API, authenticated as the App installation. */
+/**
+ * The editor's GitHub operations over the REST API, with a `write`
+ * installation token (from the GitHub App, or the managed-hosting broker).
+ */
 export class RestGitHubClient implements GitHubClient {
+  readonly fullName: string;
+
   constructor(
-    private readonly app: GitHubApp,
-    readonly fullName: string,
-    private readonly installationId: number,
-  ) {}
+    private readonly github: GitHubAccess,
+    private readonly repo: RepoRef,
+  ) {
+    this.fullName = repo.fullName;
+  }
 
   private async call(method: string, path: string, body?: unknown, ok: number[] = [200, 201]) {
-    const res = await this.app.installationRequest(
-      this.installationId,
+    const res = await this.github.request(
+      this.repo,
       method,
       `/repos/${this.fullName}${path}`,
       body,
+      'write',
     );
     if (!ok.includes(res.status)) {
       const message =

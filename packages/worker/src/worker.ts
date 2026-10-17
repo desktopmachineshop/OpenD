@@ -18,7 +18,7 @@ import {
 } from '@opend/store';
 import { searchIndexInput } from './search.js';
 import { fetchSource } from './source.js';
-import { nullReporter, type GitHubApp, type StatusReporter } from './github.js';
+import { nullReporter, type GitHubAccess, type StatusReporter } from './github.js';
 
 export type Log = (entry: Record<string, unknown>) => void;
 
@@ -28,8 +28,11 @@ export const jsonLog: Log = (entry) =>
 export interface WorkerDeps {
   pool: Pool;
   blobs: BlobStore;
-  /** Mints installation tokens for private repos; omit for public or local sources. */
-  github?: GitHubApp | null;
+  /**
+   * Installation tokens for private repos (a GitHub App, the token broker, or
+   * a `GitHubConnection` choosing between them); omit for public or local sources.
+   */
+  github?: GitHubAccess | null;
   reporter?: StatusReporter;
   log?: Log;
 }
@@ -136,8 +139,7 @@ type BuildOutcome =
 async function buildAndPublish(deps: WorkerDeps, repo: Repo, job: BuildJob): Promise<BuildOutcome> {
   let token: string | undefined;
   try {
-    if (repo.installationId !== null && deps.github)
-      token = await deps.github.installationToken(repo.installationId);
+    token = await deps.github?.repoToken(repo, 'read');
   } catch (err) {
     throw new RetryableError(`GitHub token: ${err instanceof Error ? err.message : String(err)}`);
   }

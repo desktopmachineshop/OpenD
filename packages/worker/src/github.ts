@@ -23,10 +23,67 @@ export interface StatusReporter {
 
 export const nullReporter: StatusReporter = { report: async () => {} };
 
+/** Installation-token permissions: `read` for builds and polling, `write` for the editor. */
+export type TokenPermission = 'read' | 'write';
+
+/** What a token is minted for: a registered repository. */
+export interface RepoRef {
+  fullName: string;
+  installationId: number | null;
+  /** The clone URL; tokens are only ever sent to GitHub hosts (`gitHosts`). */
+  sourceUrl?: string;
+}
+
+export interface GitHubResponse {
+  status: number;
+  /** Parsed JSON, the raw text when not JSON, or `null` when empty. */
+  data: unknown;
+}
+
+/**
+ * Access to repositories on GitHub as an installation: a local GitHub App
+ * (`GitHubApp`), the managed-hosting token broker (`GitHubBroker`), or
+ * whichever of them is configured right now (`GitHubConnection`).
+ */
+export interface GitHubAccess extends StatusReporter {
+  /** Hosts git may send tokens to (see `gitAuthArgs`). */
+  readonly gitHosts: readonly string[];
+  /** An installation token for the repository, or `undefined` when it needs none. */
+  repoToken(repo: RepoRef, permission: TokenPermission): Promise<string | undefined>;
+  /**
+   * Calls the REST API with a token for the repository. An error status is
+   * returned, not thrown, so callers can act on 404, 409 or 422.
+   */
+  request(
+    repo: RepoRef,
+    method: string,
+    path: string,
+    body?: unknown,
+    permission?: TokenPermission,
+  ): Promise<GitHubResponse>;
+}
+
+/** `ghe.example/api/v3` → `ghe.example`, `api.github.com` → `github.com`. */
+export function gitHostsFor(apiUrl?: string, webUrl?: string): readonly string[] {
+  if (webUrl) return [new URL(webUrl).host];
+  return [new URL(apiUrl ?? 'https://api.github.com').host.replace(/^api\./, '')];
+}
+
+/** Parses a response body: JSON, text, or `null` when empty. */
+export async function readBody(res: Response): Promise<unknown> {
+  const text = await res.text();
+  if (!text) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
+}
+
 /** Minimal GitHub App client: installation tokens and commit statuses. */
-export class GitHubApp implements StatusReporter {
+export class GitHubApp implements GitHubAccess {
   private readonly key: KeyObject;
-  private readonly apiUrl: string;
+  readonly apiUrl: string;
   /**
    * Hosts that git may send this app's installation tokens to: `github.com`
    * for the public API, or the Enterprise host the API URL names
@@ -41,7 +98,11 @@ export class GitHubApp implements StatusReporter {
   ) {
     this.key = createPrivateKey(config.privateKey.replace(/\\n/g, '\n'));
     this.apiUrl = (config.apiUrl ?? 'https://api.github.com').replace(/\/$/, '');
-    this.gitHosts = [new URL(this.apiUrl).host.replace(/^api\./, '')];
+    this.gitHosts = gitHostsFor(this.apiUrl);
+  }
+
+  get appId(): string {
+    return this.config.appId;
   }
 
   private async appJwt(): Promise<string> {
@@ -97,23 +158,65 @@ export class GitHubApp implements StatusReporter {
     method: string,
     path: string,
     body?: unknown,
-  ): Promise<{ status: number; data: unknown }> {
+  ): Promise<GitHubResponse> {
     const init: RequestInit & { token: string } = {
       method,
       token: await this.installationToken(installationId),
     };
     if (body !== undefined) init.body = JSON.stringify(body);
     const res = await this.send(path, init);
-    const text = await res.text();
-    let data: unknown = null;
-    if (text) {
-      try {
-        data = JSON.parse(text);
-      } catch {
-        data = text;
-      }
+    return { status: res.status, data: await readBody(res) };
+  }
+
+  /** Calls the REST API as the app itself (JWT), e.g. `GET /app/installations/:id`. */
+  async appRequest(method: string, path: string): Promise<GitHubResponse> {
+    const res = await this.send(path, { method, token: await this.appJwt() });
+    return { status: res.status, data: await readBody(res) };
+  }
+
+  /** Repositories an installation can access, at most `limit`. */
+  async installationRepos(
+    installationId: number,
+    limit = 300,
+  ): Promise<{ fullName: string; private: boolean; defaultBranch: string }[]> {
+    const out: { fullName: string; private: boolean; defaultBranch: string }[] = [];
+    for (let page = 1; out.length < limit; page++) {
+      const res = await this.installationRequest(
+        installationId,
+        'GET',
+        `/installation/repositories?per_page=100&page=${page}`,
+      );
+      if (res.status !== 200) throw new Error(`GitHub repository list failed: ${res.status}`);
+      const list = ((res.data as { repositories?: unknown[] } | null)?.repositories ?? []) as {
+        full_name?: unknown;
+        private?: unknown;
+        default_branch?: unknown;
+      }[];
+      for (const r of list)
+        if (typeof r.full_name === 'string')
+          out.push({
+            fullName: r.full_name,
+            private: r.private === true,
+            defaultBranch: typeof r.default_branch === 'string' ? r.default_branch : 'main',
+          });
+      if (list.length < 100) break;
     }
-    return { status: res.status, data };
+    return out.slice(0, limit);
+  }
+
+  async repoToken(repo: RepoRef): Promise<string | undefined> {
+    return repo.installationId === null ? undefined : this.installationToken(repo.installationId);
+  }
+
+  async request(
+    repo: RepoRef,
+    method: string,
+    path: string,
+    body?: unknown,
+  ): Promise<GitHubResponse> {
+    if (repo.installationId === null)
+      throw new Error(`${repo.fullName} has no GitHub App installation`);
+    return this.installationRequest(repo.installationId, method, path, body);
   }
 
   async report(

@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE task PUBLIC "-//OASIS//DTD DITA Task//EN" "task.dtd">
+<task id="admin-console" product="core hosted" audience="admin">
+  <title>Run your site from the admin console</title>
+  <shortdesc>Staff readers run the docs site in the browser at <filepath>/admin</filepath>: who can read it,
+    which repository it is built from, readers and organizations, sign-in, the GitHub connection and the web
+    editor. No server access or environment variables needed.</shortdesc>
+  <taskbody>
+    <context>
+      <p>Only signed-in staff readers can open the console. Anyone else gets a <codeph>404</codeph>; visitors
+        who are not signed in are sent to the sign-in page first. Staff readers see an <uicontrol>Admin</uicontrol>
+        link next to their name on every docs page.</p>
+      <p>The console works without JavaScript. Every change is a form protected by a token tied to your
+        session, is refused from other sites, and is written to the audit log as
+        <codeph>staff:<varname>your email</varname></codeph>. A change applies at once on every server, without
+        a restart.</p>
+    </context>
+    <steps>
+      <step id="first-staff">
+        <cmd>Become the first staff reader with a one-time setup link.</cmd>
+        <info>
+          <p>The first time, nobody is staff yet. Whoever operates the server mints a setup link, which works
+            once, for 30 minutes, and only while no staff reader exists:</p>
+          <codeblock>opend-server admin-link                     # on Railway: run it in the web service's shell
+# or, with the admin token:
+curl -X POST "$PUBLIC_URL/admin/api/setup-links" -H "authorization: Bearer $OPEND_ADMIN_TOKEN" \
+  -H 'content-type: application/json' -d '{"minutes":30}'</codeblock>
+          <p>Open the link, enter your email address and name, and you are signed in as a staff reader of the
+            <codeph>staff</codeph> organization (or your existing reader is made staff). Use the address you
+            will sign in with from then on, with GitHub or your company account. On a managed site, the
+            hosting provider makes you staff when the site is created.</p>
+        </info>
+        <stepresult><p>The console's <uicontrol>Overview</uicontrol> opens, with what is left to set up.</p></stepresult>
+      </step>
+      <step>
+        <cmd>Connect GitHub on the <uicontrol>GitHub</uicontrol> page.</cmd>
+        <info><p>Self-hosted sites create their own GitHub App in a few clicks (<xref href="connect-github.dita"/>).
+          Managed sites install the provider's app with <uicontrol>Connect GitHub</uicontrol>.</p></info>
+      </step>
+      <step>
+        <cmd>Choose the docs repository on the <uicontrol>Docs source</uicontrol> page.</cmd>
+        <info>
+          <p>Pick it from the repositories the GitHub App can access, or give a public repository's
+            <codeph>https://</codeph> clone URL. Set the branches and tags that publish (such as
+            <codeph>main, v*</codeph>) and the folder that holds <filepath>opend.config.yaml</filepath>.
+            <uicontrol>Build now</uicontrol> queues a build of every matching branch and tag;
+            <uicontrol>Rebuild now</uicontrol> does it again later. Choosing another repository keeps the site's
+            access settings and readers.</p>
+        </info>
+      </step>
+      <step>
+        <cmd>Decide who can read the site on the <uicontrol>Site &amp; access</uicontrol> page.</cmd>
+        <info><p><uicontrol>Private</uicontrol> or <uicontrol>Public</uicontrol>, and for a public site the
+          products, features and release anonymous visitors see, chosen from those the published release
+          declares in <filepath>opend.config.yaml</filepath>. See <xref href="access.dita"/>. The site title
+          comes from the repository and is shown read-only.</p></info>
+      </step>
+      <step>
+        <cmd>Add organizations and readers on the <uicontrol>People</uicontrol> page.</cmd>
+        <info><p>An organization's products, features and release decide what its readers see. Readers sign
+          in with an account whose verified email is the one you give. Make teammates staff here; you cannot
+          remove your own staff role, yourself or your own organization.</p></info>
+      </step>
+      <step>
+        <cmd>Choose how readers sign in on the <uicontrol>Sign-in</uicontrol> page.</cmd>
+        <info><p><uicontrol>Sign in with GitHub</uicontrol> comes with the connected GitHub App and can be
+          turned off. Company sign-in (OIDC) takes the issuer URL, client id and client secret from your
+          identity provider; register <filepath>$PUBLIC_URL/auth/callback</filepath> there as the redirect URI.
+          Demo readers can be turned off where the server allows them; they never appear in production.</p></info>
+      </step>
+      <step>
+        <cmd>Set up the web editor on the <uicontrol>Editor</uicontrol> page.</cmd>
+        <info><p>Give the editor's address to turn on <uicontrol>Edit this page</uicontrol> links, choose whether
+          <uicontrol>View source on GitHub</uicontrol> links show, and add authors who sign in with company
+          sign-in. The editor service itself needs only <codeph>DATABASE_URL</codeph>,
+          <codeph>SESSION_SECRET</codeph>, <codeph>EDITOR_PUBLIC_URL</codeph> and <codeph>PUBLIC_URL</codeph>;
+          see <xref href="editor.dita"/>.</p></info>
+      </step>
+    </steps>
+    <result>
+      <p>Settings set by environment variables are shown as <uicontrol>Set by environment</uicontrol> and
+        cannot be changed in the console; see <xref href="settings.dita"/>. Secrets you enter (client secrets)
+        are stored encrypted and never shown again: the console only says whether one is set.</p>
+    </result>
+  </taskbody>
+</task>

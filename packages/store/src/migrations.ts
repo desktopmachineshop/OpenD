@@ -320,4 +320,38 @@ create table if not exists reader_identities (
 alter table analytics_events alter column org_slug drop not null;
 `,
   },
+  {
+    id: '007_settings',
+    sql: `
+-- Settings site owners change in the admin console (sign-in, GitHub connection,
+-- editor links), as JSON per key. Environment variables, where set, win.
+create table if not exists settings (
+  key text primary key,
+  value jsonb not null,
+  updated_by text not null,
+  updated_at timestamptz not null default now()
+);
+
+-- Secrets for those settings, sealed with AES-256-GCM (OPEND_SECRET_KEY, or a
+-- key derived from SESSION_SECRET). Plaintext never reaches the database, and
+-- no route ever returns or renders a secret. key_id tells which key sealed it.
+create table if not exists secrets (
+  name text primary key,
+  sealed text not null,
+  key_id text not null,
+  updated_by text not null,
+  updated_at timestamptz not null default now()
+);
+
+-- One-time links that make the first staff reader (opend-server admin-link, or
+-- POST /admin/api/setup-links). Only a hash of each token is kept.
+create table if not exists admin_setup_tokens (
+  token_hash text primary key,
+  created_by text not null,
+  created_at timestamptz not null default now(),
+  expires_at timestamptz not null,
+  used_at timestamptz
+);
+`,
+  },
 ];

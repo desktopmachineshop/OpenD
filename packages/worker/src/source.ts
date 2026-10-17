@@ -51,7 +51,7 @@ export async function fetchSource(
 export const DEFAULT_GIT_HOSTS: readonly string[] = ['github.com'];
 
 /** Whether `sourceUrl` is an https URL on one of `hosts` (host, with port if not 443). */
-function onTokenHost(sourceUrl: string, hosts: readonly string[]): boolean {
+export function onTokenHost(sourceUrl: string, hosts: readonly string[]): boolean {
   let url: URL;
   try {
     url = new URL(sourceUrl);

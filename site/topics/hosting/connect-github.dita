@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE task PUBLIC "-//OASIS//DTD DITA Task//EN" "task.dtd">
+<task id="connect-github" product="core" audience="admin">
+  <title>Connect GitHub from the admin console</title>
+  <shortdesc><uicontrol>Connect GitHub</uicontrol> creates a GitHub App for your site with every setting
+    filled in, stores its credentials encrypted, and installs it on your docs repository, so builds, private
+    repositories, GitHub sign-in and the web editor work without environment variables.</shortdesc>
+  <taskbody>
+    <prereq>
+      <ul>
+        <li>You are a staff reader (<xref href="admin-console.dita"/>).</li>
+        <li>The site's <codeph>PUBLIC_URL</codeph> is its real address: GitHub sends webhooks and sign-ins
+          there.</li>
+        <li><codeph>GITHUB_APP_ID</codeph> is not set. With it, the site uses that app and the console shows it
+          read-only.</li>
+      </ul>
+    </prereq>
+    <steps>
+      <step>
+        <cmd>Open <menucascade><uicontrol>Admin</uicontrol><uicontrol>GitHub</uicontrol></menucascade>, check the
+          app's name (unique on GitHub, at most 34 characters), optionally give the GitHub organization that
+          should own it, and choose <uicontrol>Connect GitHub</uicontrol>.</cmd>
+      </step>
+      <step>
+        <cmd>Choose <uicontrol>Continue to GitHub</uicontrol>, then <uicontrol>Create GitHub App</uicontrol> on
+          GitHub.</cmd>
+        <info>
+          <p>The page sends GitHub an app manifest: the webhook <filepath>$PUBLIC_URL/webhooks/github</filepath>
+            (push events), the sign-in callbacks <filepath>$PUBLIC_URL/auth/github/callback</filepath> and, when the
+            editor's address is set, <filepath>$EDITOR_PUBLIC_URL/auth/github/callback</filepath>, the setup URL
+            <filepath>$PUBLIC_URL/admin/github/installed</filepath>, and the permissions in
+            <xref href="github-app.dita"/>. The app is private to its owner.</p>
+          <p>GitHub sends you back with a one-time code. The site checks that the request carries a signed
+            state from your own session (valid for an hour), exchanges the code for the app's id, client
+            secret, private key and webhook secret, and stores them encrypted.</p>
+        </info>
+      </step>
+      <step>
+        <cmd>Install the app on your docs repository when GitHub asks, and choose
+          <uicontrol>Install</uicontrol>.</cmd>
+        <info><p>GitHub returns to the setup URL with the installation id. The site asks GitHub, as the app,
+          whether that installation is its own before it stores it.</p></info>
+      </step>
+      <step>
+        <cmd>On <uicontrol>Docs source</uicontrol>, pick the repository and choose <uicontrol>Use this
+          repository</uicontrol>.</cmd>
+        <stepresult><p>The repository is registered with its installation, and the first build is queued. From
+          now on every push to a release branch or tag builds, and each commit shows an
+          <codeph>opend/build</codeph> status.</p></stepresult>
+      </step>
+    </steps>
+    <result>
+      <ul>
+        <li>The web service, the worker and the editor all read the stored app from the database, so one
+          connection configures them all, and a new connection applies without a restart.</li>
+        <li>Readers get <uicontrol>Sign in with GitHub</uicontrol>, matched by a verified email. Turn it off on
+          the <uicontrol>Sign-in</uicontrol> page if you prefer.</li>
+        <li><uicontrol>Disconnect GitHub</uicontrol> removes the stored credentials. Delete the app on GitHub
+          too if you no longer need it.</li>
+        <li>For GitHub Enterprise Server, set <codeph>GITHUB_WEB_URL</codeph> and
+          <codeph>GITHUB_API_URL</codeph> first.</li>
+        <li>Adding the editor later? Add <filepath>$EDITOR_PUBLIC_URL/auth/github/callback</filepath> to the app's
+          callback URLs on GitHub; the console lists the URLs the app needs.</li>
+      </ul>
+      <p>The manual route (create the app yourself and set <codeph>GITHUB_APP_ID</codeph> and the other
+        variables) still works; see <xref href="github-app.dita"/>.</p>
+    </result>
+  </taskbody>
+</task>

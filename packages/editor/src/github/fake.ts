@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, generateKeyPairSync, randomBytes } from 'node:crypto';
 import type { GitIdentity, Permission } from './client.js';
 
 type Json = Record<string, unknown>;
@@ -71,7 +71,15 @@ export class FakeGitHub {
   private readonly repos = new Map<string, FakeRepo>();
   private readonly oauthCodes = new Map<string, { user: OAuthUser; challenge?: string }>();
   private readonly oauthTokens = new Map<string, OAuthUser>();
-  private readonly installationTokens = new Set<string>();
+  private readonly installationTokens = new Map<string, number>();
+  private readonly manifestCodes = new Map<string, Json>();
+  /** Apps created through the manifest flow, by id. */
+  readonly apps = new Map<number, { slug: string; pem: string; webhookSecret: string }>();
+  private readonly installations = new Map<
+    number,
+    { appId: number | null; account: string; repos: string[] }
+  >();
+  private nextApp = 1000;
   private nextPull = 1;
   private clock = 0;
   /** Every request, for assertions: `METHOD /path`. */
@@ -192,6 +200,19 @@ export class FakeGitHub {
     this.oauthCodes.set(code, challenge === undefined ? { user } : { user, challenge });
   }
 
+  /**
+   * Makes `code` a manifest code, as GitHub's redirect after "Create GitHub
+   * App" carries. Converting it creates an app with a fresh private key.
+   */
+  addManifestCode(code: string, app: { name: string; owner?: string }): void {
+    this.manifestCodes.set(code, app);
+  }
+
+  /** An installation of an app (by id; `null`: any app) on `account`, with access to `repos`. */
+  addInstallation(id: number, account: string, repos: string[], appId: number | null = null): void {
+    this.installations.set(id, { appId, account, repos });
+  }
+
   // ---- object store --------------------------------------------------------
 
   private repo(fullName: string): FakeRepo {
@@ -286,13 +307,74 @@ export class FakeGitHub {
     const path = url.pathname;
     const token = auth.replace(/^Bearer /, '');
 
+    const conversion = /^\/app-manifests\/([^/]+)\/conversions$/.exec(path);
+    if (conversion && method === 'POST') {
+      const pending = this.manifestCodes.get(decodeURIComponent(conversion[1]!));
+      if (!pending) return json(404, { message: 'Not Found' });
+      this.manifestCodes.delete(decodeURIComponent(conversion[1]!));
+      const id = this.nextApp++;
+      const slug = String(pending.name)
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-');
+      const pem = generateKeyPairSync('rsa', { modulusLength: 2048 })
+        .privateKey.export({ type: 'pkcs1', format: 'pem' })
+        .toString();
+      const webhookSecret = randomBytes(16).toString('hex');
+      this.apps.set(id, { slug, pem, webhookSecret });
+      const owner = typeof pending.owner === 'string' ? pending.owner : 'octo-owner';
+      return json(201, {
+        id,
+        slug,
+        name: pending.name,
+        owner: { login: owner },
+        html_url: `${this.webUrl}/apps/${slug}`,
+        client_id: `Iv1.${slug}`,
+        client_secret: `secret-${randomBytes(8).toString('hex')}`,
+        webhook_secret: webhookSecret,
+        pem,
+      });
+    }
+    const appIssuer = () => {
+      // A real App JWT has three parts; anything else is refused.
+      const parts = token.split('.');
+      if (parts.length !== 3) return undefined;
+      try {
+        const payload = JSON.parse(Buffer.from(parts[1]!, 'base64url').toString('utf8')) as {
+          iss?: unknown;
+        };
+        return Number(payload.iss);
+      } catch {
+        return undefined;
+      }
+    };
     const install = /^\/app\/installations\/(\d+)\/access_tokens$/.exec(path);
     if (install && method === 'POST') {
-      // A real App JWT has three parts; anything else is refused.
-      if (token.split('.').length !== 3) return json(401, { message: 'Bad credentials' });
+      if (appIssuer() === undefined) return json(401, { message: 'Bad credentials' });
       const t = `ghs_${randomBytes(8).toString('hex')}`;
-      this.installationTokens.add(t);
+      this.installationTokens.set(t, Number(install[1]));
       return json(201, { token: t, expires_at: new Date(Date.now() + 3600_000).toISOString() });
+    }
+    const installation = /^\/app\/installations\/(\d+)$/.exec(path);
+    if (installation && method === 'GET') {
+      const iss = appIssuer();
+      if (iss === undefined) return json(401, { message: 'Bad credentials' });
+      const found = this.installations.get(Number(installation[1]));
+      if (!found || (found.appId !== null && found.appId !== iss))
+        return json(404, { message: 'Not Found' });
+      return json(200, { id: Number(installation[1]), account: { login: found.account } });
+    }
+    if (path === '/installation/repositories' && method === 'GET') {
+      const id = this.installationTokens.get(token);
+      if (id === undefined) return json(401, { message: 'Bad credentials' });
+      const repos = this.installations.get(id)?.repos ?? [];
+      return json(200, {
+        total_count: repos.length,
+        repositories: repos.map((full_name) => ({
+          full_name,
+          private: true,
+          default_branch: 'main',
+        })),
+      });
     }
     if (path === '/user' || path === '/user/emails') {
       const user = this.oauthTokens.get(token);

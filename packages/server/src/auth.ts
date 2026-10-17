@@ -84,6 +84,17 @@ export function sessionReaderId(request: FastifyRequest): number | null {
   return readSession(request, SESSION_COOKIE) ?? readSession(request, EMBED_COOKIE);
 }
 
+/**
+ * The docs site's own session only (never the embed session, which is a
+ * third-party cookie inside host apps): for the admin console. Returns the
+ * reader id and the raw signed cookie, which CSRF tokens and the GitHub
+ * manifest state are bound to.
+ */
+export function siteSession(request: FastifyRequest): { readerId: number; cookie: string } | null {
+  const readerId = readSession(request, SESSION_COOKIE);
+  return readerId === null ? null : { readerId, cookie: request.cookies[SESSION_COOKIE]! };
+}
+
 /** The raw value of the cookie `sessionReaderId` accepted, or `null`. */
 function sessionCookieValue(request: FastifyRequest): string | null {
   for (const name of [SESSION_COOKIE, EMBED_COOKIE])
@@ -156,7 +167,7 @@ export async function currentAccess(
   return access;
 }
 
-function loginPath(returnTo: string): string {
+export function loginPath(returnTo: string): string {
   return `/auth/login?returnTo=${encodeURIComponent(returnTo)}`;
 }
 
@@ -229,7 +240,6 @@ async function provisionCollaborator(
 export function registerAuth(app: FastifyInstance, ctx: AppContext): void {
   const callbackUrl = `${ctx.config.publicUrl}/auth/callback`;
   const githubCallbackUrl = `${ctx.config.publicUrl}/auth/github/callback`;
-  const oidcName = ctx.config.oidc?.displayName ?? 'your company account';
 
   const html = (reply: FastifyReply, status: number, body: string) =>
     reply.code(status).type('text/html; charset=utf-8').send(body);
@@ -280,7 +290,10 @@ export function registerAuth(app: FastifyInstance, ctx: AppContext): void {
       github: Boolean(ctx.githubOAuth),
       backToDocs: repo?.access === 'public',
     };
-    if (ctx.oidc) options.oidcName = oidcName;
+    if (ctx.oidc) {
+      options.oidcName = ctx.config.oidc?.displayName ?? 'your company account';
+      if (ctx.config.oidc?.icon) options.oidcIcon = ctx.config.oidc.icon;
+    }
     if (ctx.config.devLogin) options.demoReaders = await listReaders(ctx.pool);
     const title = await publicSiteTitle(ctx);
     if (title) options.siteTitle = title;
@@ -429,18 +442,20 @@ export function registerAuth(app: FastifyInstance, ctx: AppContext): void {
     );
   });
 
-  if (ctx.config.devLogin) {
-    // Development only: sign in as any registered reader, from the sign-in page.
-    app.get('/auth/dev', async (request, reply) => {
-      const returnTo = safeReturnTo((request.query as { returnTo?: unknown }).returnTo);
-      return reply.redirect(loginPath(returnTo));
-    });
-    app.post('/auth/dev', async (request, reply) => {
-      const body = request.body as { readerId?: string; returnTo?: string } | undefined;
-      const readerId = Number(body?.readerId);
-      const access = Number.isInteger(readerId) ? await getReaderAccess(ctx.pool, readerId) : null;
-      if (!access) return refuse(reply, 400, 'Unknown reader', 'Choose a reader from the list.');
-      return finish(reply, readerId, body?.returnTo);
-    });
-  }
+  // Development only: sign in as any registered reader, from the sign-in page. The
+  // environment must allow it (never in production); the admin console can turn it off.
+  if (!ctx.env.devLogin) return;
+  app.get('/auth/dev', async (request, reply) => {
+    if (!ctx.config.devLogin) return reply.callNotFound();
+    const returnTo = safeReturnTo((request.query as { returnTo?: unknown }).returnTo);
+    return reply.redirect(loginPath(returnTo));
+  });
+  app.post('/auth/dev', async (request, reply) => {
+    if (!ctx.config.devLogin) return reply.callNotFound();
+    const body = request.body as { readerId?: string; returnTo?: string } | undefined;
+    const readerId = Number(body?.readerId);
+    const access = Number.isInteger(readerId) ? await getReaderAccess(ctx.pool, readerId) : null;
+    if (!access) return refuse(reply, 400, 'Unknown reader', 'Choose a reader from the list.');
+    return finish(reply, readerId, body?.returnTo);
+  });
 }

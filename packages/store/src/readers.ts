@@ -53,6 +53,14 @@ export async function setEntitlements(db: Db, orgSlug: string, e: Entitlements):
   return rowCount === 1;
 }
 
+/** Removes an org's entitlements: its readers then see nothing gated (or nothing, on a private site). */
+export async function clearEntitlements(db: Db, orgSlug: string): Promise<void> {
+  await db.query('delete from entitlements where org_id = (select id from orgs where slug = $1)', [
+    orgSlug,
+  ]);
+  await notify(db, CHANNELS.entitlementsChanged);
+}
+
 export async function deleteOrg(db: Db, slug: string): Promise<boolean> {
   const { rowCount } = await db.query('delete from orgs where slug = $1', [slug]);
   await notify(db, CHANNELS.entitlementsChanged);

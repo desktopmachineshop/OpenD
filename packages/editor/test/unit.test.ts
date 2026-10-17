@@ -211,16 +211,37 @@ describe('config', () => {
     ).toBe('acme/x');
   });
 
-  it('requires the GitHub App, a long secret and a sign-in method', () => {
-    expect(() => loadEditorConfig({ ...env, GITHUB_APP_ID: undefined })).toThrow(/GITHUB_APP_ID/);
+  it('needs a session secret; the GitHub App and sign-in may come from the admin console', () => {
+    expect(() => loadEditorConfig({ ...env, GITHUB_APP_ID: undefined })).toThrow(
+      /GITHUB_APP_ID and GITHUB_APP_PRIVATE_KEY/,
+    );
     expect(() => loadEditorConfig({ ...env, EDITOR_SESSION_SECRET: 'short' })).toThrow(/32/);
+    expect(() => loadEditorConfig({ ...env, EDITOR_SESSION_SECRET: undefined })).toThrow(
+      /SESSION_SECRET/,
+    );
+    // The minimum for an editor configured from the docs site's admin console.
+    const minimal = loadEditorConfig({
+      DATABASE_URL: 'postgres://x/y',
+      EDITOR_PUBLIC_URL: 'https://edit.example.com',
+      PUBLIC_URL: 'https://docs.example.com',
+      SESSION_SECRET: 's'.repeat(32),
+    });
+    expect(minimal.github).toBeUndefined();
+    expect(minimal.githubOAuth).toBeUndefined();
+    expect(minimal.secretKey).toHaveLength(32);
+    // Its own cookie key, never the docs site's session secret itself.
+    expect(minimal.sessionSecret).not.toBe('s'.repeat(32));
+    const brokered = loadEditorConfig({
+      ...env,
+      GITHUB_APP_ID: undefined,
+      GITHUB_APP_PRIVATE_KEY: undefined,
+      OPEND_GITHUB_BROKER_URL: 'https://control.example/broker/v1',
+      OPEND_GITHUB_BROKER_SECRET: 'b'.repeat(32),
+    });
+    expect(brokered.broker?.url).toBe('https://control.example/broker/v1');
     expect(() =>
-      loadEditorConfig({
-        ...env,
-        GITHUB_OAUTH_CLIENT_ID: undefined,
-        GITHUB_OAUTH_CLIENT_SECRET: undefined,
-      }),
-    ).toThrow(/at least one sign-in/);
+      loadEditorConfig({ ...env, OPEND_GITHUB_BROKER_URL: 'https://control.example/broker/v1' }),
+    ).toThrow(/OPEND_GITHUB_BROKER_SECRET/);
     expect(() =>
       loadEditorConfig({ ...env, EDITOR_OIDC_ISSUER: 'https://idp.example.com' }),
     ).toThrow(/EDITOR_OIDC_CLIENT_ID/);

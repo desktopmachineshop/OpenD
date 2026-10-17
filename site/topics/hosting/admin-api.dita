@@ -17,8 +17,9 @@
           problem.</li>
         <li>Every change is written to the audit log with the actor <codeph>admin-token</codeph>.</li>
       </ul>
-      <p>The admin API will be joined by staff sign-in and an operator console; see
-        <xref href="../next/console.dita">the operator console plans</xref>.</p>
+      <p>Staff readers can do most of this in the browser instead, in the admin console at
+        <filepath>/admin</filepath>; see <xref href="admin-console.dita"/>. Its changes are audited with the
+        actor <codeph>staff:<varname>email</varname></codeph>.</p>
     </section>
   </refbody>
 
@@ -107,9 +108,25 @@
         <sthead><stentry>Route</stentry><stentry>What it does</stentry></sthead>
         <strow><stentry><codeph>GET /admin/api/audit</codeph></stentry><stentry>The latest 100 entries, newest first: <codeph>at</codeph>, <codeph>actor</codeph>, <codeph>action</codeph> and <codeph>detail</codeph>.</stentry></strow>
       </simpletable>
-      <p>Actions are <codeph>repo.upsert</codeph>, <codeph>build.request</codeph>, <codeph>org.upsert</codeph>,
-        <codeph>entitlements.set</codeph>, <codeph>org.delete</codeph>, <codeph>reader.upsert</codeph>,
-        <codeph>reader.delete</codeph> and, from the <codeph>seed</codeph> command, <codeph>seed.apply</codeph>.</p>
+      <p>Actions are <codeph>repo.upsert</codeph>, <codeph>repo.access</codeph>, <codeph>build.request</codeph>,
+        <codeph>org.upsert</codeph>, <codeph>entitlements.set</codeph>, <codeph>org.delete</codeph>,
+        <codeph>reader.upsert</codeph>, <codeph>reader.staff</codeph>, <codeph>reader.delete</codeph> and, from the
+        <codeph>seed</codeph> command, <codeph>seed.apply</codeph>. The admin console adds
+        <codeph>settings.oidc</codeph>, <codeph>settings.signin</codeph>, <codeph>settings.editor</codeph>,
+        <codeph>github.connect</codeph>, <codeph>github.install</codeph>, <codeph>github.disconnect</codeph>,
+        <codeph>editor.user</codeph>, <codeph>admin.setup-link</codeph> and <codeph>admin.setup</codeph>. Details
+        never hold a secret.</p>
+    </refbody>
+  </reference>
+
+  <reference id="settings">
+    <title>Admin console settings and setup links</title>
+    <refbody>
+      <simpletable relcolwidth="3* 5*">
+        <sthead><stentry>Route</stentry><stentry>What it does</stentry></sthead>
+        <strow><stentry><codeph>GET /admin/api/settings</codeph></stentry><stentry>The settings stored by the admin console (<codeph>values</codeph>), which stored secrets are set (<codeph>secrets</codeph>, as <codeph>"set"</codeph>; never their values), any that this key cannot decrypt (<codeph>unreadable</codeph>), where each group of settings comes from (<codeph>sources</codeph>: <codeph>env</codeph>, <codeph>console</codeph>, <codeph>broker</codeph> or <codeph>none</codeph>) and the GitHub mode.</stentry></strow>
+        <strow><stentry><codeph>POST /admin/api/setup-links</codeph></stentry><stentry>A one-time link that makes its visitor the first staff reader. Body <codeph>{"minutes": 30}</codeph> (5 to 1440, default 30). 201 <codeph>{"url", "expiresAt"}</codeph>; 409 once a staff reader exists. See <xref href="admin-console.dita#admin-console/first-staff"/>.</stentry></strow>
+      </simpletable>
     </refbody>
   </reference>
 

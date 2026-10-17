@@ -21,7 +21,7 @@ import {
   releaseRefsToPoll,
   startPoller,
   type DocsRepo,
-  type GitHubApp,
+  type GitHubAccess,
   type RemoteRef,
 } from '../src/index.js';
 
@@ -181,8 +181,9 @@ describe.skipIf(!url)('pollOnce', () => {
     });
     const tokens: (string | undefined)[] = [];
     const github = {
-      installationToken: async (id: number) => `token-${id}`,
-    } as unknown as GitHubApp;
+      repoToken: async (repo: { installationId: number | null }) =>
+        repo.installationId === null ? undefined : `token-${repo.installationId}`,
+    } as unknown as GitHubAccess;
     const before = (await listJobs(db.pool)).length;
     const summary = await pollOnce({
       pool: db.pool,

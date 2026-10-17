@@ -1,5 +1,9 @@
 # One GitHub App for OpenD
 
+**Preferred: Connect GitHub in the admin console.** A staff reader opens `/admin/github` and presses **Connect GitHub**. OpenD posts a [GitHub App manifest](https://docs.github.com/en/apps/sharing-github-apps/registering-a-github-app-from-a-manifest) with every setting below, GitHub sends back a one-time code, and OpenD exchanges it for the app's id, client secret, private key and webhook secret and stores them encrypted (see [ADR 0011](adr/0011-admin-console-and-github-connection.md)). GitHub then asks where to install the app; its setup URL (`/admin/github/installed`) records the installation after checking it with GitHub, and the owner picks the docs repository. Web, worker and editor all read the stored app, so none of the variables in the table at the end are needed. Managed hosting uses the provider's app instead: see [managed-github.md](managed-github.md).
+
+The manual route below remains as a fallback, for example to keep the credentials in environment variables (which always win over the console).
+
 One GitHub App serves the whole managed install:
 
 - **Reader sign-in** on the docs site (`/auth/github/callback` on the docs host).
@@ -19,7 +23,7 @@ A GitHub App accepts up to ten callback URLs, so the docs site and the editor sh
 | Expire user authorization tokens                       | On (the default; OpenD uses the token once, at sign-in)                                       |
 | Request user authorization (OAuth) during installation | **Off**                                                                                       |
 | Enable Device Flow                                     | Off                                                                                           |
-| Setup URL                                              | Empty                                                                                         |
+| Setup URL                                              | Empty (Connect GitHub uses `https://DOCS_HOST/admin/github/installed`)                        |
 | Webhook                                                | Active. URL `https://DOCS_HOST/webhooks/github`. Secret: the value of `GITHUB_WEBHOOK_SECRET` |
 | Repository permissions                                 | Contents: Read and write                                                                      |
 |                                                        | Pull requests: Read and write                                                                 |

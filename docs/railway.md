@@ -2,7 +2,7 @@
 
 One Railway project runs one OpenD instance:
 
-- **web:** readers, the GitHub webhook and the admin API.
+- **web:** readers, the GitHub webhook, the admin console (`/admin`) and the admin API.
 - **worker:** builds.
 - **Postgres.**
 - **A bucket** for images, themes and cached PDFs.
@@ -42,7 +42,9 @@ GITHUB_WEBHOOK_SECRET=<openssl rand -hex 32>
 NODE_ENV=production
 ```
 
-Add OIDC (`OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`) and/or GitHub (`GITHUB_OAUTH_CLIENT_ID`, `GITHUB_OAUTH_CLIENT_SECRET`, plus `GITHUB_APP_ID` and `GITHUB_APP_PRIVATE_KEY`; see [github-app.md](github-app.md)) for reader sign-in. Add `OPEND_EMBED_SECRET` and `OPEND_EMBED_ORIGINS` to embed help in your apps.
+Then get into the admin console: in the web service's shell run `node dist/bin.js admin-link`, open the printed link (it works once, for 30 minutes), and enter your email. From `/admin` you can **Connect GitHub**, pick the docs repository, set sign-in and access, all without more variables. Variables you set still win over the console.
+
+Instead of the console, add OIDC (`OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`) and/or GitHub (`GITHUB_OAUTH_CLIENT_ID`, `GITHUB_OAUTH_CLIENT_SECRET`, plus `GITHUB_APP_ID` and `GITHUB_APP_PRIVATE_KEY`; see [github-app.md](github-app.md)) for reader sign-in. Add `OPEND_EMBED_SECRET` and `OPEND_EMBED_ORIGINS` to embed help in your apps.
 
 A public demo can instead set `NODE_ENV=development` and `OPEND_DEV_LOGIN=1`, so that visitors pick a sample reader. Never do this with real content.
 
@@ -60,19 +62,19 @@ The web editor is a third service from the same image, on its own domain:
 | Watch paths    | same as web                                          |
 | Public domain  | yes, port 3000 (its own Railway domain, never web's) |
 
+With GitHub connected in the admin console, the editor reads the app from the shared database:
+
 ```
 DATABASE_URL=${{Postgres.DATABASE_URL}}
+SESSION_SECRET=${{web.SESSION_SECRET}}
 EDITOR_PUBLIC_URL=https://<editor domain>
-EDITOR_SESSION_SECRET=<openssl rand -hex 32, not SESSION_SECRET>
 PUBLIC_URL=https://<web domain>
-GITHUB_APP_ID=<the App's id>
-GITHUB_APP_PRIVATE_KEY=<the App's private key, \n for line breaks>
-GITHUB_OAUTH_CLIENT_ID=<the App's client id>
-GITHUB_OAUTH_CLIENT_SECRET=<the App's client secret>
 NODE_ENV=production
 ```
 
-Set `EDITOR_PUBLIC_URL` on web too, so signed-in readers get **Edit this page** links. One GitHub App provides reader and author sign-in, the editor's commits and pull requests, and the push webhook: see [github-app.md](github-app.md).
+(If web sets `OPEND_SECRET_KEY`, add `OPEND_SECRET_KEY=${{web.OPEND_SECRET_KEY}}` too.) With the App in variables instead, add `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, `GITHUB_OAUTH_CLIENT_ID` and `GITHUB_OAUTH_CLIENT_SECRET`.
+
+Set the editor's address on web too (admin console **Editor** page, or `EDITOR_PUBLIC_URL`), so signed-in readers get **Edit this page** links. If the GitHub App was created before the editor's address was known, add `https://<editor domain>/auth/github/callback` to its callback URLs on GitHub. One GitHub App provides reader and author sign-in, the editor's commits and pull requests, and the push webhook: see [github-app.md](github-app.md).
 
 ## Public or private
 

@@ -7,14 +7,14 @@ import type { AppContext } from './context.js';
 import { SERVER_CSS } from './style.js';
 
 /** A minimal page for sign-in, errors and notices. `body` is trusted HTML. */
-export function simplePage(title: string, body: string): string {
+export function simplePage(title: string, body: string, extraCss = ''): string {
   return `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escapeHtml(title)}</title>
-<style>${DEFAULT_CSS}${SERVER_CSS}</style>
+<style>${DEFAULT_CSS}${SERVER_CSS}${extraCss}</style>
 </head>
 <body class="opend-plain"><main class="opend-simple" id="opend-main"><div class="opend-card">${body}</div></main></body>
 </html>
@@ -65,9 +65,11 @@ export function accountControls(
   const form = `<form method="post" action="/auth/logout"><input type="hidden" name="_csrf" value="${escapeHtml(csrf)}"><button type="submit">Sign out</button></form>`;
   const initial = escapeHtml(Array.from(display)[0] ?? '?');
   const staff = access.reader.staff ? ' (staff view)' : '';
+  // Staff readers run the site from the admin console.
+  const admin = access.reader.staff ? '<a href="/admin">Admin</a>' : '';
   return {
-    header: `<div class="site-account"><span class="site-account-who" title="${escapeHtml(email + staff)}"><span class="site-avatar" aria-hidden="true">${initial}</span><span class="site-account-name"><span class="opend-visually-hidden">Signed in as </span>${escapeHtml(display)}</span></span>${form}</div>`,
-    menu: `<p class="site-menu-heading">Account</p><p class="site-menu-who">Signed in as <strong>${escapeHtml(display)}</strong>${display === email ? '' : ` (${escapeHtml(email)})`}${staff}</p>${form}`,
+    header: `<div class="site-account">${admin}<span class="site-account-who" title="${escapeHtml(email + staff)}"><span class="site-avatar" aria-hidden="true">${initial}</span><span class="site-account-name"><span class="opend-visually-hidden">Signed in as </span>${escapeHtml(display)}</span></span>${form}</div>`,
+    menu: `<p class="site-menu-heading">Account</p><p class="site-menu-who">Signed in as <strong>${escapeHtml(display)}</strong>${display === email ? '' : ` (${escapeHtml(email)})`}${staff}</p>${admin ? `<p class="site-menu-who"><a href="/admin">Admin console</a></p>` : ''}${form}`,
   };
 }
 
@@ -101,7 +103,7 @@ export function topicActions(
   file: string,
 ): string {
   const links: string[] = [];
-  if (viewer.access && ctx.config.editorUrl) {
+  if (viewer.access && ctx.config.editorUrl && ctx.config.editLinks !== false) {
     const href = `${ctx.config.editorUrl}/edit?path=${encodeURIComponent(file)}`;
     links.push(`<a href="${escapeHtml(href)}">${PENCIL_ICON}Edit this page</a>`);
   }
@@ -121,15 +123,17 @@ export interface SignInOptions {
   github: boolean;
   /** "Sign in with <name>" for the OIDC provider. */
   oidcName?: string;
+  /** The OIDC button's icon: GitHub's mark when the provider is GitHub (managed hosting). */
+  oidcIcon?: 'github' | 'key';
   /** Development login (`OPEND_DEV_LOGIN`): sign in as any registered reader. */
   demoReaders?: { id: number; email: string; orgSlug: string; staff: boolean }[];
   /** Link back to the docs for public sites. */
   backToDocs?: boolean;
 }
 
-const GITHUB_ICON =
+export const GITHUB_ICON =
   '<svg viewBox="0 0 16 16" width="20" height="20" aria-hidden="true" focusable="false"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>';
-const KEY_ICON =
+export const KEY_ICON =
   '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><path d="M14 3a7 7 0 00-6.7 9.1L2 17.4V22h4.6l1-1v-2h2v-2h2l1.9-1.9A7 7 0 1014 3zm2.5 6A1.5 1.5 0 1116.5 6a1.5 1.5 0 010 3z"/></svg>';
 
 /** The branded sign-in page: every configured provider, and demo readers in development. */
@@ -142,7 +146,7 @@ export function signInPage(o: SignInOptions): string {
     );
   if (o.oidcName)
     providers.push(
-      `<li><a class="opend-auth-provider${providers.length ? '' : ' is-primary'}" href="/auth/oidc${escapeHtml(q)}">${KEY_ICON}Sign in with ${escapeHtml(o.oidcName)}</a></li>`,
+      `<li><a class="opend-auth-provider${providers.length ? '' : ' is-primary'}" href="/auth/oidc${escapeHtml(q)}">${o.oidcIcon === 'github' ? GITHUB_ICON : KEY_ICON}Sign in with ${escapeHtml(o.oidcName)}</a></li>`,
     );
   const list = providers.length
     ? `<ul class="opend-auth-providers">${providers.join('')}</ul>`
