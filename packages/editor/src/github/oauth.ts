@@ -115,12 +115,16 @@ export function createGitHubOAuth(
         id: number;
         login: string;
         name: string | null;
+        email?: string | null;
       };
-      const emails = (await api('/user/emails', body.access_token)) as {
-        email: string;
-        primary: boolean;
-        verified: boolean;
-      }[];
+      // `/user/emails` needs the app's "Email addresses" permission. Without it, fall
+      // back to the profile's public email, which GitHub only allows to be a verified one.
+      let emails: { email: string; primary: boolean; verified: boolean }[];
+      try {
+        emails = (await api('/user/emails', body.access_token)) as typeof emails;
+      } catch {
+        emails = user.email ? [{ email: user.email, primary: true, verified: true }] : [];
+      }
       const verified = emails.filter((e) => e.verified === true);
       const primary = verified.find((e) => e.primary);
       const signIn: GitHubSignIn = {

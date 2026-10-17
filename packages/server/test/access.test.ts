@@ -553,6 +553,45 @@ describe.skipIf(!url)('public and private sites, sign-in and staff', () => {
       expect(page.body).toContain('Signed in as </span>Gus');
     });
 
+    it('falls back to the public profile email when the app lacks the email permission', async () => {
+      gh.noEmailPermission = true;
+      try {
+        const { authorize, cookie } = await begin();
+        gh.addOAuthCode(
+          'no-email-permission',
+          user({ email: 'dee@globex.example' }),
+          authorize.searchParams.get('code_challenge')!,
+        );
+        const res = await callback(
+          'no-email-permission',
+          authorize.searchParams.get('state')!,
+          cookie,
+        );
+        expect(res.statusCode).toBe(302);
+        const page = await get('/topics/install.html', cookiesFrom(res));
+        expect(page.body).toContain('Sign out');
+        expect(page.body).not.toContain('href="/auth/login');
+        // No public email and no permission: nothing to match, so no sign-in.
+        const next = await begin();
+        gh.addOAuthCode(
+          'no-email-at-all',
+          user({ email: null }),
+          next.authorize.searchParams.get('code_challenge')!,
+        );
+        expect(
+          (
+            await callback(
+              'no-email-at-all',
+              next.authorize.searchParams.get('state')!,
+              next.cookie,
+            )
+          ).statusCode,
+        ).toBe(403);
+      } finally {
+        gh.noEmailPermission = false;
+      }
+    });
+
     it('matches a secondary verified email, never an unverified one', async () => {
       let { authorize, cookie } = await begin();
       gh.addOAuthCode(

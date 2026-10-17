@@ -312,6 +312,8 @@ export interface StoredGitHubApp {
   clientId: string;
   htmlUrl: string;
   owner: string | null;
+  /** True when `owner` is an organization (its settings live under /organizations/). */
+  ownerIsOrg?: boolean;
   /** The web and API URLs it was created on (GitHub Enterprise Server installs differ). */
   webUrl: string;
   apiUrl: string;
@@ -337,6 +339,7 @@ export function storedGitHubApp(
     clientId: str(v.clientId) ?? '',
     htmlUrl: str(v.htmlUrl) ?? '',
     owner: str(v.owner) ?? null,
+    ownerIsOrg: v.ownerIsOrg === true,
     webUrl: str(v.webUrl) ?? 'https://github.com',
     apiUrl: str(v.apiUrl) ?? 'https://api.github.com',
     createdAt: str(v.createdAt) ?? '',

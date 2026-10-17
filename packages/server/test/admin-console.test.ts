@@ -550,7 +550,6 @@ describe.skipIf(!url)('the admin console', () => {
           checks: 'read',
           statuses: 'write',
           metadata: 'read',
-          email_addresses: 'read',
         },
       });
       expect(res.body).toContain('Continue to GitHub');
@@ -599,6 +598,9 @@ describe.skipIf(!url)('the admin console', () => {
       expect(api).not.toContain(created.webhookSecret);
       const page = await get('/admin/github', owner);
       expect(page.body).toContain('Install the app');
+      // The manifest can't ask for the account-level email permission; the page says how to add it.
+      expect(page.body).toContain('Email addresses');
+      expect(page.body).toContain('/settings/apps/');
       expect(page.body).not.toContain(created.webhookSecret);
       expect(logs.join('\n')).not.toContain(created.webhookSecret);
       expect(logs.join('\n')).not.toContain('PRIVATE KEY');
