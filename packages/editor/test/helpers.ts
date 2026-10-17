@@ -93,7 +93,7 @@ export async function startEditor(
     log: options.log ?? (() => {}),
     fetch: gh.fetch,
     oidc: fakeOidc(options.oidc ?? {}),
-    service: { updateBranchPolls: [5, 10, 20], signingTtlMs: 1 },
+    service: { updateBranchPolls: [5, 10, 20], signingTtlMs: 0 },
   });
   await editor.app.ready();
   return {
