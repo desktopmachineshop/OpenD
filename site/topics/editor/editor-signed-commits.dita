@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="editor-signed-commits" product="core hosted" audience="author">
+  <title>Verified commits</title>
+  <shortdesc>If you sign in to the editor with GitHub, your saves are commits by your own GitHub account,
+    and GitHub marks them Verified. Some repositories accept only such commits.</shortdesc>
+  <conbody>
+    <section id="who-commits">
+      <title>Who your commits come from</title>
+      <p>Each page shows how your saves reach GitHub, above your working branch:</p>
+      <dl>
+        <dlentry>
+          <dt><systemoutput>Commits as @your-login</systemoutput> with <systemoutput>Verified by
+            GitHub</systemoutput></dt>
+          <dd>You signed in with GitHub. The editor saves with your own GitHub account, so GitHub records you
+            as the author and signs the commit. Your pull requests and merges are yours too.</dd>
+        </dlentry>
+        <dlentry>
+          <dt><systemoutput>Commits as the OpenD app on your behalf</systemoutput></dt>
+          <dd>You signed in with your company account (or GitHub sign-in cannot commit for you). The editor's
+            GitHub App makes the commit, with your name and email as the author and a
+            <codeph>Co-authored-by</codeph> line. GitHub does not mark these commits Verified.</dd>
+        </dlentry>
+      </dl>
+    </section>
+
+    <section id="required">
+      <title>Repositories that require signed commits</title>
+      <p>A repository can require that every commit is signed. The editor then shows <systemoutput>Signed
+        commits required</systemoutput> next to who your commits come from.</p>
+      <ul>
+        <li>Signed in with GitHub: you save and publish as usual.</li>
+        <li>Signed in with your company account: you can still open files and preview drafts, but
+          <uicontrol>Save</uicontrol>, <uicontrol>Create topic</uicontrol> and
+          <uicontrol>Publish</uicontrol> are turned off, and the editor says <systemoutput>This repository
+          requires signed commits. Sign in with GitHub to save and publish.</systemoutput> Choose
+          <uicontrol>Sign in with GitHub</uicontrol>, then come back to your file. If there is no such
+          button, ask whoever runs the editor.</li>
+      </ul>
+      <p>On these repositories GitHub itself brings the main branch's changes into your branch, and only when
+        your branch has a pull request: until you publish, the editor shows that the main branch has newer
+        changes, and merges them when you publish. When you resolve conflicts, the editor opens your pull
+        request as a draft so GitHub can merge the main branch in; your choices are saved on top, and
+        nothing is published until you choose <uicontrol>Publish</uicontrol>.</p>
+    </section>
+
+    <section id="messages">
+      <title>Messages</title>
+      <simpletable relcolwidth="3* 2*">
+        <sthead><stentry>The editor says</stentry><stentry>What to do</stentry></sthead>
+        <strow><stentry><systemoutput>Your GitHub sign-in has expired or was revoked. Sign in with GitHub
+          again to save and publish.</systemoutput></stentry><stentry>Sign in with GitHub again. Your unsaved
+          text stays in the page; copy it first if you are unsure.</stentry></strow>
+        <strow><stentry><systemoutput>GitHub does not let @your-login write to the
+          repository.</systemoutput></stentry><stentry>Ask a maintainer of the repository for write
+          access.</stentry></strow>
+        <strow><stentry><systemoutput>GitHub is still merging the main branch into your
+          branch.</systemoutput></stentry><stentry>Reload the page in a moment.</stentry></strow>
+      </simpletable>
+    </section>
+  </conbody>
+</concept>

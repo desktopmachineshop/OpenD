@@ -15,13 +15,20 @@ import { editorScript } from './client.js';
 import type { EditorConfig } from './config.js';
 import { repoResolver, type EditorContext } from './context.js';
 import type { GitHubClient } from './github/client.js';
-import { createGitHubOAuth, type GitHubOAuth } from './github/oauth.js';
+import { createGitHubOAuth, isGitHubAppClientId, type GitHubOAuth } from './github/oauth.js';
 import { RestGitHubClient } from './github/rest.js';
+import { RestUserGitHubClient } from './github/user.js';
 import { createOidcProvider, type OidcProvider } from './oidc.js';
 import { EDITOR_CSP, messagePage, PAGE_HEADERS } from './pages.js';
 import { registerRoutes } from './routes.js';
-import { EditorError, EditorService, type DraftBuild } from './service.js';
+import {
+  EditorError,
+  EditorService,
+  type DraftBuild,
+  type EditorServiceOptions,
+} from './service.js';
 import { EDITOR_CSS } from './style.js';
+import { EditorTokens } from './tokens.js';
 
 export interface EditorDeps {
   pool: Pool;
@@ -35,14 +42,27 @@ export interface EditorDeps {
   githubOAuth?: GitHubOAuth | null;
   /** Reload settings on Postgres notifications. Default true. */
   listen?: boolean;
+  /** Service tuning (tests shorten the update-branch polling). */
+  service?: Omit<EditorServiceOptions, 'userClient'>;
 }
 
-/** GitHub sign-in for authors: the environment's OAuth app, or the connected app's credentials. */
+/**
+ * GitHub sign-in for authors: the environment's OAuth credentials, or the
+ * connected app's. `githubApp`: the credentials are a GitHub App's, whose user
+ * tokens the editor keeps to commit as the author.
+ */
 function storedOAuth(
   config: EditorConfig,
   snapshot: SettingsSnapshot,
-): { clientId: string; clientSecret: string; webUrl: string; apiUrl?: string } | null {
-  if (config.githubOAuth) return config.githubOAuth;
+): {
+  clientId: string;
+  clientSecret: string;
+  webUrl: string;
+  apiUrl?: string;
+  githubApp: boolean;
+} | null {
+  if (config.githubOAuth)
+    return { ...config.githubOAuth, githubApp: isGitHubAppClientId(config.githubOAuth.clientId) };
   const app = storedGitHubApp(snapshot);
   if (!app?.clientId || !app.clientSecret) return null;
   return {
@@ -50,6 +70,7 @@ function storedOAuth(
     clientSecret: app.clientSecret,
     webUrl: app.webUrl,
     apiUrl: app.apiUrl,
+    githubApp: true,
   };
 }
 
@@ -80,11 +101,16 @@ export async function createEditorApp(config: EditorConfig, deps: EditorDeps): P
   });
   const clientFor = deps.clientFor ?? ((repo: Repo) => new RestGitHubClient(github, repo));
   let oauthKey = '';
+  let userApiUrl = config.githubApiUrl ?? 'https://api.github.com';
   const ctx: EditorContext = {
     config,
     pool: deps.pool,
     log: deps.log ?? jsonLog,
-    service: new EditorService(deps.pool),
+    service: new EditorService(deps.pool, {
+      ...deps.service,
+      userClient: (repo, source) =>
+        new RestUserGitHubClient(source, repo, { apiUrl: userApiUrl, fetch: fetchImpl }),
+    }),
     github,
     settings,
     clientFor,
@@ -99,6 +125,13 @@ export async function createEditorApp(config: EditorConfig, deps: EditorDeps): P
             })
           : null,
     githubOAuth: deps.githubOAuth ?? null,
+    keepsGitHubTokens: false,
+    tokens: new EditorTokens(
+      deps.pool,
+      () => settings.secretBox,
+      () => ctx.githubOAuth,
+      (entry) => ctx.log(entry),
+    ),
     repoContext: async () => {
       throw new Error('unreachable');
     },
@@ -112,6 +145,8 @@ export async function createEditorApp(config: EditorConfig, deps: EditorDeps): P
     if (key === oauthKey) return;
     oauthKey = key;
     ctx.githubOAuth = oauth ? createGitHubOAuth(oauth, fetchImpl) : null;
+    ctx.keepsGitHubTokens = oauth?.githubApp === true;
+    userApiUrl = oauth?.apiUrl ?? config.githubApiUrl ?? 'https://api.github.com';
   };
   applySettings();
 
@@ -159,8 +194,17 @@ export async function createEditorApp(config: EditorConfig, deps: EditorDeps): P
           : String(err)
         : 'Something went wrong. Try again.';
     const html = String(request.headers.accept ?? '').includes('text/html');
+    // Refusals that GitHub sign-in fixes say where to sign in, when it can help.
+    const signIn =
+      known &&
+      (err.detail.signedCommitsRequired === true || err.detail.githubSignIn === true) &&
+      ctx.githubOAuth !== null &&
+      ctx.keepsGitHubTokens &&
+      ctx.tokens.canStore
+        ? { signInUrl: '/auth/github?returnTo=%2F' }
+        : {};
     if (wantsJson(request) || (request.method !== 'GET' && !html))
-      return reply.code(status).send({ error: message, ...(known ? err.detail : {}) });
+      return reply.code(status).send({ error: message, ...(known ? err.detail : {}), ...signIn });
     return reply
       .code(status)
       .headers(PAGE_HEADERS)

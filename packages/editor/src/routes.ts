@@ -27,9 +27,11 @@ import {
 import { banner, renderPreview, type PreviewAudience } from './preview.js';
 import {
   EditorError,
+  SIGNED_COMMITS_REQUIRED,
   checkEditablePath,
   isEditable,
   type Choice,
+  type CommitIdentity,
   type DraftBuild,
   type RepoContext,
   type SyncResult,
@@ -67,21 +69,65 @@ function previewPath(draft: DraftBuild, path: string): string {
   return draft.result.release?.topics[id] ? `${encodePath(id)}.html` : '';
 }
 
+/** Who the author's commits come from, the signing badge, and the refusal when they may not write. */
+interface WriteState {
+  identity: CommitIdentity;
+  blocked: boolean;
+  html: string;
+}
+
+async function writeState(
+  ctx: EditorContext,
+  rc: RepoContext,
+  editor: SignedIn,
+  branch: EditorBranch | null,
+  returnTo: string,
+): Promise<WriteState> {
+  const identity = await ctx.service.identity(rc, editor, branch);
+  const badge =
+    identity.requirement === 'required'
+      ? ' <span class="ed-badge ed-badge-signed">Signed commits required</span>'
+      : '';
+  let html: string;
+  if (identity.via === 'user') {
+    html = `<p class="ed-identity">Commits as <strong>@${h(identity.login ?? '')}</strong> <span class="ed-verified">Verified by GitHub</span>${badge}</p>`;
+  } else if (identity.via === 'app') {
+    html = `<p class="ed-identity">Commits as the OpenD app on your behalf, crediting you as co-author.${badge}</p>`;
+  } else {
+    const canSignIn = ctx.githubOAuth !== null && ctx.keepsGitHubTokens && ctx.tokens.canStore;
+    const label =
+      editor.provider === 'github' ? 'Sign in with GitHub again' : 'Sign in with GitHub';
+    const action = canSignIn
+      ? `<p><a class="ed-button" href="/auth/github?returnTo=${h(encodeURIComponent(returnTo))}">${label}</a></p>`
+      : `<p class="ed-hint">GitHub sign-in that can commit for you is not set up for this editor. Ask an administrator to connect GitHub${ctx.github.mode() === 'broker' ? '; company sign-in through managed hosting does not carry a GitHub identity' : ''}.</p>`;
+    html = `<section class="ed-blocked" role="alert" aria-labelledby="signed-h"><h2 id="signed-h">Signed commits required</h2>
+<p>${h(SIGNED_COMMITS_REQUIRED)}</p>
+<p class="ed-hint">GitHub signs the commits of authors who sign in with their GitHub account, and marks them Verified. You can still read files and preview drafts.</p>
+${action}</section>`;
+  }
+  return { identity, blocked: identity.via === 'blocked', html };
+}
+
 function statusPanel(
   rc: RepoContext,
   branch: EditorBranch | null,
   sync: SyncResult | null,
+  write: WriteState,
 ): string {
   const conflict =
     sync?.status === 'conflict'
       ? `<p class="ed-alert" role="alert">The ${h(rc.baseBranch)} branch has changes that conflict with yours. <a href="/conflicts">Resolve the conflicts</a></p>`
       : '';
+  const behind =
+    sync?.status === 'behind'
+      ? ` <code>${h(rc.baseBranch)}</code> has newer changes; GitHub merges them into your branch when you publish.`
+      : '';
   if (!branch)
-    return `<section class="ed-status" aria-label="Working branch"><p>You have no working branch yet. Your first save creates one, based on <code>${h(rc.baseBranch)}</code>.</p></section>`;
+    return `<section class="ed-status" aria-label="Working branch">${write.html}<p>You have no working branch yet.${write.blocked ? '' : ` Your first save creates one, based on <code>${h(rc.baseBranch)}</code>.`}</p></section>`;
   const pr = branch.prNumber
     ? ` Pull request <a href="/publish">#${branch.prNumber}</a> is open: each save updates it.`
     : ' Nothing is published until you choose <a href="/publish">Publish</a>.';
-  return `<section class="ed-status" aria-label="Working branch">${conflict}<p>Your working branch: <code>${h(branch.branch)}</code>.${pr}</p></section>`;
+  return `<section class="ed-status" aria-label="Working branch">${write.html}${conflict}<p>Your working branch: <code>${h(branch.branch)}</code>.${pr}${behind}</p></section>`;
 }
 
 /** The active branch, merged with the base branch when the author opens a page. */
@@ -149,8 +195,9 @@ export function registerRoutes(app: FastifyInstance, ctx: EditorContext): void {
     const notice = query.resolved
       ? `<p class="ed-notice" role="status">Conflicts resolved in commit <code>${h(query.resolved.slice(0, 7))}</code>.</p>`
       : '';
+    const write = await writeState(ctx, rc, editor, branch, '/');
     const body = `<h1>Files</h1>
-${notice}${statusPanel(rc, branch, sync)}
+${notice}${statusPanel(rc, branch, sync, write)}
 <div class="ed-columns">
 <section aria-labelledby="files-h"><h2 id="files-h">DITA files</h2>${fileTree(editable, null, changed)}
 <p><a href="/preview/saved/">Preview ${branch ? 'your branch' : rc.baseBranch}</a> · ${errors ? `<a href="/preview/saved/">${errors} validation error${errors === 1 ? '' : 's'}</a>` : 'no validation errors'}</p></section>
@@ -162,7 +209,7 @@ ${notice}${statusPanel(rc, branch, sync)}
 <p><label for="new-dir">Folder</label><select id="new-dir" name="dir">${(dirs.length ? dirs : ['topics']).map((d) => `<option${d === 'topics' ? ' selected' : ''}>${h(d)}</option>`).join('')}</select></p>
 <p><label for="new-type">Type</label><select id="new-type" name="type">${TOPIC_TYPES.map((t) => `<option value="${t.type}">${h(t.label)}</option>`).join('')}</select></p>
 <p><label for="new-map">Add to navigation</label><select id="new-map" name="map"><option value="">Not yet</option>${maps.map((m) => `<option${m === rootMap ? ' selected' : ''}>${h(m)}</option>`).join('')}</select></p>
-<p><button type="submit">Create topic</button></p>
+<p><button type="submit"${write.blocked ? ' disabled' : ''}>Create topic</button></p>
 </form></section>
 <section aria-labelledby="as-h" class="ed-card"><h2 id="as-h">Preview as an org</h2>
 <p class="ed-hint">See ${branch ? 'your branch' : rc.baseBranch} as a customer org sees it, with their entitlements. The preview link expires after ${PREVIEW_MINUTES} minutes and is logged.</p>
@@ -198,8 +245,15 @@ ${notice}${statusPanel(rc, branch, sync)}
     const saved = query.saved
       ? `<p class="ed-notice" role="status">Saved as commit <code>${h(query.saved.slice(0, 7))}</code>.</p>`
       : '';
+    const write = await writeState(
+      ctx,
+      rc,
+      editor,
+      branch,
+      `/edit?path=${encodeURIComponent(path)}`,
+    );
     const body = `<h1 class="ed-file">${h(path)}</h1>
-${saved}${statusPanel(rc, branch, sync)}
+${saved}${statusPanel(rc, branch, sync, write)}
 <div class="ed-workspace">
 ${fileTree([...files.keys()].filter(isEditable), path, new Set())}
 <section class="ed-source" aria-labelledby="source-label">
@@ -211,7 +265,7 @@ ${csrfField(editor.csrf)}
 <label id="source-label" for="ed-source">DITA source</label>
 <textarea id="ed-source" name="content" spellcheck="false" autocapitalize="off" autocomplete="off" rows="30" aria-describedby="ed-diagnostics-h">${h(file.text)}</textarea>
 <p><label for="ed-message">Note about this change (optional)</label><input id="ed-message" name="message" maxlength="200"></p>
-<p class="ed-actions"><button type="submit">Save</button> <span id="ed-save-status" role="status" aria-live="polite"></span></p>
+<p class="ed-actions"><button type="submit"${write.blocked ? ' disabled aria-describedby="signed-h"' : ''}>Save</button> <span id="ed-save-status" role="status" aria-live="polite"></span></p>
 </form>
 <section aria-labelledby="ed-diagnostics-h"><h2 id="ed-diagnostics-h">Problems</h2><div id="ed-diagnostics" aria-live="polite">${diagnosticsList(draft.diagnostics, path)}</div></section>
 </section>
@@ -339,8 +393,10 @@ ${csrfField(editor.csrf)}
         ),
       );
     const set = await ctx.service.conflicts(rc, branch);
+    const write = await writeState(ctx, rc, editor, branch, '/conflicts');
     let body = `<h1>Changes on ${h(rc.baseBranch)} conflict with yours</h1>
-<p>Someone changed the same files on <code>${h(rc.baseBranch)}</code> since you started. For each file, choose which version to keep, or edit it by hand. Your choice is saved to your branch as a merge; nothing is published.</p>`;
+${write.blocked ? write.html : ''}
+<p>Someone changed the same files on <code>${h(rc.baseBranch)}</code> since you started. For each file, choose which version to keep, or edit it by hand. ${write.identity.via === 'user' && write.identity.requirement !== 'not-required' ? 'GitHub merges the current version into your branch and your choices are saved on top, all as signed commits; this opens your pull request as a draft if there is none yet. Nothing is published.' : 'Your choice is saved to your branch as a merge; nothing is published.'}</p>`;
     if (set.structural.length) {
       body += `<section class="ed-alert" role="alert" aria-labelledby="structural-h"><h2 id="structural-h">A developer needs to resolve this</h2>
 <p>These changes cannot be resolved by choosing a version, so a developer must resolve them in the pull request:</p>
@@ -371,7 +427,7 @@ ${branch.prNumber ? `<p>Pull request <a href="/publish">#${branch.prNumber}</a>.
 <input type="hidden" name="theirsSha" value="${h(set.theirsSha)}">
 ${sections}
 ${set.automatic.length ? `<p class="ed-hint">${set.automatic.length} other file${set.automatic.length === 1 ? '' : 's'} merged without conflicts.</p>` : ''}
-<p><button type="submit">Save my choices</button></p></form>`;
+<p><button type="submit"${write.blocked ? ' disabled' : ''}>Save my choices</button></p></form>`;
     return page(reply, layout(shell, body));
   });
 
@@ -444,18 +500,22 @@ ${review.checks.length ? `<table><caption>Checks</caption><thead><tr><th scope="
 ${review.blockers.length ? `<h3>Still blocking the merge</h3><ul>${review.blockers.map((b) => `<li>${h(b)}</li>`).join('')}</ul>` : '<p>Nothing blocks the merge.</p>'}
 </section>`
       : '';
-    const canPublish = branch && files.length > 0 && !errors.length && sync?.status !== 'conflict';
-    const action = !branch
-      ? '<p>You have no changes to publish. Edit a file and save first.</p>'
-      : sync?.status === 'conflict'
-        ? `<p class="ed-alert">Resolve the <a href="/conflicts">conflicts with ${h(rc.baseBranch)}</a> before publishing.</p>`
-        : errors.length
-          ? `<p class="ed-alert">Fix the ${errors.length} validation error${errors.length === 1 ? '' : 's'} before publishing.</p>${diagnosticsList(errors)}`
-          : files.length === 0
-            ? '<p>Your branch has no changes yet.</p>'
-            : '';
+    const write = await writeState(ctx, rc, editor, branch, '/publish');
+    const canPublish =
+      branch && files.length > 0 && !errors.length && sync?.status !== 'conflict' && !write.blocked;
+    const action = write.blocked
+      ? ''
+      : !branch
+        ? '<p>You have no changes to publish. Edit a file and save first.</p>'
+        : sync?.status === 'conflict'
+          ? `<p class="ed-alert">Resolve the <a href="/conflicts">conflicts with ${h(rc.baseBranch)}</a> before publishing.</p>`
+          : errors.length
+            ? `<p class="ed-alert">Fix the ${errors.length} validation error${errors.length === 1 ? '' : 's'} before publishing.</p>${diagnosticsList(errors)}`
+            : files.length === 0
+              ? '<p>Your branch has no changes yet.</p>'
+              : '';
     const body = `<h1>Publish</h1>
-${notice}${statusPanel(rc, branch, sync)}
+${notice}${statusPanel(rc, branch, sync, write)}
 ${rulesHtml}
 ${files.length ? `<section aria-labelledby="files-h" class="ed-card"><h2 id="files-h">Your changes</h2><ul>${files.map((f) => `<li><code>${h(f)}</code></li>`).join('')}</ul></section>` : ''}
 ${prHtml}

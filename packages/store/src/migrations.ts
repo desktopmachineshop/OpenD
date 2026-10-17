@@ -354,4 +354,30 @@ create table if not exists admin_setup_tokens (
 );
 `,
   },
+  {
+    id: '008_editor_github_tokens',
+    sql: `
+-- GitHub user access tokens of authors who signed in to the editor with GitHub
+-- (GitHub App user-to-server tokens), so their commits are made, and signed, by
+-- GitHub as them. One row per editor session: signing out, an expired or revoked
+-- session, or disabling the author removes it. Both tokens are sealed with the
+-- same AES-256-GCM key as the secrets table (key_id says which), bound to the
+-- session id; plaintext never reaches the database and no route returns them.
+create table if not exists editor_github_tokens (
+  session_id text primary key references editor_sessions (id) on delete cascade,
+  user_id bigint not null references editor_users (id) on delete cascade,
+  github_id bigint not null,
+  github_login text not null,
+  access_sealed text not null,
+  -- null for tokens that do not expire (GitHub Apps with expiring tokens off)
+  refresh_sealed text,
+  expires_at timestamptz,
+  refresh_expires_at timestamptz,
+  key_id text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists editor_github_tokens_user on editor_github_tokens (user_id);
+`,
+  },
 ];

@@ -9,7 +9,13 @@ export interface FakeCommit {
   parents: string[];
   message: string;
   author: GitIdentity;
+  committer: GitIdentity;
+  /** Signed by GitHub (shown "Verified"): createCommitOnBranch, update-branch and squash merges. */
+  signed: boolean;
 }
+
+/** GitHub's own committer on commits it makes and signs. */
+export const GITHUB_COMMITTER: GitIdentity = { name: 'GitHub', email: 'noreply@github.com' };
 
 interface FakePull {
   number: number;
@@ -17,6 +23,9 @@ interface FakePull {
   base: string;
   title: string;
   body: string;
+  draft: boolean;
+  /** Who opened it: `app` or a user login. */
+  openedBy: string;
   state: 'open' | 'closed';
   merged: boolean;
   mergeCommit: string | null;
@@ -70,7 +79,13 @@ export class FakeGitHub {
   private readonly commits = new Map<string, FakeCommit>();
   private readonly repos = new Map<string, FakeRepo>();
   private readonly oauthCodes = new Map<string, { user: OAuthUser; challenge?: string }>();
-  private readonly oauthTokens = new Map<string, OAuthUser>();
+  private readonly oauthTokens = new Map<string, { user: OAuthUser; expiresAt: number | null }>();
+  private readonly refreshTokens = new Map<string, OAuthUser>();
+  /** Every user access and refresh token ever issued, for "never leaked" assertions. */
+  readonly issuedTokens: string[] = [];
+  /** Issue expiring user tokens with refresh tokens, as GitHub Apps do by default. */
+  expiringUserTokens = false;
+  private graphqlHooks: (() => void)[] = [];
   private readonly installationTokens = new Map<string, number>();
   private readonly manifestCodes = new Map<string, Json>();
   /** Apps created through the manifest flow, by id. */
@@ -84,6 +99,8 @@ export class FakeGitHub {
   private clock = 0;
   /** Every request, for assertions: `METHOD /path`. */
   readonly requests: string[] = [];
+  /** Every request with who made it: `app` (installation token), a user's login, or `none`. */
+  readonly calls: { method: string; path: string; as: string }[] = [];
 
   readonly fetch = (async (input: string | URL | Request, init?: RequestInit) => {
     const url = new URL(typeof input === 'string' || input instanceof URL ? input : input.url);
@@ -91,6 +108,14 @@ export class FakeGitHub {
     const body = typeof init?.body === 'string' && init.body ? (JSON.parse(init.body) as Json) : {};
     const headers = new Headers(init?.headers);
     this.requests.push(`${method} ${url.pathname}`);
+    const token = (headers.get('authorization') ?? '').replace(/^Bearer /, '');
+    this.calls.push({
+      method,
+      path: url.pathname,
+      as: this.installationTokens.has(token)
+        ? 'app'
+        : (this.oauthTokens.get(token)?.user.login ?? 'none'),
+    });
     return this.handle(method, url, body, headers.get('authorization') ?? '');
   }) as typeof fetch;
 
@@ -208,6 +233,34 @@ export class FakeGitHub {
     this.manifestCodes.set(code, app);
   }
 
+  /** Makes every user token of `login` expired (refresh tokens still work). */
+  expireUserTokens(login: string): void {
+    for (const entry of this.oauthTokens.values())
+      if (entry.user.login === login) entry.expiresAt = Date.now() - 1000;
+  }
+
+  /** Revokes every access and refresh token of `login`, as the user would in their settings. */
+  revokeUserTokens(login: string): void {
+    for (const [token, entry] of this.oauthTokens)
+      if (entry.user.login === login) this.oauthTokens.delete(token);
+    for (const [token, user] of this.refreshTokens)
+      if (user.login === login) this.refreshTokens.delete(token);
+  }
+
+  /** Access tokens of `login` that GitHub would accept now. */
+  liveUserTokens(login: string): string[] {
+    return [...this.oauthTokens]
+      .filter(
+        ([, e]) => e.user.login === login && (e.expiresAt === null || e.expiresAt > Date.now()),
+      )
+      .map(([t]) => t);
+  }
+
+  /** Runs `fn` just before the next GraphQL request is handled (to simulate a race). */
+  beforeNextGraphql(fn: () => void): void {
+    this.graphqlHooks.push(fn);
+  }
+
   /** An installation of an app (by id; `null`: any app) on `account`, with access to `repos`. */
   addInstallation(id: number, account: string, repos: string[], appId: number | null = null): void {
     this.installations.set(id, { appId, account, repos });
@@ -235,10 +288,67 @@ export class FakeGitHub {
     return sha;
   }
 
-  private putCommit(c: Omit<FakeCommit, 'sha'>): string {
+  private putCommit(
+    input: Omit<FakeCommit, 'sha' | 'committer' | 'signed'> &
+      Partial<Pick<FakeCommit, 'committer' | 'signed'>>,
+  ): string {
+    const c = {
+      ...input,
+      committer: input.committer ?? input.author,
+      signed: input.signed ?? false,
+    };
     const sha = sha1(`commit ${JSON.stringify(c)} ${this.clock++}`);
     this.commits.set(sha, { ...c, sha });
     return sha;
+  }
+
+  /** Whether classic protection or a ruleset requires signed commits on a branch. */
+  private requiresSignatures(repo: FakeRepo, branch: string): boolean {
+    const protection = repo.protection.get(branch);
+    if (
+      protection &&
+      protection !== 'forbidden' &&
+      (protection.required_signatures as Json | undefined)?.enabled === true
+    )
+      return true;
+    const rules = this.rulesFor(repo, branch);
+    return Array.isArray(rules) && rules.some((r) => r.type === 'required_signatures');
+  }
+
+  /** Rulesets set for the branch name or for a pattern matching it (`*`, `**`). */
+  private rulesFor(repo: FakeRepo, branch: string): Json[] | 'forbidden' {
+    const out: Json[] = [];
+    for (const [pattern, rules] of repo.rulesets) {
+      if (!globMatch(pattern, branch)) continue;
+      if (rules === 'forbidden') return 'forbidden';
+      out.push(...rules);
+    }
+    return out;
+  }
+
+  /** Commits `sha` brings that no branch has yet: what signature rules check on an update. */
+  private newCommits(repo: FakeRepo, sha: string): FakeCommit[] {
+    const known = new Set<string>();
+    for (const head of repo.refs.values()) for (const c of this.ancestors(head)) known.add(c);
+    return this.ancestors(sha)
+      .filter((c) => !known.has(c))
+      .map((c) => this.commit(c));
+  }
+
+  private signatureViolation(repo: FakeRepo, branch: string, sha: string): Response | null {
+    if (!this.requiresSignatures(repo, branch)) return null;
+    if (this.newCommits(repo, sha).every((c) => c.signed)) return null;
+    return json(422, {
+      message: 'Repository rule violations found\n\nCommits must have verified signatures.',
+    });
+  }
+
+  /** The identity GitHub gives a user's commits: their name and no-reply address. */
+  private identityOf(user: OAuthUser): GitIdentity {
+    return {
+      name: user.name ?? user.login,
+      email: `${user.id}+${user.login}@users.noreply.github.com`,
+    };
   }
 
   private fileTree(sha: string): FileTree {
@@ -286,9 +396,53 @@ export class FakeGitHub {
     return out;
   }
 
+  private revokeAccessTokens(login: string): void {
+    for (const [token, entry] of this.oauthTokens)
+      if (entry.user.login === login) this.oauthTokens.delete(token);
+  }
+
+  private issueUserToken(user: OAuthUser): Json {
+    const token = `ghu_${randomBytes(12).toString('hex')}`;
+    this.issuedTokens.push(token);
+    if (!this.expiringUserTokens) {
+      this.oauthTokens.set(token, { user, expiresAt: null });
+      return { access_token: token, token_type: 'bearer', scope: '' };
+    }
+    const refresh = `ghr_${randomBytes(16).toString('hex')}`;
+    this.issuedTokens.push(refresh);
+    this.oauthTokens.set(token, { user, expiresAt: Date.now() + 28_800_000 });
+    this.refreshTokens.set(refresh, user);
+    return {
+      access_token: token,
+      token_type: 'bearer',
+      scope: '',
+      expires_in: 28_800,
+      refresh_token: refresh,
+      refresh_token_expires_in: 15_897_600,
+    };
+  }
+
+  private userFor(token: string): OAuthUser | undefined {
+    const entry = this.oauthTokens.get(token);
+    if (!entry || (entry.expiresAt !== null && entry.expiresAt <= Date.now())) return undefined;
+    return entry.user;
+  }
+
   // ---- HTTP -----------------------------------------------------------------
 
   private handle(method: string, url: URL, body: Json, auth: string): Response {
+    if (
+      url.origin === this.webUrl &&
+      url.pathname === '/login/oauth/access_token' &&
+      body.grant_type === 'refresh_token'
+    ) {
+      const user = this.refreshTokens.get(String(body.refresh_token));
+      if (!user) return json(200, { error: 'bad_refresh_token' });
+      // Using a refresh token invalidates it and the access token it came with.
+      this.refreshTokens.delete(String(body.refresh_token));
+      this.revokeAccessTokens(user.login);
+      return json(200, this.issueUserToken(user));
+    }
     if (url.origin === this.webUrl && url.pathname === '/login/oauth/access_token') {
       const pending = this.oauthCodes.get(String(body.code));
       if (!pending) return json(200, { error: 'bad_verification_code' });
@@ -298,10 +452,7 @@ export class FakeGitHub {
         const challenge = createHash('sha256').update(verifier).digest('base64url');
         if (challenge !== pending.challenge) return json(200, { error: 'invalid_grant' });
       }
-      const user = pending.user;
-      const token = `gho_${randomBytes(8).toString('hex')}`;
-      this.oauthTokens.set(token, user);
-      return json(200, { access_token: token, token_type: 'bearer' });
+      return json(200, this.issueUserToken(pending.user));
     }
     if (url.origin !== this.apiUrl) return json(404, { message: 'Not Found' });
     const path = url.pathname;
@@ -376,8 +527,9 @@ export class FakeGitHub {
         })),
       });
     }
+    if (path === '/graphql' && method === 'POST') return this.graphql(token, body);
     if (path === '/user' || path === '/user/emails') {
-      const user = this.oauthTokens.get(token);
+      const user = this.userFor(token);
       if (!user) return json(401, { message: 'Bad credentials' });
       if (path === '/user') return json(200, { id: user.id, login: user.login, name: user.name });
       return json(200, [
@@ -390,10 +542,88 @@ export class FakeGitHub {
 
     const m = /^\/repos\/([^/]+\/[^/]+)(\/.*)$/.exec(path);
     if (!m) return json(404, { message: 'Not Found' });
-    if (!this.installationTokens.has(token)) return json(401, { message: 'Bad credentials' });
+    const user = this.installationTokens.has(token) ? null : this.userFor(token);
+    if (!this.installationTokens.has(token) && !user)
+      return json(401, { message: 'Bad credentials' });
     const repo = this.repos.get(m[1]!);
     if (!repo) return json(404, { message: 'Not Found' });
-    return this.repoRoute(repo, method, decodeURIComponent(m[2]!), url.searchParams, body);
+    if (user) {
+      // A user token can do only what the user may (and the app allows).
+      const permission = repo.collaborators.get(user.login.toLowerCase());
+      if (!permission || permission === 'none') return json(404, { message: 'Not Found' });
+      if (method !== 'GET' && !['write', 'maintain', 'admin'].includes(permission))
+        return json(403, { message: 'Resource not accessible by integration' });
+    }
+    return this.repoRoute(repo, method, decodeURIComponent(m[2]!), url.searchParams, body, user);
+  }
+
+  private graphql(token: string, body: Json): Response {
+    for (const hook of this.graphqlHooks.splice(0)) hook();
+    const user = this.userFor(token);
+    if (!user && !this.installationTokens.has(token))
+      return json(401, { message: 'Bad credentials' });
+    const query = String(body.query ?? '');
+    const input = ((body.variables as Json | undefined)?.input ?? {}) as Json;
+    const fail = (type: string, message: string) =>
+      json(200, { data: null, errors: [{ type, message }] });
+    if (query.includes('createCommitOnBranch')) {
+      const branchInput = (input.branch ?? {}) as Json;
+      const repo = this.repos.get(String(branchInput.repositoryNameWithOwner));
+      if (!repo) return fail('NOT_FOUND', 'Could not resolve to a Repository.');
+      if (user) {
+        const permission = repo.collaborators.get(user.login.toLowerCase());
+        if (!permission || !['write', 'maintain', 'admin'].includes(permission))
+          return fail(
+            'FORBIDDEN',
+            `${user.login} does not have the correct permissions to execute \`CreateCommitOnBranch\``,
+          );
+      }
+      const branch = String(branchInput.branchName).replace(/^refs\/heads\//, '');
+      const head = repo.refs.get(branch);
+      if (!head) return fail('NOT_FOUND', `A ref named "${branch}" does not exist.`);
+      if (head !== input.expectedHeadOid)
+        return fail(
+          'STALE_DATA',
+          `Expected branch to point to "${String(input.expectedHeadOid)}" but it did not. Pull and try again.`,
+        );
+      const changes = (input.fileChanges ?? {}) as Json;
+      const tree = new Map(this.fileTree(this.commit(head).tree));
+      for (const d of (changes.deletions as Json[] | undefined) ?? []) tree.delete(String(d.path));
+      for (const a of (changes.additions as Json[] | undefined) ?? [])
+        tree.set(String(a.path), {
+          sha: this.putBlob(Buffer.from(String(a.contents), 'base64')),
+          mode: '100644',
+        });
+      const message = (input.message ?? {}) as Json;
+      const sha = this.putCommit({
+        tree: this.putTree(tree),
+        parents: [head],
+        message: message.body
+          ? `${String(message.headline)}\n\n${String(message.body)}`
+          : String(message.headline),
+        author: user
+          ? this.identityOf(user)
+          : { name: 'app[bot]', email: 'app[bot]@users.noreply.github.com' },
+        committer: GITHUB_COMMITTER,
+        signed: true,
+      });
+      repo.refs.set(branch, sha);
+      return json(200, { data: { createCommitOnBranch: { commit: { oid: sha } } } });
+    }
+    if (query.includes('markPullRequestReadyForReview')) {
+      const id = String(input.pullRequestId);
+      for (const repo of this.repos.values()) {
+        const pull = repo.pulls.find((p) => `PR_${p.number}` === id);
+        if (pull) {
+          pull.draft = false;
+          return json(200, {
+            data: { markPullRequestReadyForReview: { pullRequest: { isDraft: false } } },
+          });
+        }
+      }
+      return fail('NOT_FOUND', 'Could not resolve to a node.');
+    }
+    return fail('UNKNOWN', 'Fake GitHub has no such GraphQL operation');
   }
 
   private repoRoute(
@@ -402,8 +632,12 @@ export class FakeGitHub {
     path: string,
     query: URLSearchParams,
     body: Json,
+    user: OAuthUser | null = null,
   ): Response {
     let r: RegExpExecArray | null;
+    const actorIdentity = user
+      ? this.identityOf(user)
+      : { name: 'app[bot]', email: 'app[bot]@users.noreply.github.com' };
     if ((r = /^\/git\/ref\/heads\/(.+)$/.exec(path)) && method === 'GET') {
       const sha = repo.refs.get(r[1]!);
       return sha
@@ -425,6 +659,8 @@ export class FakeGitHub {
       if (!this.commits.has(sha)) return json(422, { message: 'Object does not exist' });
       if (!body.force && !this.ancestors(sha).includes(current))
         return json(422, { message: 'Update is not a fast forward' });
+      const violation = this.signatureViolation(repo, r[1]!, sha);
+      if (violation) return violation;
       repo.refs.set(r[1]!, sha);
       return json(200, { object: { sha } });
     }
@@ -448,7 +684,7 @@ export class FakeGitHub {
         tree: String(body.tree),
         parents,
         message: String(body.message),
-        author: author ? { name: author.name, email: author.email } : { name: 'app', email: '' },
+        author: author ? { name: author.name, email: author.email } : actorIdentity,
       });
       return json(201, { sha });
     }
@@ -499,12 +735,15 @@ export class FakeGitHub {
           )
         : null;
       if (!merged) return json(409, { message: 'Merge conflict' });
+      // Not documented to be signed by GitHub, so the fake treats it as unsigned.
       const sha = this.putCommit({
         tree: this.putTree(merged),
         parents: [baseSha, headSha],
         message: String(body.commit_message ?? `Merge ${String(body.head)} into ${base}`),
-        author: { name: 'app[bot]', email: 'app[bot]@users.noreply.github.com' },
+        author: actorIdentity,
       });
+      const violation = this.signatureViolation(repo, base, sha);
+      if (violation) return violation;
       repo.refs.set(base, sha);
       return json(201, { sha });
     }
@@ -556,6 +795,8 @@ export class FakeGitHub {
         base: String(body.base),
         title: String(body.title),
         body: String(body.body ?? ''),
+        draft: body.draft === true,
+        openedBy: user?.login ?? 'app',
         state: 'open',
         merged: false,
         mergeCommit: null,
@@ -564,7 +805,7 @@ export class FakeGitHub {
       repo.pulls.push(pull);
       return json(201, this.pullJson(repo, pull));
     }
-    if ((r = /^\/pulls\/(\d+)(\/reviews|\/merge)?$/.exec(path))) {
+    if ((r = /^\/pulls\/(\d+)(\/reviews|\/merge|\/update-branch)?$/.exec(path))) {
       const pull = repo.pulls.find((p) => p.number === Number(r![1]));
       if (!pull) return json(404, { message: 'Not Found' });
       if (!r[2] && method === 'GET') return json(200, this.pullJson(repo, pull));
@@ -583,6 +824,20 @@ export class FakeGitHub {
           })),
         );
       if (r[2] === '/merge' && method === 'PUT') return this.mergePull(repo, pull, body);
+      if (r[2] === '/update-branch' && method === 'PUT')
+        return this.updatePullBranch(repo, pull, body, actorIdentity);
+    }
+    if (
+      (r = /^\/branches\/(.+)\/protection\/required_signatures$/.exec(path)) &&
+      method === 'GET'
+    ) {
+      const rules = repo.protection.get(r[1]!);
+      if (rules === 'forbidden')
+        return json(403, { message: 'Resource not accessible by integration' });
+      if (!rules) return json(404, { message: 'Branch not protected' });
+      return json(200, {
+        enabled: (rules.required_signatures as Json | undefined)?.enabled === true,
+      });
     }
     if ((r = /^\/branches\/(.+)\/protection$/.exec(path)) && method === 'GET') {
       const rules = repo.protection.get(r[1]!);
@@ -591,10 +846,10 @@ export class FakeGitHub {
       return rules ? json(200, rules) : json(404, { message: 'Branch not protected' });
     }
     if ((r = /^\/rules\/branches\/(.+)$/.exec(path)) && method === 'GET') {
-      const rules = repo.rulesets.get(r[1]!);
+      const rules = this.rulesFor(repo, r[1]!);
       if (rules === 'forbidden')
         return json(403, { message: 'Resource not accessible by integration' });
-      return json(200, rules ?? []);
+      return json(200, rules);
     }
     if ((r = /^\/commits\/([^/]+)\/status$/.exec(path)) && method === 'GET') {
       const statuses = repo.statuses.get(repo.refs.get(r[1]!) ?? r[1]!) ?? [];
@@ -634,6 +889,8 @@ export class FakeGitHub {
       state: p.state,
       merged: p.merged,
       mergeable,
+      draft: p.draft,
+      node_id: `PR_${p.number}`,
       title: p.title,
       body: p.body,
       head: { ref: p.head, sha: headSha },
@@ -644,7 +901,7 @@ export class FakeGitHub {
   /** What branch protection would refuse, like GitHub's 405 "Base branch policy prohibits the merge". */
   private policyBlock(repo: FakeRepo, pull: FakePull, headSha: string): string | null {
     const protection = repo.protection.get(pull.base);
-    const rulesets = repo.rulesets.get(pull.base);
+    const rulesets = this.rulesFor(repo, pull.base);
     let approvals = 0;
     const checks: string[] = [];
     if (protection && protection !== 'forbidden') {
@@ -669,6 +926,12 @@ export class FakeGitHub {
     if (states.includes('CHANGES_REQUESTED')) return 'Changes requested';
     if (states.filter((s) => s === 'APPROVED').length < approvals)
       return 'Base branch policy prohibits the merge: approving review required';
+    if (this.requiresSignatures(repo, pull.base)) {
+      // GitHub's test merge checks the head branch's commits, though it signs the squash itself.
+      const inBase = new Set(this.ancestors(repo.refs.get(pull.base)!));
+      if (this.ancestors(headSha).some((c) => !inBase.has(c) && !this.commit(c).signed))
+        return 'Base branch policy prohibits the merge: commits must have verified signatures';
+    }
     const statuses = repo.statuses.get(headSha) ?? [];
     for (const context of checks) {
       if (statuses.find((s) => s.context === context)?.state !== 'success')
@@ -679,6 +942,7 @@ export class FakeGitHub {
 
   private mergePull(repo: FakeRepo, pull: FakePull, body: Json): Response {
     if (pull.state !== 'open') return json(405, { message: 'Pull Request is not mergeable' });
+    if (pull.draft) return json(405, { message: 'Pull Request is still a draft' });
     const headSha = repo.refs.get(pull.head)!;
     if (body.sha && body.sha !== headSha)
       return json(409, { message: 'Head branch was modified. Review and try the merge again.' });
@@ -697,6 +961,8 @@ export class FakeGitHub {
       parents: [baseSha],
       message: message ? `${title}\n\n${message}` : title,
       author: { name: 'app[bot]', email: 'app[bot]@users.noreply.github.com' },
+      committer: GITHUB_COMMITTER,
+      signed: true,
     });
     repo.refs.set(pull.base, sha);
     pull.state = 'closed';
@@ -704,4 +970,54 @@ export class FakeGitHub {
     pull.mergeCommit = sha;
     return json(200, { merged: true, sha, message: 'Pull Request successfully merged' });
   }
+
+  /** PUT /pulls/{n}/update-branch: GitHub merges the base branch into the head branch and signs it. */
+  private updatePullBranch(
+    repo: FakeRepo,
+    pull: FakePull,
+    body: Json,
+    author: GitIdentity,
+  ): Response {
+    if (pull.state !== 'open') return json(422, { message: 'Pull request is closed' });
+    const headSha = repo.refs.get(pull.head);
+    const baseSha = repo.refs.get(pull.base);
+    if (!headSha || !baseSha) return json(422, { message: 'Branch not found' });
+    if (body.expected_head_sha && body.expected_head_sha !== headSha)
+      return json(422, { message: "expected head sha didn't match current head ref." });
+    if (this.ancestors(headSha).includes(baseSha))
+      return json(422, { message: 'There are no new commits on the base branch.' });
+    const mb = this.mergeBase(headSha, baseSha);
+    const merged = mb
+      ? this.mergeTrees(this.commit(mb).tree, this.commit(headSha).tree, this.commit(baseSha).tree)
+      : null;
+    if (!merged) return json(422, { message: 'merge conflict between base and head' });
+    const sha = this.putCommit({
+      tree: this.putTree(merged),
+      parents: [headSha, baseSha],
+      message: `Merge branch '${pull.base}' into ${pull.head}`,
+      author,
+      committer: GITHUB_COMMITTER,
+      signed: true,
+    });
+    repo.refs.set(pull.head, sha);
+    return json(202, {
+      message: 'Updating pull request branch.',
+      url: `${this.webUrl}/pull/${pull.number}`,
+    });
+  }
+}
+
+/** GitHub's ref patterns: `*` within one path segment, `**` across segments. */
+function globMatch(pattern: string, name: string): boolean {
+  if (!pattern.includes('*')) return pattern === name;
+  const re = pattern
+    .split('**')
+    .map((part) =>
+      part
+        .split('*')
+        .map((p) => p.replace(/[.+?^${}()|[\]\\]/g, '\\$&'))
+        .join('[^/]*'),
+    )
+    .join('.*');
+  return new RegExp(`^${re}$`).test(name);
 }

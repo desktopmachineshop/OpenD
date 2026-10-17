@@ -16,6 +16,7 @@ import {
   type SquashMerge,
   type TreeChange,
   type TreeEntry,
+  type UpdateBranchResult,
 } from './client.js';
 
 type Json = Record<string, unknown>;
@@ -33,6 +34,8 @@ function asPull(data: Json): PullRequest {
     state: data.state === 'open' ? 'open' : 'closed',
     merged: data.merged === true || typeof data.merged_at === 'string',
     mergeable: typeof data.mergeable === 'boolean' ? data.mergeable : null,
+    draft: data.draft === true,
+    nodeId: (data.node_id as string | undefined) ?? '',
     headSha: head.sha as string,
     headRef: head.ref as string,
     baseRef: base.ref as string,
@@ -49,13 +52,21 @@ export class RestGitHubClient implements GitHubClient {
   readonly fullName: string;
 
   constructor(
-    private readonly github: GitHubAccess,
-    private readonly repo: RepoRef,
+    protected readonly github: Pick<GitHubAccess, 'request'>,
+    protected readonly repo: RepoRef,
   ) {
     this.fullName = repo.fullName;
   }
 
-  private async call(method: string, path: string, body?: unknown, ok: number[] = [200, 201]) {
+  /** The error for an unexpected status. Subclasses turn some into messages for the author. */
+  protected failure(method: string, path: string, status: number, message: string): Error {
+    return new GitHubError(
+      `GitHub ${method} ${path.split('?')[0]} failed: ${status}${message ? ` ${message}` : ''}`,
+      status,
+    );
+  }
+
+  protected async call(method: string, path: string, body?: unknown, ok: number[] = [200, 201]) {
     const res = await this.github.request(
       this.repo,
       method,
@@ -68,10 +79,7 @@ export class RestGitHubClient implements GitHubClient {
         res.data && typeof res.data === 'object' && 'message' in res.data
           ? String((res.data as Json).message)
           : '';
-      throw new GitHubError(
-        `GitHub ${method} ${path.split('?')[0]} failed: ${res.status}${message ? ` ${message}` : ''}`,
-        res.status,
-      );
+      throw this.failure(method, path, res.status, message);
     }
     return res;
   }
@@ -197,6 +205,7 @@ export class RestGitHubClient implements GitHubClient {
     body: string;
     head: string;
     base: string;
+    draft?: boolean;
   }): Promise<PullRequest> {
     return asPull((await this.call('POST', '/pulls', input)).data as Json);
   }
@@ -232,6 +241,32 @@ export class RestGitHubClient implements GitHubClient {
     return { merged: false, reason: String(data.message ?? `GitHub refused (${res.status})`) };
   }
 
+  async updatePullBranch(number: number, expectedHeadSha: string): Promise<UpdateBranchResult> {
+    const res = await this.call(
+      'PUT',
+      `/pulls/${number}/update-branch`,
+      { expected_head_sha: expectedHeadSha },
+      [202, 422],
+    );
+    if (res.status === 202) return { status: 'accepted' };
+    const message = String(((res.data ?? {}) as Json).message ?? 'GitHub refused (422)');
+    return /conflict/i.test(message)
+      ? { status: 'conflict', message }
+      : { status: 'refused', message };
+  }
+
+  async requiredSignatures(branch: string): Promise<RulesLookup<boolean>> {
+    const res = await this.call(
+      'GET',
+      `/branches/${branchPath(branch)}/protection/required_signatures`,
+      undefined,
+      [200, 403, 404],
+    );
+    if (res.status === 404) return { status: 'none' };
+    if (res.status === 403) return { status: 'forbidden' };
+    return { status: 'ok', rules: (res.data as Json).enabled === true };
+  }
+
   async branchProtection(branch: string): Promise<RulesLookup<ProtectionRules>> {
     const res = await this.call(
       'GET',
@@ -255,6 +290,7 @@ export class RestGitHubClient implements GitHubClient {
           : 0,
         codeOwnerReview: reviews?.require_code_owner_reviews === true,
         requiredChecks: [...contexts],
+        requiredSignatures: (data.required_signatures as Json | undefined)?.enabled === true,
       },
     };
   }
@@ -320,7 +356,12 @@ export class RestGitHubClient implements GitHubClient {
 
 /** Merges the rules of every ruleset that applies to a branch. */
 export function rulesFromRulesets(rules: Json[]): ProtectionRules {
-  const out: ProtectionRules = { requiredApprovals: 0, codeOwnerReview: false, requiredChecks: [] };
+  const out: ProtectionRules = {
+    requiredApprovals: 0,
+    codeOwnerReview: false,
+    requiredChecks: [],
+    requiredSignatures: false,
+  };
   for (const rule of rules) {
     const p = (rule.parameters as Json | undefined) ?? {};
     if (rule.type === 'pull_request') {
@@ -329,6 +370,8 @@ export function rulesFromRulesets(rules: Json[]): ProtectionRules {
         (p.required_approving_review_count as number | undefined) ?? 0,
       );
       if (p.require_code_owner_review === true) out.codeOwnerReview = true;
+    } else if (rule.type === 'required_signatures') {
+      out.requiredSignatures = true;
     } else if (rule.type === 'required_status_checks') {
       for (const c of (p.required_status_checks as Json[] | undefined) ?? []) {
         const context = c.context as string;

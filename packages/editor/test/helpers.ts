@@ -56,10 +56,17 @@ export interface Harness extends EditorApp {
 
 export async function startEditor(
   url: string,
-  options: { oidc?: Record<string, OidcIdentity>; config?: Partial<EditorConfig> } = {},
+  options: {
+    oidc?: Record<string, OidcIdentity>;
+    config?: Partial<EditorConfig>;
+    log?: (entry: Record<string, unknown>) => void;
+    /** Set up the fake before the app starts. */
+    gh?: (gh: FakeGitHub) => void;
+  } = {},
 ): Promise<Harness> {
   const db = await createTestDatabase(url);
   const gh = new FakeGitHub();
+  options.gh?.(gh);
   gh.createRepo(REPO, readStarter());
   await upsertRepo(db.pool, {
     fullName: REPO,
@@ -83,9 +90,10 @@ export async function startEditor(
   };
   const editor = await createEditorApp(config, {
     pool: db.pool,
-    log: () => {},
+    log: options.log ?? (() => {}),
     fetch: gh.fetch,
     oidc: fakeOidc(options.oidc ?? {}),
+    service: { updateBranchPolls: [5, 10, 20], signingTtlMs: 1 },
   });
   await editor.app.ready();
   return {

@@ -5,6 +5,7 @@ import type { EditorConfig } from './config.js';
 import type { GitHubClient } from './github/client.js';
 import type { GitHubOAuth } from './github/oauth.js';
 import type { OidcProvider } from './oidc.js';
+import type { EditorTokens } from './tokens.js';
 import {
   EditorError,
   docsPrefix,
@@ -21,6 +22,13 @@ export interface EditorContext {
   oidc: OidcProvider | null;
   /** Author sign-in with GitHub: from the environment, or the app the admin console connected. */
   githubOAuth: GitHubOAuth | null;
+  /**
+   * Whether GitHub sign-in uses a GitHub App's credentials, so the editor keeps
+   * the author's user token (with a secret key) and commits as them.
+   */
+  keepsGitHubTokens: boolean;
+  /** Authors' GitHub user tokens, sealed per session. */
+  tokens: EditorTokens;
   /** Installation tokens: the environment's App, the broker, or the connected app. */
   github: GitHubConnection;
   /** Settings shared with the docs site's admin console; null in tests that pass none. */

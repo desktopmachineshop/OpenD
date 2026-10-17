@@ -27,6 +27,7 @@ const SESSION_HOURS = 12;
 
 export interface SignedIn extends Actor {
   csrf: string;
+  provider: 'github' | 'oidc';
 }
 
 function secure(ctx: EditorContext): boolean {
@@ -50,7 +51,14 @@ export async function currentEditor(
   if (!unsigned.valid || !unsigned.value) return null;
   const found = await getEditorSession(ctx.pool, unsigned.value);
   if (!found) return null;
-  return { user: found.user, sessionId: found.session.id, csrf: csrfToken(ctx, found.session.id) };
+  return {
+    user: found.user,
+    sessionId: found.session.id,
+    csrf: csrfToken(ctx, found.session.id),
+    provider: found.session.provider,
+    github:
+      found.session.provider === 'github' ? await ctx.tokens.forSession(found.session.id) : null,
+  };
 }
 
 /**
@@ -118,7 +126,7 @@ async function startSession(
   ctx: EditorContext,
   user: EditorUser,
   provider: 'github' | 'oidc',
-): Promise<void> {
+): Promise<string> {
   const session = await createEditorSession(ctx.pool, user.id, provider, SESSION_HOURS);
   await recordEditorAudit(ctx.pool, {
     sessionId: session.id,
@@ -134,6 +142,7 @@ async function startSession(
     path: '/',
     maxAge: SESSION_HOURS * 3600,
   });
+  return session.id;
 }
 
 function setLoginCookie(reply: FastifyReply, ctx: EditorContext, value: object): void {
@@ -243,7 +252,24 @@ export function registerAuth(app: FastifyInstance, ctx: EditorContext): void {
         `@${login.login} cannot edit these docs. Ask an administrator to add you as an editor.`,
       );
     }
-    await startSession(reply, ctx, user, 'github');
+    // Switching from company sign-in (e.g. to make signed commits) ends the old session.
+    const previous = await currentEditor(request, ctx);
+    if (previous) await revokeEditorSession(ctx.pool, previous.sessionId);
+    const sessionId = await startSession(reply, ctx, user, 'github');
+    // Keep the author's GitHub App user token, sealed, so their commits are made
+    // and signed by GitHub as them. OAuth App tokens are never kept.
+    if (login.grant && ctx.keepsGitHubTokens) {
+      const kept = await ctx.tokens.save(
+        { sessionId, userId: user.id },
+        { id: login.id, login: login.login },
+        login.grant,
+      );
+      if (!kept)
+        ctx.log({
+          level: 'warn',
+          msg: 'github user token not kept: no secret key (set OPEND_SECRET_KEY or SESSION_SECRET)',
+        });
+    }
     return reply.redirect(safeReturnTo(pending.returnTo));
   });
 

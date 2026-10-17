@@ -70,3 +70,5 @@ The instance verifies the signature in constant time, records the delivery id an
 ## Sign-in
 
 Readers and staff sign in with the instance's existing OIDC support against the control plane, which authenticates them with GitHub and returns verified emails. No GitHub OAuth client exists on the instance in managed mode. The web editor uses its `EDITOR_OIDC_*` settings against the same issuer.
+
+**Signed commits.** OIDC sign-in gives the editor no GitHub user access token, so in managed mode the editor commits through broker installation tokens, which GitHub does not sign. On repositories whose branch protection or rulesets require signed commits, authors therefore cannot save or publish; the editor tells them so. A follow-up could let the control plane issue GitHub App user tokens through a token-exchange endpoint (an OIDC session in, a user token for the same person out); it is not part of this contract yet. See [ADR 0012](adr/0012-signed-commits-from-the-editor.md).

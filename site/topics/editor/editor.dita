@@ -19,7 +19,8 @@
           the repository's review rules on GitHub decide when it can merge.</li>
         <li>Once it merges, the docs site builds and publishes it like any other push.</li>
         <li>Commits name you as the author, even if you have no GitHub account, and the editor keeps a record
-          of what you did.</li>
+          of what you did. If you sign in with GitHub, they are commits by your own account, marked Verified
+          by GitHub; see <xref href="editor-signed-commits.dita"/>.</li>
       </ul>
     </section>
 
@@ -66,6 +67,7 @@
         <li><xref href="editor-edit.dita"/></li>
         <li><xref href="editor-publish.dita"/></li>
         <li><xref href="editor-conflicts.dita"/></li>
+        <li><xref href="editor-signed-commits.dita"/></li>
       </ul>
     </section>
   </conbody>
