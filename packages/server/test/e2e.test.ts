@@ -299,6 +299,35 @@ describe.skipIf(!url)('push to publish', () => {
       .toBe(200);
   });
 
+  it('takes a release line off the site and falls back to the next newest', async () => {
+    expect((await admin(h.app, 'DELETE', '/repos/1/releases/2')).statusCode).toBe(204);
+    expect((await admin(h.app, 'DELETE', '/repos/1/releases/2')).statusCode).toBe(404);
+    const live = (await admin(h.app, 'GET', '/repos/1/releases')).json() as {
+      releaseLine: string;
+    }[];
+    expect(live.map((r) => r.releaseLine)).toEqual(['1']);
+    expect((await get('/topics/install.html', cookies['v2-basic'])).body).toContain(
+      'No documentation has been published for release 2.x yet.',
+    );
+    expect((await get('/topics/install.html', cookies['v1-basic'])).statusCode).toBe(200);
+    // The staff view, used by API keys without a version, now reads line 1.
+    const key = (
+      await admin(h.app, 'POST', '/api-keys', {
+        name: 'fallback',
+        scopes: ['read'],
+        audience: 'staff',
+      })
+    ).json() as { token: string };
+    const versions = await h.app.inject({
+      method: 'GET',
+      url: '/api/v1/versions',
+      headers: { authorization: `Bearer ${key.token}` },
+    });
+    expect(versions.json()).toMatchObject({ current: '1' });
+    const audit = (await admin(h.app, 'GET', '/audit')).json() as { action: string }[];
+    expect(audit.map((a) => a.action)).toContain('release.retire');
+  });
+
   it('reports health', async () => {
     expect((await get('/healthz')).json()).toEqual({ status: 'ok' });
   });
