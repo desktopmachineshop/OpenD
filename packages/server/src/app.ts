@@ -20,6 +20,7 @@ import { registerAuth } from './auth.js';
 import type { ServerConfig } from './config.js';
 import { Caches, type AppContext } from './context.js';
 import { registerDelivery } from './delivery.js';
+import { registerApi } from './api.js';
 import { registerEmbed } from './embed.js';
 import { registerFeedback } from './feedback.js';
 import { registerPdf } from './pdf.js';
@@ -174,6 +175,7 @@ export async function createApp(config: ServerConfig, deps: AppDeps): Promise<Op
   registerAdminConsole(app, ctx);
   registerEntitlementSync(app, ctx);
   registerEmbed(app, ctx);
+  registerApi(app, ctx);
   registerPdf(app, ctx);
   registerFeedback(app, ctx);
   registerDelivery(app, ctx);

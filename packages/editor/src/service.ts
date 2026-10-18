@@ -1159,7 +1159,15 @@ export class EditorService {
    * (squash, crediting the author) when the base branch's rules allow it.
    * GitHub makes and signs the squash commit.
    */
-  publish(rc: RepoContext, actor: Actor, branch: EditorBranch): Promise<PublishOutcome> {
+  publish(
+    rc: RepoContext,
+    actor: Actor,
+    branch: EditorBranch,
+    options: {
+      /** `false`: open or update the pull request but never merge it (API keys without `publish`). */
+      merge?: boolean;
+    } = {},
+  ): Promise<PublishOutcome> {
     return this.locks.run(branch.branch, async () => {
       const mode = await this.mode(rc, actor, branch, true);
       // The signed flow merges main in through the pull request, once it exists.
@@ -1200,7 +1208,7 @@ export class EditorService {
       });
       const { pull: fresh, review } = await this.reviewState(rc, branch);
       const outcome: PublishOutcome = { pull: fresh ?? pull, created, merged: false, review };
-      if (!review.canMerge) return outcome;
+      if (!review.canMerge || options.merge === false) return outcome;
       const result = await mode.writer.mergePull(pull.number, {
         title: `${pull.title} (#${pull.number})`,
         message: `${files.map((f) => `* ${f}`).join('\n')}\n\n${coAuthorTrailer(actor.user)}`,

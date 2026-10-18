@@ -47,6 +47,8 @@ export const ADMIN_CSS = `
 .admin-table tbody tr:last-child > * { border-bottom: 0; }
 .admin-table td.admin-actions { white-space: nowrap; text-align: right; }
 .admin-table code { white-space: nowrap; }
+.admin-reveal { border-color: var(--opend-accent); }
+.admin-secret { display: block; padding: 10px 12px; border: 1px solid var(--opend-border); border-radius: var(--opend-radius-sm); background: var(--opend-surface-alt); font-size: 14px; overflow-wrap: anywhere; user-select: all; }
 .admin-empty { margin: 0; padding: 16px; border: 1px dashed var(--opend-border-strong); border-radius: var(--opend-radius); color: var(--opend-muted); text-align: center; }
 
 .admin-badge { display: inline-block; padding: 1px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; line-height: 1.6; white-space: nowrap; background: color-mix(in srgb, var(--opend-muted) 14%, var(--opend-surface)); color: var(--opend-muted); }

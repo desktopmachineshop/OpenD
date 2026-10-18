@@ -2,8 +2,12 @@ import { timingSafeEqual } from 'node:crypto';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import {
+  API_SCOPES,
   analyticsSummary,
   audit,
+  createApiKey,
+  listApiKeys,
+  revokeApiKey,
   countStaffReaders,
   createSetupToken,
   deleteOrg,
@@ -127,6 +131,19 @@ export function csvField(value: unknown): string {
   if (/^[=+\-@\t\r]/.test(text)) text = `'${text}`;
   return `"${text.replaceAll('"', '""')}"`;
 }
+
+const apiKeySchema = z
+  .object({
+    name: z.string().trim().min(1).max(100),
+    scopes: z.array(z.enum(API_SCOPES)).min(1),
+    audience: z.enum(['staff', 'org', 'public']),
+    org: slug.optional(),
+    expiresInDays: z.number().int().min(1).max(3650).nullable().default(90),
+  })
+  .refine((k) => (k.audience === 'org') === (k.org !== undefined), {
+    message: 'org is required for (and only for) the org audience',
+    path: ['org'],
+  });
 
 const setupLinkSchema = z.object({
   minutes: z
@@ -354,6 +371,46 @@ export function registerAdmin(app: FastifyInstance, ctx: AppContext): void {
         return link
           ? reply.code(201).send(link)
           : reply.code(409).send({ error: 'a staff reader exists; sign in as staff instead' });
+      });
+
+      // Public API keys (/api/v1). The token is in the creation response only.
+      scope.get('/api-keys', async () => listApiKeys(ctx.pool));
+      scope.post('/api-keys', async (request, reply) => {
+        const input = parse(apiKeySchema, request.body ?? {}, reply);
+        if (!input) return reply;
+        if (input.org && !(await listOrgs(ctx.pool)).some((o) => o.slug === input.org))
+          return reply.code(404).send({ error: 'no such org' });
+        const created = await withTransaction(ctx.pool, async (db) => {
+          const r = await createApiKey(db, {
+            name: input.name,
+            scopes: input.scopes,
+            audience: input.audience,
+            orgSlug: input.org ?? null,
+            createdBy: ACTOR,
+            expiresAt:
+              input.expiresInDays === null
+                ? null
+                : new Date(Date.now() + input.expiresInDays * 86_400_000),
+          });
+          await audit(db, ACTOR, 'api-key.create', {
+            id: r.key.id,
+            name: r.key.name,
+            scopes: r.key.scopes,
+            audience: r.key.audience,
+            orgSlug: r.key.orgSlug,
+          });
+          return r;
+        });
+        return reply.code(201).send({ ...created.key, token: created.token });
+      });
+      scope.delete('/api-keys/:id', async (request, reply) => {
+        const id = Number((request.params as { id: string }).id);
+        const revoked = await withTransaction(ctx.pool, async (db) => {
+          const ok = Number.isSafeInteger(id) && (await revokeApiKey(db, id));
+          if (ok) await audit(db, ACTOR, 'api-key.revoke', { id });
+          return ok;
+        });
+        return revoked ? reply.code(204).send() : reply.code(404).send({ error: 'no such key' });
       });
 
       // Analytics: read-only, and still readable after OPEND_ANALYTICS=0 stops recording.

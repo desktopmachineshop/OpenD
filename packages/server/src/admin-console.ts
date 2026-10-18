@@ -5,6 +5,10 @@ import {
   SECRET,
   SETTING,
   audit,
+  createApiKey,
+  listApiKeys,
+  revokeApiKey,
+  type ApiAudience,
   clearEntitlements,
   consumeSetupToken,
   deleteOrg,
@@ -50,6 +54,7 @@ import { listRemoteRefs, releaseRefsToPoll } from '@opend/worker';
 import { entitlementsSchema, repoSchema, slug as slugSchema } from './admin.js';
 import {
   adminShell,
+  apiPage,
   connectPage,
   editorPage,
   githubPage,
@@ -66,6 +71,7 @@ import {
 } from './admin-pages.js';
 import { ADMIN_CSS } from './admin-style.js';
 import { loginPath, safeReturnTo, setSession, siteSession } from './auth.js';
+import { API_KEY_EMAIL_DOMAIN } from './api-writes.js';
 import type { AppContext } from './context.js';
 import { siteRepo } from './delivery.js';
 import {
@@ -123,6 +129,7 @@ const DONE: Record<string, string> = {
   disconnected: 'GitHub disconnected.',
   editor: 'Editor settings saved.',
   author: 'Author saved.',
+  'key-revoked': 'API key revoked. Anything using it stops working at once.',
 };
 
 const ORG_SLUG = /^[A-Za-z0-9][A-Za-z0-9-]{0,38}$/;
@@ -130,6 +137,47 @@ const GITHUB_LOGIN = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/;
 const token = z.string().regex(/^[A-Za-z0-9_.:-]+$/);
 
 class InputError extends Error {}
+
+/** A new key from the console form: its name, scopes, audience and expiry. */
+function apiKeyInput(
+  body: Record<string, string>,
+  orgs: { slug: string }[],
+): {
+  name: string;
+  scopes: string[];
+  audience: ApiAudience;
+  orgSlug: string | null;
+  expiresAt: Date | null;
+} {
+  const name = (body.name ?? '').trim();
+  if (!name || name.length > 100)
+    throw new InputError('Give the key a name (up to 100 characters).');
+  const access = body.access ?? 'read';
+  if (!['read', 'write', 'publish'].includes(access))
+    throw new InputError('Choose what the key can do.');
+  const scopes = [access, ...(body.builds === '1' ? ['builds'] : [])];
+  const audienceValue = body.audience ?? 'staff';
+  let audience: ApiAudience;
+  let orgSlug: string | null = null;
+  if (audienceValue === 'staff' || audienceValue === 'public') audience = audienceValue;
+  else if (
+    audienceValue.startsWith('org:') &&
+    orgs.some((o) => o.slug === audienceValue.slice(4))
+  ) {
+    audience = 'org';
+    orgSlug = audienceValue.slice(4);
+  } else throw new InputError('Choose whose view of the docs the key reads.');
+  const days = body.expires === 'never' ? null : Number(body.expires ?? '90');
+  if (days !== null && (!Number.isInteger(days) || days < 1 || days > 3650))
+    throw new InputError('Choose when the key expires.');
+  return {
+    name,
+    scopes,
+    audience,
+    orgSlug,
+    expiresAt: days === null ? null : new Date(Date.now() + days * 86_400_000),
+  };
+}
 
 function bodyOf(request: FastifyRequest): Record<string, string> {
   const body = request.body;
@@ -238,7 +286,11 @@ export function registerAdminConsole(app: FastifyInstance, ctx: AppContext): voi
   };
 
   type Page = { title: string; body: Html; formAction?: string };
-  const pages: Record<AdminSection, (s: Staff) => Promise<Page>> = {
+  /** `created`: a key just made, whose token the API page shows this once. */
+  const pages: Record<
+    AdminSection,
+    (s: Staff, created?: { name: string; token: string }) => Promise<Page>
+  > = {
     overview: async () => {
       const repos = await listRepos(ctx.pool);
       const repo = await siteRepo(ctx);
@@ -414,6 +466,19 @@ export function registerAdminConsole(app: FastifyInstance, ctx: AppContext): voi
         }),
       };
     },
+    api: async (s, created) => {
+      return {
+        title: 'API & AI',
+        body: apiPage({
+          keys: await listApiKeys(ctx.pool),
+          orgs: (await listOrgs(ctx.pool)).map((o) => ({ slug: o.slug, name: o.name })),
+          created: created ?? null,
+          apiBase: `${ctx.env.publicUrl}/api/v1`,
+          mcpUrl: ctx.env.mcpUrl ?? null,
+          csrf: s.csrf,
+        }),
+      };
+    },
     editor: async (s) => {
       const snap = ctx.settings.current;
       const sources = settingSources(ctx.env, snap);
@@ -425,7 +490,10 @@ export function registerAdminConsole(app: FastifyInstance, ctx: AppContext): voi
           editLinks: ctx.config.editLinks !== false,
           sourceLinks: ctx.config.sourceLinks === true,
           sourceLinksEnv: ctx.env.sourceLinks === true,
-          users: await listEditorUsers(ctx.pool),
+          // API keys' own editor users are listed on the API page, not as authors.
+          users: (await listEditorUsers(ctx.pool)).filter(
+            (u) => !u.email.endsWith(`@${API_KEY_EMAIL_DOMAIN}`),
+          ),
           github: ctx.github.mode(),
           publicUrl: ctx.env.publicUrl,
           csrf: s.csrf,
@@ -440,8 +508,9 @@ export function registerAdminConsole(app: FastifyInstance, ctx: AppContext): voi
     section: AdminSection,
     flash: Flash | null,
     status = 200,
+    created?: { name: string; token: string },
   ) => {
-    const page = await pages[section](s);
+    const page = await pages[section](s, created);
     return reply
       .code(status)
       .headers(adminHeaders(page.formAction))
@@ -475,6 +544,7 @@ export function registerAdminConsole(app: FastifyInstance, ctx: AppContext): voi
     ['/admin/sign-in', 'sign-in'],
     ['/admin/github', 'github'],
     ['/admin/editor', 'editor'],
+    ['/admin/api-keys', 'api'],
   ];
   for (const [path, section] of ROUTES) {
     app.get(path, async (request, reply) => {
@@ -1055,6 +1125,47 @@ export function registerAdminConsole(app: FastifyInstance, ctx: AppContext): voi
           <code>opend-server admin-link</code>.
         </p>`.value,
     );
+
+  // ---- API keys ------------------------------------------------------------
+
+  // Not an `action`: the new key's token is shown once in this response, never in a URL.
+  app.post('/admin/api-keys', async (request, reply) => {
+    const s = await staffOnly(request, reply);
+    if (!s) return reply;
+    if (!checkPost(request, s))
+      return reply
+        .code(403)
+        .headers(adminHeaders())
+        .type('text/html; charset=utf-8')
+        .send(messagePage('Form expired', 'Reload the page and try again.'));
+    try {
+      const input = apiKeyInput(bodyOf(request), await listOrgs(ctx.pool));
+      const created = await withTransaction(ctx.pool, async (db) => {
+        const r = await createApiKey(db, { ...input, createdBy: s.actor });
+        await audit(db, s.actor, 'api-key.create', {
+          id: r.key.id,
+          name: r.key.name,
+          scopes: r.key.scopes,
+          audience: r.key.audience,
+          orgSlug: r.key.orgSlug,
+        });
+        return r;
+      });
+      return show(reply, s, 'api', null, 200, { name: created.key.name, token: created.token });
+    } catch (err) {
+      if (!(err instanceof InputError)) throw err;
+      return show(reply, s, 'api', { kind: 'error', message: err.message }, 400);
+    }
+  });
+
+  action('/admin/api-keys/revoke', 'api', async (s, body) => {
+    const id = Number(body.id);
+    await withTransaction(ctx.pool, async (db) => {
+      if (Number.isSafeInteger(id) && (await revokeApiKey(db, id)))
+        await audit(db, s.actor, 'api-key.revoke', { id });
+    });
+    return 'key-revoked';
+  });
 
   app.get('/admin/setup', async (request, reply) => {
     const tokenValue = (request.query as { token?: unknown }).token;

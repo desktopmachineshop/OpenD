@@ -94,6 +94,7 @@
       <topicmeta><resourceid appname="opend-console" appid="orgs.entitlements"/></topicmeta>
     </topicref>
     <topicref href="../topics/hosting/admin-api.dita" product="core"/>
+    <topicref href="../topics/hosting/api.dita"/>
     <topicref href="../topics/hosting/analytics.dita" product="core"/>
     <topicref href="../topics/hosting/backups.dita" product="core"/>
     <topicref href="../topics/hosting/upgrades.dita" product="core"/>

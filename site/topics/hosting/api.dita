@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE reference PUBLIC "-//OASIS//DTD DITA Reference//EN" "reference.dtd">
+<reference id="api" product="core hosted" audience="admin">
+  <title>Public API and AI assistants</title>
+  <shortdesc>Read the docs from your own tools, and let scripts and AI assistants propose changes as pull
+    requests, with API keys that read exactly what their audience may see.</shortdesc>
+  <prolog>
+    <resourceid appname="opend-console" appid="api"/>
+  </prolog>
+  <refbody>
+    <section id="keys">
+      <title>API keys</title>
+      <p>Staff create keys in the admin console under <uicontrol>API &amp; AI</uicontrol>, or with
+        <codeph>POST /admin/api/api-keys</codeph>; see <xref keyref="admin-api"/>. A key looks like
+        <codeph>opd_<varname>prefix</varname>_<varname>secret</varname></codeph> and is shown once. Only a
+        hash of the secret is stored. Send it as <codeph>Authorization: Bearer opd_…</codeph>.</p>
+      <p>Each key has:</p>
+      <ul>
+        <li><b>Scopes</b>, which say what it can do: <codeph>read</codeph> (the published docs),
+          <codeph>write</codeph> (read the source, validate, save changes and open pull requests),
+          <codeph>publish</codeph> (also merge them when the repository's rules allow) and
+          <codeph>builds</codeph> (see and start builds). <codeph>publish</codeph> includes
+          <codeph>write</codeph>, and both include <codeph>read</codeph>.</li>
+        <li><b>An audience</b>, which says whose view of the docs it reads:
+          <ul>
+            <li><b>staff</b>: everything, with conditional content labelled, any live release line;</li>
+            <li><b>one org</b>: exactly what that org's readers see, on their release line;</li>
+            <li><b>public</b>: what anonymous visitors see; only on public sites.</li>
+          </ul>
+          Every answer goes through the same filtering as the site, so a key never sees a topic, title, link,
+          image or search hit its audience could not.</li>
+        <li><b>An expiry</b> (30, 90 or 365 days, or never). Revoking a key in the console or with
+          <codeph>DELETE /admin/api/api-keys/:id</codeph> takes effect at once.</li>
+      </ul>
+      <p>Each key may make 300 requests a minute; more get 429 with <codeph>Retry-After</codeph>.</p>
+    </section>
+    <section id="routes">
+      <title>Routes</title>
+      <p>The base path is <filepath>/api/v1</filepath>. <codeph>GET /api/v1/openapi.json</codeph> describes
+        every route in OpenAPI 3.1 and needs no key.</p>
+      <simpletable relcolwidth="3* 1* 5*">
+        <sthead><stentry>Route</stentry><stentry>Scope</stentry><stentry>What it does</stentry></sthead>
+        <strow><stentry><codeph>GET /me</codeph></stentry><stentry>read</stentry><stentry>The calling key: name, scopes, audience, expiry.</stentry></strow>
+        <strow><stentry><codeph>GET /versions</codeph></stentry><stentry>read</stentry><stentry>Live release lines the key can read, and its default one.</stentry></strow>
+        <strow><stentry><codeph>GET /nav</codeph></stentry><stentry>read</stentry><stentry>The navigation tree: titles, topic ids, URLs.</stentry></strow>
+        <strow><stentry><codeph>GET /topics</codeph></stentry><stentry>read</stentry><stentry>Every topic the key can read: id, title, short description, URL.</stentry></strow>
+        <strow><stentry><codeph>GET /topics/<varname>id</varname></codeph></stentry><stentry>read</stentry><stentry>One topic. <parmname>format</parmname> is <codeph>markdown</codeph> (default), <codeph>html</codeph> or <codeph>text</codeph>. Links point at the docs site.</stentry></strow>
+        <strow><stentry><codeph>GET /search?q=</codeph></stentry><stentry>read</stentry><stentry>Full-text search, best first; <parmname>limit</parmname> 1 to 50.</stentry></strow>
+        <strow><stentry><codeph>GET /source/files</codeph>, <codeph>GET /source/files/<varname>path</varname></codeph></stentry><stentry>write</stentry><stentry>The docs source on the published branch, or with <codeph>ref=working</codeph> on the key's working branch.</stentry></strow>
+        <strow><stentry><codeph>POST /validate</codeph></stentry><stentry>write</stentry><stentry>Validates <codeph>{"files": [{"path", "content"}]}</codeph> laid over the working branch, without saving. Returns the diagnostics.</stentry></strow>
+        <strow><stentry><codeph>GET /changes</codeph></stentry><stentry>write</stentry><stentry>The key's working branch, its pull request and what still blocks merging.</stentry></strow>
+        <strow><stentry><codeph>POST /changes</codeph></stentry><stentry>write</stentry><stentry>Saves files as one commit to the key's working branch. Optional <parmname>message</parmname>, and <parmname>expectSha</parmname> to refuse the save if the file changed since it was read.</stentry></strow>
+        <strow><stentry><codeph>POST /changes/publish</codeph></stentry><stentry>write</stentry><stentry>Opens, or updates, one pull request for the working branch. With <codeph>{"merge": true}</codeph> and the <codeph>publish</codeph> scope, merges it when the branch's review rules allow.</stentry></strow>
+        <strow><stentry><codeph>GET /builds</codeph>, <codeph>POST /builds</codeph></stentry><stentry>builds</stentry><stentry>Recent builds; build the release refs now, or one <parmname>ref</parmname>.</stentry></strow>
+      </simpletable>
+      <p>Staff keys may add <parmname>version</parmname> (a release line such as <codeph>2</codeph>) to the
+        read routes. Org and public keys read their own line; asking for another gets 403.</p>
+    </section>
+    <section id="changes">
+      <title>How changes work</title>
+      <p>Writes use the web editor's workflow; see <xref href="editor.dita"/>. Each key is an author of its
+        own: its commits are credited to <q><varname>key name</varname> (API key)</q>, on its own working
+        branch. The published branch is merged in after each save, never rebased. Publishing opens one pull
+        request, which your branch protection and reviewers govern like any other. Files must be
+        <filepath>.dita</filepath>, <filepath>.ditamap</filepath> or <filepath>.bookmap</filepath> inside the
+        docs folder. Malformed XML is refused, and validation errors stop publishing.</p>
+      <p>On repositories that require signed commits, keys cannot save: the app cannot sign as a person. See
+        <xref href="../editor/editor-signed-commits.dita"/>.</p>
+    </section>
+    <section id="example">
+      <title>Example</title>
+      <codeblock>curl -H "Authorization: Bearer $OPEND_KEY" \
+  "https://docs.example.com/api/v1/search?q=install"
+
+curl -H "Authorization: Bearer $OPEND_KEY" \
+  "https://docs.example.com/api/v1/topics/topics/install"</codeblock>
+    </section>
+    <section id="ai">
+      <title>AI assistants</title>
+      <p>On managed hosting, the <uicontrol>API &amp; AI</uicontrol> page shows an MCP (Model Context
+        Protocol) address for your site. Add it as a custom connector in an AI assistant such as Claude, and
+        paste an API key when it asks. The assistant can then search and read the docs as the key's audience,
+        and, with <codeph>write</codeph>, propose changes as pull requests. Self-hosted sites can point any
+        MCP or OpenAPI client at <filepath>/api/v1</filepath>.</p>
+    </section>
+  </refbody>
+</reference>

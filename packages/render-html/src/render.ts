@@ -91,7 +91,11 @@ export function renderTopic(
   topic: CompiledTopic,
   options: RenderOptions = {},
 ): string {
-  const ctx: Ctx = {
+  return renderNode(topic.body, makeCtx(view, options));
+}
+
+function makeCtx(view: ReleaseView, options: RenderOptions): Ctx {
+  return {
     view,
     base: options.base ?? '/',
     topicHref: options.topicHref ?? ((id) => pageHref(id, options.base ?? '/')),
@@ -105,7 +109,38 @@ export function renderTopic(
     colnames: [],
     parent: '',
   };
-  return renderNode(topic.body, ctx);
+}
+
+/**
+ * Where a link element (`xref`, `link`) points and its default text, by the
+ * same rules as the HTML: `null` when the reader cannot see the target (never
+ * reveal its title), `undefined` when the reference did not resolve.
+ */
+export function resolveLink(
+  view: ReleaseView,
+  node: ElementNode,
+  options: RenderOptions = {},
+): { href: string; defaultText: string } | null | undefined {
+  return linkTarget(node, makeCtx(view, options));
+}
+
+/** An image's source URL and alternative text, or a null source when it is unavailable. */
+export function resolveImage(
+  view: ReleaseView,
+  node: ElementNode,
+  options: RenderOptions = {},
+): { src: string | null; alt: string } {
+  const ctx = makeCtx(view, options);
+  const asset = node.attrs[ASSET_ATTR];
+  const href = node.attrs.href;
+  const src =
+    asset !== undefined
+      ? ctx.assetSrc(asset, 'image')
+      : href !== undefined && safeUrl(href, IMAGE_SCHEMES)
+        ? href
+        : null;
+  const altEl = childElements(node, 'alt')[0];
+  return { src, alt: altEl ? textContent(altEl) : (node.attrs.alt ?? '') };
 }
 
 /** A short label of an element's filtering attributes, e.g. `product=gadget release=2.0..`. */
