@@ -132,17 +132,18 @@ To try it without an identity provider, set `NODE_ENV=development` and `OPEND_DE
 
 **Staff and edit links.** A staff reader (`PUT /admin/api/readers/:id/staff`, or `staff: true` in a seed) sees the unfiltered staff view with conditions marked; entitlement sync never sets it. With `EDITOR_PUBLIC_URL` set on the docs site, signed-in readers get **Edit this page** under each topic, opening it in the web editor; `OPEND_SOURCE_LINKS=1` adds **View source on GitHub**. One GitHub App serves the docs site, the editor and the build webhook: see [docs/github-app.md](docs/github-app.md) and `node scripts/github-app-url.mjs <docsUrl> <editorUrl>` for a pre-filled registration link.
 
-| Admin API (`Authorization: Bearer $OPEND_ADMIN_TOKEN`)                                               |                                                          |
-| ---------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
-| `GET/POST /admin/api/repos`, `POST /admin/api/repos/:id/builds`                                      | Register docs repos; rebuild a commit                    |
-| `PUT /admin/api/repos/:id/access`                                                                    | Make a site public (with public entitlements) or private |
-| `GET /admin/api/repos/:id/releases`, `GET /admin/api/builds[/:id]`                                   | Live releases; builds and their diagnostics              |
-| `GET/POST /admin/api/orgs`, `PUT /admin/api/orgs/:slug/entitlements`, `DELETE /admin/api/orgs/:slug` | Orgs and entitlements                                    |
-| `GET/POST /admin/api/readers`, `DELETE /admin/api/readers/:id`                                       | Readers, matched to OIDC sign-ins by verified email      |
-| `PUT /admin/api/readers/:id/staff`                                                                   | Grant or revoke the unfiltered staff view                |
-| `GET /admin/api/audit`                                                                               | Audit log                                                |
-| `GET /admin/api/settings`, `POST /admin/api/setup-links`                                             | Console settings (never secrets); first-staff setup link |
-| `GET /admin/api/analytics/summary`, `GET /admin/api/analytics/feedback[.csv]`                        | Docs analytics and reader feedback                       |
+| Admin API (`Authorization: Bearer $OPEND_ADMIN_TOKEN`)                                               |                                                                       |
+| ---------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| `GET/POST /admin/api/repos`, `POST /admin/api/repos/:id/builds`                                      | Register docs repos; rebuild a commit                                 |
+| `PUT /admin/api/repos/:id/access`                                                                    | Make a site public (with public entitlements) or private              |
+| `GET /admin/api/repos/:id/releases`, `GET /admin/api/builds[/:id]`                                   | Live releases; builds and their diagnostics                           |
+| `DELETE /admin/api/repos/:id/releases/:line`                                                         | Take a release line off the site (the next build for it puts it back) |
+| `GET/POST /admin/api/orgs`, `PUT /admin/api/orgs/:slug/entitlements`, `DELETE /admin/api/orgs/:slug` | Orgs and entitlements                                                 |
+| `GET/POST /admin/api/readers`, `DELETE /admin/api/readers/:id`                                       | Readers, matched to OIDC sign-ins by verified email                   |
+| `PUT /admin/api/readers/:id/staff`                                                                   | Grant or revoke the unfiltered staff view                             |
+| `GET /admin/api/audit`                                                                               | Audit log                                                             |
+| `GET /admin/api/settings`, `POST /admin/api/setup-links`                                             | Console settings (never secrets); first-staff setup link              |
+| `GET /admin/api/analytics/summary`, `GET /admin/api/analytics/feedback[.csv]`                        | Docs analytics and reader feedback                                    |
 
 See [ADR 0004](docs/adr/0004-hosted-architecture.md) for how it fits together.
 

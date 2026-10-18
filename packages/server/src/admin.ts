@@ -19,6 +19,7 @@ import {
   listFeedback,
   listJobs,
   listLiveReleases,
+  retireReleaseLine,
   listOrgs,
   listReaders,
   listRepos,
@@ -261,6 +262,20 @@ export function registerAdmin(app: FastifyInstance, ctx: AppContext): void {
       scope.get('/repos/:id/releases', async (request) =>
         listLiveReleases(ctx.pool, Number((request.params as { id: string }).id)),
       );
+      scope.delete('/repos/:id/releases/:line', async (request, reply) => {
+        const params = request.params as { id: string; line: string };
+        const id = Number(params.id);
+        const found = await withTransaction(ctx.pool, async (db) => {
+          const ok = Number.isInteger(id) && (await retireReleaseLine(db, id, params.line));
+          if (ok)
+            await audit(db, ACTOR, 'release.retire', { repoId: id, releaseLine: params.line });
+          return ok;
+        });
+        ctx.caches.releaseChanged();
+        return found
+          ? reply.code(204).send()
+          : reply.code(404).send({ error: 'no such live release line' });
+      });
 
       scope.get('/builds', async (request) => {
         const q = request.query as { repoId?: string; limit?: string };

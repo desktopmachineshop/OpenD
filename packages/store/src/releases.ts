@@ -78,6 +78,25 @@ export async function listLiveReleases(db: Db, repoId: number): Promise<LiveRele
   return rows;
 }
 
+/**
+ * Takes a release line off the site: readers of that line get "nothing
+ * published" and the staff view falls back to the next newest line. The
+ * release itself stays stored; the next build for the line puts it back.
+ */
+export async function retireReleaseLine(
+  db: Db,
+  repoId: number,
+  releaseLine: string,
+): Promise<boolean> {
+  const res = await db.query('delete from live_releases where repo_id = $1 and release_line = $2', [
+    repoId,
+    releaseLine,
+  ]);
+  if (res.rowCount !== 1) return false;
+  await notify(db, CHANNELS.releaseChanged, String(repoId));
+  return true;
+}
+
 export async function getLiveReleaseId(
   db: Db,
   repoId: number,
