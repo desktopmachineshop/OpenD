@@ -17,7 +17,7 @@ import { mintSetupLink } from './admin.js';
 import { startAnalyticsPurge } from './analytics-purge.js';
 import { createApp } from './app.js';
 import { loadFleetConfig } from './fleet/config.js';
-import { startFleet } from './fleet/serve.js';
+import { migrateFleet, startFleet } from './fleet/serve.js';
 import { startFleetWorker } from './fleet/worker.js';
 import { DEFAULT_ANALYTICS, loadConfig } from './config.js';
 import { runReconcileCommand, type ReconcileCommandOptions } from './reconcile-command.js';
@@ -134,6 +134,14 @@ program
 const fleetCommand = program
   .command('fleet')
   .description('many sites from one deployment, each in its own schema (managed hosting)');
+
+fleetCommand
+  .command('migrate')
+  .description('migrate the fleet registry and every site schema (run before each deploy)')
+  .action(async () => {
+    const results = await migrateFleet(loadFleetConfig());
+    jsonLog({ level: 'info', msg: 'fleet migrated', sites: results.length });
+  });
 
 fleetCommand
   .command('serve')

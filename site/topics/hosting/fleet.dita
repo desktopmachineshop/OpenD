@@ -23,7 +23,8 @@
     <section id="run">
       <title>Running a fleet</title>
       <p>Run <codeph>opend-server fleet serve</codeph> as the web service and <codeph>opend-server fleet
-        worker</codeph> as the worker, both with the fleet variables in <xref
+        worker</codeph> as the worker, with <codeph>opend-server fleet migrate</codeph> before each deploy so
+        an upgrade's database changes reach every site's schema first, both with the fleet variables in <xref
         href="env-vars.dita#env-vars/fleet"/>. Point every site's host names (and editor host names) at the
         web service, typically with wildcard DNS records.</p>
       <p>Sites are managed through the fleet admin API, on <codeph>OPEND_FLEET_HOST</codeph> with the bearer

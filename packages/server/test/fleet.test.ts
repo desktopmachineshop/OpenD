@@ -10,6 +10,7 @@ import { createTestDatabase, testDatabaseUrl, type TestDatabase } from '@opend/s
 import { createDocsRepo, type DocsRepo } from '@opend/worker';
 import {
   loadFleetConfig,
+  migrateFleet,
   startFleet,
   startFleetWorker,
   type Fleet,
@@ -263,6 +264,24 @@ describe.skipIf(!url)('a fleet of sites', () => {
     );
     expect((await call('b.docs.test', 'GET', '/api/v1/topics', { headers: auth })).status).toBe(
       401,
+    );
+  });
+
+  it('migrates every site schema with the registry', async () => {
+    await db.pool.query("delete from site_a.schema_migrations where id = '009_api_keys'");
+    await db.pool.query('drop table site_a.api_keys');
+    const config = loadFleetConfig({
+      DATABASE_URL: db.url,
+      OPEND_FLEET_KEY: 'fleet-key-0123456789abcdef0123456789',
+      OPEND_FLEET_TOKEN: FLEET_TOKEN,
+      OPEND_FLEET_HOST: 'fleet.test',
+    });
+    const results = await migrateFleet(config, () => {});
+    expect(results).toEqual(
+      expect.arrayContaining([
+        { site: 'a', ran: ['009_api_keys'] },
+        { site: 'b', ran: [] },
+      ]),
     );
   });
 
