@@ -92,6 +92,9 @@ const envSchema = z
         message:
           'OPEND_EMBED_ORIGINS must be comma-separated origins such as https://app.example.com',
       }),
+    // Where AI assistants connect (the managed service's MCP server for this site),
+    // shown on the admin console's API page.
+    OPEND_MCP_URL: z.url().optional(),
     // On unless set to 0/false/off; nothing about a reader is recorded either way.
     OPEND_ANALYTICS: z
       .string()
@@ -221,6 +224,8 @@ export interface ServerConfig {
   siteRepo?: string;
   /** Embedded help in host apps: the token secret and the origins allowed to frame it. */
   embed?: { secret: string; origins: string[] };
+  /** The MCP server address for this site (managed hosting), shown on the API page. */
+  mcpUrl?: string;
   /**
    * Docs analytics and reader feedback. Absent means on, with the default
    * retention; `enabled: false` records nothing and hides the feedback form.
@@ -311,5 +316,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
   if (e.OPEND_SITE_REPO) config.siteRepo = e.OPEND_SITE_REPO;
   if (e.OPEND_EMBED_SECRET)
     config.embed = { secret: e.OPEND_EMBED_SECRET, origins: e.OPEND_EMBED_ORIGINS };
+  if (e.OPEND_MCP_URL) config.mcpUrl = e.OPEND_MCP_URL;
   return config;
 }

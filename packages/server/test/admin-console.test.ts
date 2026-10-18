@@ -507,6 +507,67 @@ describe.skipIf(!url)('the admin console', () => {
     });
   });
 
+  describe('API keys', () => {
+    it('creates a key, shows its token once, and revokes it', async () => {
+      let res = await submit('/admin/api-keys', '/admin/api-keys', {
+        name: '',
+        access: 'read',
+        audience: 'staff',
+        expires: '90',
+      });
+      expect(res.statusCode).toBe(400);
+      expect(res.body).toContain('Give the key a name');
+      res = await submit('/admin/api-keys', '/admin/api-keys', {
+        name: 'Support bot',
+        access: 'write',
+        builds: '1',
+        audience: 'staff',
+        expires: '30',
+      });
+      expect(res.statusCode).toBe(200);
+      const token = /opd_[A-Za-z0-9]{12}_[A-Za-z0-9_-]{43}/.exec(res.body)?.[0];
+      expect(token).toBeDefined();
+      expect(res.body).toContain('shown only this once');
+      const api = await h.app.inject({
+        method: 'GET',
+        url: '/api/v1/me',
+        headers: { authorization: `Bearer ${token}` },
+      });
+      expect(api.json()).toMatchObject({
+        key: { name: 'Support bot', scopes: ['read', 'write', 'builds'], audience: 'staff' },
+      });
+      // Never again: not on the page, in the audit log or in the database.
+      const page = await get('/admin/api-keys', owner);
+      expect(page.body).toContain('Support bot');
+      expect(page.body).not.toContain(token!);
+      const audit = JSON.stringify((await h.db.pool.query('select * from audit_log')).rows);
+      expect(audit).toContain('api-key.create');
+      expect(audit).not.toContain(token!.slice(18));
+      expect(JSON.stringify((await h.db.pool.query('select * from api_keys')).rows)).not.toContain(
+        token!.slice(18),
+      );
+      // Without the session's CSRF token, nothing is made.
+      expect(
+        (
+          await post(
+            '/admin/api-keys',
+            { name: 'Forged', access: 'read', audience: 'staff' },
+            owner,
+          )
+        ).statusCode,
+      ).toBe(403);
+      const id = /name="id" value="(\d+)"/.exec(page.body)?.[1];
+      res = await submit('/admin/api-keys', '/admin/api-keys/revoke', { id: id! });
+      expect(res.statusCode).toBe(303);
+      const after = await h.app.inject({
+        method: 'GET',
+        url: '/api/v1/me',
+        headers: { authorization: `Bearer ${token}` },
+      });
+      expect(after.statusCode).toBe(401);
+    });
+  });
+
   describe('Connect GitHub', () => {
     let state = '';
 

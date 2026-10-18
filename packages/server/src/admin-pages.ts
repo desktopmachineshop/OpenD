@@ -1,6 +1,15 @@
 import { DEFAULT_CSS, escapeHtml } from '@opend/render-html';
 import type { Diagnostic } from '@opend/model';
-import type { BuildJob, EditorUser, LiveRelease, Org, Reader, Repo } from '@opend/store';
+import type {
+  ApiKey,
+  ApiScope,
+  BuildJob,
+  EditorUser,
+  LiveRelease,
+  Org,
+  Reader,
+  Repo,
+} from '@opend/store';
 import { ADMIN_CSS } from './admin-style.js';
 import type { PickableRepo } from './github-connect.js';
 import { GITHUB_ICON, KEY_ICON } from './pages.js';
@@ -59,6 +68,7 @@ const ICONS = {
     '<path d="M9 19c-4.3 1.4-4.3-2.5-6-3m12 5v-3.5c0-1 .1-1.4-.5-2 2.8-.3 5.5-1.4 5.5-6a4.6 4.6 0 00-1.3-3.2 4.2 4.2 0 00-.1-3.2s-1.1-.3-3.5 1.3a12.3 12.3 0 00-6.2 0C6.5 2.8 5.4 3.1 5.4 3.1a4.2 4.2 0 00-.1 3.2A4.6 4.6 0 004 9.5c0 4.6 2.7 5.7 5.5 6-.6.6-.6 1.2-.5 2V21"/>',
   ),
   editor: icon('<path d="M4 20h4L19 9l-4-4L4 16v4z"/><path d="M14 6l4 4"/>'),
+  key: icon('<circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3M14 9l2 2"/>'),
   shield: icon(
     '<path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6l8-3z"/><path d="M9 12l2 2 4-4"/>',
   ),
@@ -70,7 +80,7 @@ const MENU_ICON = raw(
 // ---- shell -----------------------------------------------------------------
 
 export type AdminSection =
-  'overview' | 'site' | 'source' | 'people' | 'sign-in' | 'github' | 'editor';
+  'overview' | 'site' | 'source' | 'people' | 'sign-in' | 'github' | 'editor' | 'api';
 
 const NAV: { group: string; items: [AdminSection, string, string, Html][] }[] = [
   {
@@ -88,6 +98,7 @@ const NAV: { group: string; items: [AdminSection, string, string, Html][] }[] = 
       ['sign-in', '/admin/sign-in', 'Sign-in', ICONS.signIn],
       ['github', '/admin/github', 'GitHub', ICONS.github],
       ['editor', '/admin/editor', 'Editor', ICONS.editor],
+      ['api', '/admin/api-keys', 'API & AI', ICONS.key],
     ],
   },
 ];
@@ -1364,6 +1375,178 @@ export function editorPage(d: EditorPageData): Html {
             </div>
             <div class="admin-buttons">
               <button class="admin-button" type="submit">Add author</button>
+            </div>
+          </form>
+        </div>
+      </details>
+    </section>`;
+}
+
+// ---- API keys --------------------------------------------------------------
+
+export interface ApiPageData {
+  keys: ApiKey[];
+  orgs: { slug: string; name: string }[];
+  /** A key just created: its token is shown this once. */
+  created: { name: string; token: string } | null;
+  apiBase: string;
+  mcpUrl: string | null;
+  csrf: string;
+}
+
+const SCOPE_LABELS: Record<ApiScope, string> = {
+  read: 'read',
+  write: 'propose changes',
+  publish: 'publish',
+  builds: 'builds',
+};
+
+function audienceLabel(k: ApiKey, orgs: ApiPageData['orgs']): string {
+  if (k.audience === 'staff') return 'Everything (staff view)';
+  if (k.audience === 'public') return 'Public (anonymous visitors)';
+  return `Org: ${orgs.find((o) => o.slug === k.orgSlug)?.name ?? k.orgSlug ?? ''}`;
+}
+
+export function apiPage(d: ApiPageData): Html {
+  const now = Date.now();
+  const status = (k: ApiKey) =>
+    k.revokedAt
+      ? badge('revoked', 'muted')
+      : k.expiresAt && k.expiresAt.getTime() <= now
+        ? badge('expired', 'warn')
+        : badge('active', 'ok');
+  const active = (k: ApiKey) => !k.revokedAt && !(k.expiresAt && k.expiresAt.getTime() <= now);
+  const keys = d.keys.length
+    ? html`<div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th scope="col">Key</th>
+              <th scope="col">Can</th>
+              <th scope="col">Reads as</th>
+              <th scope="col">Last used</th>
+              <th scope="col">Status</th>
+              <th scope="col"><span class="opend-visually-hidden">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            ${d.keys.map(
+              (k) =>
+                html`<tr>
+                  <td>
+                    ${k.name}<br /><code class="admin-muted">opd_${k.prefix}_…</code> <br /><span
+                      class="admin-muted"
+                      >by ${k.createdBy}, ${time(k.createdAt)}</span
+                    >
+                  </td>
+                  <td>${k.scopes.map((sc) => html`${badge(SCOPE_LABELS[sc], 'info')} `)}</td>
+                  <td>${audienceLabel(k, d.orgs)}</td>
+                  <td>${k.lastUsedAt ? time(k.lastUsedAt) : '—'}</td>
+                  <td>
+                    ${status(k)}${
+                      k.expiresAt && active(k)
+                        ? html`<br /><span class="admin-muted">until ${time(k.expiresAt)}</span>`
+                        : ''
+                    }
+                  </td>
+                  <td class="admin-actions">
+                    ${
+                      active(k)
+                        ? confirmButton({
+                            action: '/admin/api-keys/revoke',
+                            csrf: d.csrf,
+                            label: 'Revoke',
+                            question: `Revoke “${k.name}”? Anything using it stops working at once.`,
+                            fields: { id: k.id },
+                          })
+                        : ''
+                    }
+                  </td>
+                </tr>`,
+            )}
+          </tbody>
+        </table>
+      </div>`
+    : html`<p class="admin-empty">No API keys yet.</p>`;
+  const created = d.created
+    ? html`<section class="admin-card admin-reveal" aria-labelledby="key-new-h">
+        <h2 id="key-new-h">Copy the key for “${d.created.name}” now</h2>
+        <p>It is shown only this once. Store it like a password.</p>
+        <p><code class="admin-secret">${d.created.token}</code></p>
+      </section>`
+    : '';
+  const connect = d.mcpUrl
+    ? html`<section class="admin-card" aria-labelledby="mcp-h">
+        <h2 id="mcp-h">Connect an AI assistant</h2>
+        <p>
+          AI assistants that support MCP (Model Context Protocol), such as Claude, can search and
+          read these docs and propose changes as pull requests. Add a custom connector with this
+          address, then paste an API key when it asks:
+        </p>
+        <p><code class="admin-secret">${d.mcpUrl}</code></p>
+        <p class="admin-hint">
+          Tools that send their own headers can use the key directly:
+          <code>Authorization: Bearer opd_…</code>.
+        </p>
+      </section>`
+    : '';
+  const orgOptions = d.orgs.map((o) => html`<option value="org:${o.slug}">Org: ${o.name}</option>`);
+  return html`${head('Settings', 'API & AI', html`Read and change these docs from your own tools with the REST API at <code>${d.apiBase}</code> (<a href="${d.apiBase}/openapi.json">OpenAPI description</a>). Each key reads the docs as one audience, filtered exactly as the site is.`)}
+    ${created}${connect}
+    <section class="admin-card" aria-labelledby="keys-h">
+      <h2 id="keys-h">API keys</h2>
+      ${keys}
+      <details class="admin-details" ${raw(d.keys.length ? '' : ' open')}>
+        <summary>Create a key</summary>
+        <div>
+          <form class="admin-form" method="post" action="/admin/api-keys">
+            ${csrfField(d.csrf)}
+            <div class="admin-form-row">
+              ${field({ name: 'name', label: 'Name', required: true, placeholder: 'Support bot', hint: 'Who or what uses it. Changes it proposes are credited to this name.' })}
+            </div>
+            <fieldset class="admin-fieldset">
+              <legend class="admin-legend">What it can do</legend>
+              <div class="admin-choices">
+                <label class="admin-choice"
+                  ><input type="radio" name="access" value="read" checked /> Read the docs</label
+                >
+                <label class="admin-choice"
+                  ><input type="radio" name="access" value="write" /> Read and propose changes (pull
+                  requests)</label
+                >
+                <label class="admin-choice"
+                  ><input type="radio" name="access" value="publish" /> Read, propose and publish
+                  (merges when the repository’s rules allow)</label
+                >
+                <label class="admin-choice"
+                  ><input type="checkbox" name="builds" value="1" /> See and start builds</label
+                >
+              </div>
+            </fieldset>
+            <div class="admin-form-row">
+              <div class="admin-field">
+                <label for="f-audience">Reads the docs as</label
+                ><select id="f-audience" name="audience" aria-describedby="f-audience-hint">
+                  <option value="staff">Everything (staff view)</option>
+                  ${orgOptions}
+                  <option value="public">Public (anonymous visitors)</option>
+                </select>
+                <p class="admin-hint" id="f-audience-hint">
+                  An org key sees only what that org's readers see. Use the narrowest that works.
+                </p>
+              </div>
+              <div class="admin-field">
+                <label for="f-expires">Expires</label
+                ><select id="f-expires" name="expires">
+                  <option value="30">In 30 days</option>
+                  <option value="90" selected>In 90 days</option>
+                  <option value="365">In a year</option>
+                  <option value="never">Never</option>
+                </select>
+              </div>
+            </div>
+            <div class="admin-buttons">
+              <button class="admin-button" type="submit">Create key</button>
             </div>
           </form>
         </div>

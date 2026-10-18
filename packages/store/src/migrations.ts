@@ -380,4 +380,30 @@ create table if not exists editor_github_tokens (
 create index if not exists editor_github_tokens_user on editor_github_tokens (user_id);
 `,
   },
+  {
+    id: '009_api_keys',
+    sql: `
+-- Keys for the public API (/api/v1), created by staff. A key is shown once as
+-- opd_<prefix>_<secret>: only the prefix (to find the row) and a SHA-256 hash of
+-- the secret are kept. scopes is a subset of read, write, publish, builds.
+-- audience says whose view of the docs the key reads: everyone (staff), one org,
+-- or anonymous visitors (public). Writes commit as the key's own editor user.
+create table if not exists api_keys (
+  id bigserial primary key,
+  name text not null,
+  prefix text not null unique,
+  secret_hash text not null,
+  scopes text[] not null,
+  audience text not null check (audience in ('staff', 'org', 'public')),
+  org_slug text references orgs (slug) on delete cascade,
+  editor_user_id bigint references editor_users (id) on delete set null,
+  created_by text not null,
+  created_at timestamptz not null default now(),
+  expires_at timestamptz,
+  last_used_at timestamptz,
+  revoked_at timestamptz,
+  check ((audience = 'org') = (org_slug is not null))
+);
+`,
+  },
 ];

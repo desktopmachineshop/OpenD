@@ -76,6 +76,16 @@ curl -X POST "$PUBLIC_URL/admin/api/setup-links" -H "authorization: Bearer $OPEN
           <codeph>SESSION_SECRET</codeph>, <codeph>EDITOR_PUBLIC_URL</codeph> and <codeph>PUBLIC_URL</codeph>;
           see <xref href="editor.dita"/>.</p></info>
       </step>
+      <step>
+        <cmd>Optional: under <uicontrol>API &amp; AI</uicontrol>, create API keys for your own tools and AI
+          assistants.</cmd>
+        <info>
+          <p>Each key has a name, what it can do (read, propose changes, publish, builds), whose view of the docs
+            it reads (everything, one org, or public) and an expiry. The key is shown once; revoke it here at any
+            time. On a managed site the page also shows the address to connect AI assistants. See
+            <xref href="api.dita"/>.</p>
+        </info>
+      </step>
     </steps>
     <result>
       <p>Settings set by environment variables are shown as <uicontrol>Set by environment</uicontrol> and
