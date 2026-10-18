@@ -39,7 +39,7 @@ Two shapes were considered:
 Good:
 
 - **Isolation by structure, not by query discipline.** A site's connections can only see its schema, and its apps are separate objects with separate secrets. The leak markers run through the fleet router in its tests, alongside sessions, admin tokens and API keys from one site being refused on another.
-- **No changes to the single-site code paths** beyond the channel suffix and a per-schema migration lock. Upgrades migrate each schema the same way a single deployment migrates its database.
+- **No changes to the single-site code paths** beyond the channel suffix and a per-schema migration lock. Upgrades migrate each schema the same way a single deployment migrates its database: `opend-server fleet migrate`, run before each deploy, migrates the registry and every site.
 - **A site moves to dedicated hosting** with an export, an import and a rebuild.
 
 Bad:

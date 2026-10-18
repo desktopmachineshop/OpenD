@@ -78,6 +78,38 @@ function page(res: ServerResponse, status: number, title: string, body: string):
   res.end(messagePage(title, body));
 }
 
+/**
+ * Migrates the registry and every site's schema, as `migrate` does for a single
+ * site. Run before each fleet deploy (the image's pre-deploy command), so an
+ * upgrade reaches every site before the new version serves it.
+ */
+export async function migrateFleet(
+  fleet: FleetConfig,
+  log: Log = jsonLog,
+): Promise<{ site: string; ran: string[] }[]> {
+  const pool = createPool(fleet.databaseUrl);
+  try {
+    await migrateRegistry(pool);
+    const registry = new Registry(pool, new SecretBox(deriveSecretKey({ secretKey: fleet.key })!));
+    const results: { site: string; ran: string[] }[] = [];
+    for (const site of await registry.list()) {
+      const sitePool = createPool(siteDatabaseUrl(fleet.databaseUrl, site.schema), undefined, {
+        max: 1,
+      });
+      try {
+        const ran = await migrate(sitePool);
+        results.push({ site: site.slug, ran });
+        if (ran.length) log({ level: 'info', msg: 'site migrated', site: site.slug, ran });
+      } finally {
+        await sitePool.end();
+      }
+    }
+    return results;
+  } finally {
+    await pool.end();
+  }
+}
+
 export async function startFleet(
   fleet: FleetConfig,
   deps: { log?: Log; pdf?: PdfRenderer } = {},
