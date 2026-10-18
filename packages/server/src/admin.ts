@@ -13,6 +13,10 @@ import {
   deleteOrg,
   deleteReader,
   enqueueJob,
+  exportSite,
+  importSite,
+  ImportRefused,
+  type SiteExport,
   getJob,
   getRepo,
   listAudit,
@@ -364,6 +368,28 @@ export function registerAdmin(app: FastifyInstance, ctx: AppContext): void {
       });
 
       scope.get('/audit', async () => listAudit(ctx.pool));
+
+      // Moving the site to another deployment (shared fleet → dedicated). The
+      // export holds sealed secrets, API key hashes and readers: admin token only.
+      scope.get('/export', async () => exportSite(ctx.pool));
+      scope.post('/import', { bodyLimit: 64 * 1024 * 1024 }, async (request, reply) => {
+        let counts: Record<string, number>;
+        try {
+          counts = await withTransaction(ctx.pool, async (db) => {
+            const c = await importSite(db, request.body as SiteExport);
+            await audit(db, ACTOR, 'site.import', { rows: c });
+            return c;
+          });
+        } catch (err) {
+          if (err instanceof ImportRefused) return reply.code(409).send({ error: err.message });
+          throw err;
+        }
+        await ctx.reloadSettings();
+        ctx.caches.releaseChanged();
+        ctx.caches.entitlementsChanged();
+        // Releases are not copied: request builds (POST /repos/:id/builds) or let the poller run.
+        return reply.code(201).send({ imported: counts });
+      });
 
       // The admin console's settings. Secrets are never returned: only whether each is set.
       scope.get('/settings', async () => {
