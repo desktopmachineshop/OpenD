@@ -328,6 +328,19 @@ describe.skipIf(!url)('push to publish', () => {
     expect(audit.map((a) => a.action)).toContain('release.retire');
   });
 
+  it('exports the site and refuses to import into a site that is not empty', async () => {
+    const exported = await admin(h.app, 'GET', '/export');
+    expect(exported.statusCode).toBe(200);
+    const data = exported.json() as { format: string; tables: Record<string, unknown[]> };
+    expect(data.format).toBe('opend-site-export');
+    expect(data.tables.readers!.length).toBeGreaterThan(0);
+    expect(data.tables).not.toHaveProperty('releases');
+    const res = await admin(h.app, 'POST', '/import', data);
+    expect(res.statusCode).toBe(409);
+    expect(res.json()).toMatchObject({ error: expect.stringContaining('not empty') });
+    expect((await h.app.inject({ method: 'GET', url: '/admin/api/export' })).statusCode).toBe(401);
+  });
+
   it('reports health', async () => {
     expect((await get('/healthz')).json()).toEqual({ status: 'ok' });
   });
