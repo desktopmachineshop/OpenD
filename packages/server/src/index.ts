@@ -26,3 +26,8 @@ export * from './admin-console.js';
 export * from './admin-pages.js';
 export * from './api.js';
 export { OPENAPI } from './api-spec.js';
+export * from './fleet/config.js';
+export * from './fleet/registry.js';
+export * from './fleet/apps.js';
+export * from './fleet/serve.js';
+export * from './fleet/worker.js';

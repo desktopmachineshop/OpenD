@@ -115,6 +115,13 @@ describe('the OpenD documentation site', async () => {
         config.indexOf('export interface'),
       );
       const read = new Set([...schema.matchAll(/^ {4}([A-Z][A-Z0-9_]+):/gm)].map((m) => m[1]!));
+      // Fleet mode's own variables (packages/server/src/fleet/config.ts).
+      const fleet = readFileSync(join(ROOT, 'packages/server/src/fleet/config.ts'), 'utf8');
+      const fleetSchema = fleet.slice(
+        fleet.indexOf('const schema'),
+        fleet.indexOf('export interface'),
+      );
+      for (const m of fleetSchema.matchAll(/^ {2}([A-Z][A-Z0-9_]+):/gm)) read.add(m[1]!);
       // Test helpers (testing.ts) read TEST_DATABASE_URL and CI; servers never do.
       for (const { text } of all.filter((s) => !s.file.endsWith('testing.ts')))
         for (const m of text.matchAll(/process\.env\.([A-Z][A-Z0-9_]+)/g)) read.add(m[1]!);

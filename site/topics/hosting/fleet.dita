@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="fleet" product="core" audience="admin">
+  <title>Run many sites from one deployment</title>
+  <shortdesc>Fleet mode serves many small docs sites from one web service, one worker and one Postgres
+    database. Each site keeps its own schema, settings, readers and secrets.</shortdesc>
+  <conbody>
+    <p>Most deployments run one site. Providers that host many small sites, such as free or trial plans, can
+      run them as a fleet instead of giving each one its own services.</p>
+    <section id="how">
+      <title>How sites stay apart</title>
+      <ul>
+        <li>Each site's tables live in their own Postgres schema, <codeph>site_&lt;slug&gt;</codeph>. Its
+          connections can only see that schema.</li>
+        <li>Requests are routed by host name. Each site runs as its own app, configured from its own
+          settings, so it has its own session secret, admin token, caches and public URL.</li>
+        <li>Notifications that clear caches carry the schema in their channel name, so one site's changes
+          never touch another's.</li>
+        <li>Each site's images, themes and PDFs are stored under a prefix of their own.</li>
+      </ul>
+      <p>Per-reader filtering works exactly as on a single site.</p>
+    </section>
+    <section id="run">
+      <title>Running a fleet</title>
+      <p>Run <codeph>opend-server fleet serve</codeph> as the web service and <codeph>opend-server fleet
+        worker</codeph> as the worker, both with the fleet variables in <xref
+        href="env-vars.dita#env-vars/fleet"/>. Point every site's host names (and editor host names) at the
+        web service, typically with wildcard DNS records.</p>
+      <p>Sites are managed through the fleet admin API, on <codeph>OPEND_FLEET_HOST</codeph> with the bearer
+        token <codeph>OPEND_FLEET_TOKEN</codeph>:</p>
+      <simpletable relcolwidth="2* 3*">
+        <sthead><stentry>Route</stentry><stentry>Does</stentry></sthead>
+        <strow><stentry><codeph>POST /fleet/api/sites</codeph></stentry><stentry>Creates a site from
+          <codeph>slug</codeph>, <codeph>hosts</codeph>, <codeph>editorHosts</codeph> and
+          <codeph>env</codeph>: the settings a single-site deployment would get as environment variables
+          (<codeph>PUBLIC_URL</codeph>, <codeph>SESSION_SECRET</codeph>, <codeph>OPEND_ADMIN_TOKEN</codeph>
+          and so on). The settings must form a valid configuration. The fleet supplies the database,
+          storage and address variables itself.</stentry></strow>
+        <strow><stentry><codeph>GET /fleet/api/sites</codeph>, <codeph>GET /fleet/api/sites/:slug</codeph></stentry><stentry>Lists sites, with the names of their settings but never the values.</stentry></strow>
+        <strow><stentry><codeph>PATCH /fleet/api/sites/:slug</codeph></stentry><stentry>Changes hosts or
+          settings. The site restarts on its next request.</stentry></strow>
+        <strow><stentry><codeph>POST /fleet/api/sites/:slug/suspend</codeph>, <codeph>/resume</codeph></stentry><stentry>Pauses a site (readers see that it is paused) or brings it back.</stentry></strow>
+        <strow><stentry><codeph>DELETE /fleet/api/sites/:slug</codeph></stentry><stentry>Deletes the site, its schema and its stored files.</stentry></strow>
+      </simpletable>
+      <p>Each site then has its own admin API at its own host, with its own admin token, for registering the
+        docs repository, readers and orgs (<xref href="admin-api.dita"/>).</p>
+    </section>
+    <section id="move">
+      <title>Moving a site to its own deployment</title>
+      <p>Export the site with <codeph>GET /admin/api/export</codeph> on the site's own host. Start a
+        dedicated deployment with the same <codeph>SESSION_SECRET</codeph> (or <codeph>OPEND_SECRET_KEY</codeph>)
+        and import the export with <codeph>POST /admin/api/import</codeph>. Then request builds. Point the host
+        names at the new deployment, and delete the site from the fleet.</p>
+    </section>
+  </conbody>
+</concept>

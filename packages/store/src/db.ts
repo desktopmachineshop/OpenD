@@ -24,8 +24,9 @@ export const CHANNELS = {
 export function createPool(
   connectionString: string,
   onIdleError: (err: Error) => void = (err) => console.error('postgres idle client error', err),
+  options: { max?: number; idleTimeoutMillis?: number } = {},
 ): Pool {
-  const pool = new pg.Pool({ connectionString, max: 10 });
+  const pool = new pg.Pool({ connectionString, max: 10, ...options });
   // An idle client can be terminated by the server (restart, failover). Without
   // a handler the pool's 'error' event would crash the process.
   pool.on('error', onIdleError);

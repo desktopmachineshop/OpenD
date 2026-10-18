@@ -16,6 +16,9 @@ import { GitHubConnection, jsonLog, startPoller, startWorker } from '@opend/work
 import { mintSetupLink } from './admin.js';
 import { startAnalyticsPurge } from './analytics-purge.js';
 import { createApp } from './app.js';
+import { loadFleetConfig } from './fleet/config.js';
+import { startFleet } from './fleet/serve.js';
+import { startFleetWorker } from './fleet/worker.js';
 import { DEFAULT_ANALYTICS, loadConfig } from './config.js';
 import { runReconcileCommand, type ReconcileCommandOptions } from './reconcile-command.js';
 import { runReindexCommand, type ReindexCommandOptions } from './reindex-command.js';
@@ -122,6 +125,43 @@ program
       await worker.stop();
       await settingsListener.stop();
       await pool.end();
+      process.exit(0);
+    };
+    process.once('SIGTERM', () => void shutdown());
+    process.once('SIGINT', () => void shutdown());
+  });
+
+const fleetCommand = program
+  .command('fleet')
+  .description('many sites from one deployment, each in its own schema (managed hosting)');
+
+fleetCommand
+  .command('serve')
+  .description('serve every site of the fleet by host name, and the fleet admin API')
+  .action(async () => {
+    const config = loadFleetConfig();
+    const fleet = await startFleet(config);
+    await new Promise<void>((resolve) =>
+      fleet.server.listen(config.port, config.bindHost, resolve),
+    );
+    jsonLog({ level: 'info', msg: 'fleet serving', host: config.host, maxSites: config.maxSites });
+    const shutdown = async () => {
+      await fleet.close();
+      process.exit(0);
+    };
+    process.once('SIGTERM', () => void shutdown());
+    process.once('SIGINT', () => void shutdown());
+  });
+
+fleetCommand
+  .command('worker')
+  .description('run build jobs for every site of the fleet')
+  .action(async () => {
+    const config = loadFleetConfig();
+    const worker = await startFleetWorker(config);
+    jsonLog({ level: 'info', msg: 'fleet worker started', concurrency: config.workerConcurrency });
+    const shutdown = async () => {
+      await worker.stop();
       process.exit(0);
     };
     process.once('SIGTERM', () => void shutdown());

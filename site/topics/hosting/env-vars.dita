@@ -99,6 +99,23 @@
       </properties>
     </section>
 
+    <section id="fleet">
+      <title>Fleet mode</title>
+      <p>Read only by <codeph>opend-server fleet serve</codeph> and <codeph>opend-server fleet worker</codeph>, which
+        run many sites from one deployment (<xref href="fleet.dita"/>). The fleet also reads
+        <codeph>DATABASE_URL</codeph>, <codeph>PORT</codeph>, <codeph>HOST</codeph>, <codeph>BLOB_DIR</codeph> and the
+        <codeph>S3_*</codeph> variables for itself and every site. Each site's other settings come from its
+        registry entry, not from the environment.</p>
+      <properties relcolwidth="3* 2* 6*">
+        <prophead><proptypehd>Variable</proptypehd><propvaluehd>Default</propvaluehd><propdeschd>Meaning and rules</propdeschd></prophead>
+        <property id="OPEND_FLEET_KEY"><proptype><codeph>OPEND_FLEET_KEY</codeph></proptype><propvalue>none (required)</propvalue><propdesc>Seals each site's settings in the registry. At least 32 characters. Changing it makes stored sites unreadable.</propdesc></property>
+        <property id="OPEND_FLEET_TOKEN"><proptype><codeph>OPEND_FLEET_TOKEN</codeph></proptype><propvalue>none (required)</propvalue><propdesc>Bearer token for the fleet admin API. At least 32 characters.</propdesc></property>
+        <property id="OPEND_FLEET_HOST"><proptype><codeph>OPEND_FLEET_HOST</codeph></proptype><propvalue>none (required)</propvalue><propdesc>The fleet's own host name, where the admin API answers. No site may use it.</propdesc></property>
+        <property id="OPEND_FLEET_MAX_SITES"><proptype><codeph>OPEND_FLEET_MAX_SITES</codeph></proptype><propvalue><codeph>200</codeph></propvalue><propdesc>How many site apps (docs and editor counted separately) stay running at once. The least recently used are closed beyond it and restart on their next request.</propdesc></property>
+        <property id="OPEND_FLEET_WORKER_CONCURRENCY"><proptype><codeph>OPEND_FLEET_WORKER_CONCURRENCY</codeph></proptype><propvalue><codeph>2</codeph></propvalue><propdesc>Build jobs the fleet worker runs at once, across all sites. One site never runs two at a time.</propdesc></property>
+      </properties>
+    </section>
+
     <section id="analytics">
       <title>Analytics and feedback</title>
       <p>See <xref href="analytics.dita">Docs analytics and reader feedback</xref> for what is recorded.</p>

@@ -1,4 +1,10 @@
-import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import {
+  DeleteObjectsCommand,
+  GetObjectCommand,
+  ListObjectsV2Command,
+  PutObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3';
 import { assertSafeKey, type BlobStore } from './blobs.js';
 
 export interface S3BlobStoreOptions {
@@ -83,6 +89,27 @@ export class S3BlobStore implements BlobStore {
       if (isNotFound(err)) return null;
       throw err;
     }
+  }
+
+  /** Deletes every object under the prefix. Refused without one: the bucket may be shared. */
+  async clear(): Promise<void> {
+    if (!this.prefix) throw new Error('refusing to clear an S3 blob store without a prefix');
+    let token: string | undefined;
+    do {
+      const page = await this.client.send(
+        new ListObjectsV2Command({
+          Bucket: this.bucket,
+          Prefix: this.prefix,
+          ContinuationToken: token,
+        }),
+      );
+      const keys = (page.Contents ?? []).flatMap((o) => (o.Key ? [{ Key: o.Key }] : []));
+      if (keys.length)
+        await this.client.send(
+          new DeleteObjectsCommand({ Bucket: this.bucket, Delete: { Objects: keys, Quiet: true } }),
+        );
+      token = page.IsTruncated ? page.NextContinuationToken : undefined;
+    } while (token);
   }
 
   /** Closes the client's sockets. */
