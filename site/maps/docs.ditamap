@@ -79,6 +79,7 @@
     <topicref href="../topics/hosting/admin-console.dita"/>
     <topicref href="../topics/hosting/docker-compose.dita" product="core"/>
     <topicref href="../topics/hosting/railway.dita" product="core"/>
+    <topicref href="../topics/hosting/fleet.dita" product="core"/>
     <topicref href="../topics/hosting/env-vars.dita" product="core"/>
     <topicref href="../topics/hosting/settings.dita" product="core"/>
     <topicref href="../topics/hosting/blob-storage.dita" product="core"/>

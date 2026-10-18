@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
 /** Storage for build artifacts such as images: a local folder or an S3-compatible bucket. */
@@ -6,6 +6,8 @@ export interface BlobStore {
   put(key: string, data: Buffer): Promise<void>;
   /** `null` when the key does not exist. */
   get(key: string): Promise<Buffer | null>;
+  /** Deletes every blob in the store (a site removed from a fleet). */
+  clear?(): Promise<void>;
 }
 
 /** Rejects keys that could escape the store: absolute, `..`, backslashes or empty segments. */
@@ -38,6 +40,10 @@ export class FsBlobStore implements BlobStore {
       if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null;
       throw err;
     }
+  }
+
+  async clear(): Promise<void> {
+    await rm(this.root, { recursive: true, force: true });
   }
 }
 

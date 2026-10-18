@@ -20,7 +20,8 @@ export interface BuildJob {
 /** Jobs that fail for infrastructure reasons (fetch errors) are retried this many times. */
 export const MAX_ATTEMPTS = 5;
 /** A running job whose worker has been silent this long is assumed dead and reclaimed. */
-const STALE_LOCK = '15 minutes';
+/** A running job whose worker has not finished it after this long is claimed again. */
+export const STALE_LOCK = '15 minutes';
 
 const COLUMNS = `id, repo_id as "repoId", ref, sha, status, attempts, error, diagnostics,
   release_id as "releaseId", created_at as "createdAt", finished_at as "finishedAt"`;
