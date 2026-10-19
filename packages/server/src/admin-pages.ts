@@ -1343,7 +1343,7 @@ export function editorPage(d: EditorPageData): Html {
       </div>
       <label class="admin-choice"
         ><input type="checkbox" name="editLinks" value="1" ${raw(d.editLinks ? ' checked' : '')} />
-        “Edit this page” on topic pages for signed-in readers</label
+        “Edit this page” on topic pages for signed-in staff</label
       >
       <label class="admin-choice"
         ><input

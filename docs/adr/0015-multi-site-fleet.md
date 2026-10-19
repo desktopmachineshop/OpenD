@@ -31,7 +31,8 @@ Two shapes were considered:
   - `GET`, `PATCH` and `DELETE /fleet/api/sites/:slug`;
   - `POST /fleet/api/sites/:slug/suspend` and `/resume`;
   - delete removes the schema and the site's blobs;
-  - settings values are never returned.
+  - settings values are never returned;
+  - `PUT`, `GET` and `DELETE /fleet/api/forwards/:host` manage **forwards**: hosts the fleet answers for by proxying to another server (a dedicated deployment's own address). A provider's wildcard domain belongs to the fleet, so this is how a dedicated deployment gets a name under it until it has a domain of its own. Requests pass unchanged apart from `Host` and the `X-Forwarded-*` headers, and redirects to the upstream are rewritten to the public host.
 - **Moving a site out.** `GET /admin/api/export` and `POST /admin/api/import`, on the site itself with its admin token, carry everything not rebuilt from Git to a dedicated deployment. Sealed secrets move as they are, so the target keeps the site's `SESSION_SECRET` / `OPEND_SECRET_KEY`.
 
 ## Consequences

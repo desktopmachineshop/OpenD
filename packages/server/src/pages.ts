@@ -93,7 +93,7 @@ export function sourceHref(
 }
 
 /**
- * "Edit this page" (signed-in readers, when the web editor is configured) and
+ * "Edit this page" (staff readers, when the web editor is configured) and
  * "View source on GitHub" (when enabled). Only ever built for a topic the
  * viewer is being shown, so it names no path they could not already see.
  */
@@ -103,7 +103,7 @@ export function topicActions(
   file: string,
 ): string {
   const links: string[] = [];
-  if (viewer.access && ctx.config.editorUrl && ctx.config.editLinks !== false) {
+  if (viewer.access?.reader.staff && ctx.config.editorUrl && ctx.config.editLinks !== false) {
     const href = `${ctx.config.editorUrl}/edit?path=${encodeURIComponent(file)}`;
     links.push(`<a href="${escapeHtml(href)}">${PENCIL_ICON}Edit this page</a>`);
   }

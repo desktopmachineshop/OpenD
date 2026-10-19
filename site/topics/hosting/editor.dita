@@ -130,7 +130,7 @@ opend-server editor disable-user writer@example.com</codeblock>
         what they can do.</p>
       <ul>
         <li><b>Edit this page.</b> Set <codeph>EDITOR_PUBLIC_URL</codeph> on the docs site too, and signed-in
-          readers see <uicontrol>Edit this page</uicontrol> under each topic, opening
+          staff readers see <uicontrol>Edit this page</uicontrol> under each topic, opening
           <filepath>/edit?path=<varname>topic file</varname></filepath> in the editor. The editor still asks
           them to sign in as an author. One GitHub App can serve both hosts; see
           <xref href="github-app.dita"/>.</li>
