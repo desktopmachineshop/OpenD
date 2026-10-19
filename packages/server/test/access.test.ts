@@ -295,13 +295,16 @@ describe.skipIf(!url)('public and private sites, sign-in and staff', () => {
         expect([phrase, html.includes(phrase)]).toEqual([phrase, rule(PUBLIC)]);
     });
 
-    it('shows signed-in readers their name, "Sign out" and "Edit this page"', async () => {
+    it('shows signed-in readers their name and "Sign out", and staff "Edit this page"', async () => {
       const page = await get('/topics/install.html', cookies.gus);
       expect(page.body).toContain('Signed in as </span>Gus');
       expect(page.body).toContain('Signed in as <strong>Gus</strong> (gus@globex.example)');
       expect(page.body.match(/action="\/auth\/logout"/g)).toHaveLength(2);
-      expect(page.body).toContain('<a href="http://editor.test/edit?path=topics%2Finstall.dita">');
       expect(page.body).not.toContain('class="site-account site-signin"');
+      // Only staff may change the docs, so only staff are offered the editor.
+      expect(page.body).not.toContain('Edit this page</a>');
+      const staff = await get('/topics/install.html', cookies.owner);
+      expect(staff.body).toContain('<a href="http://editor.test/edit?path=topics%2Finstall.dita">');
       // Missing and hidden pages have no edit link to give a path away.
       const hidden = await get('/topics/configure-sso.html', cookies.nia);
       expect(hidden.statusCode).toBe(404);

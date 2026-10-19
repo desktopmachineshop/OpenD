@@ -18,6 +18,7 @@ import { jsonLog, type Log } from '@opend/worker';
 import { loadConfig } from '../config.js';
 import { messagePage } from '../pages.js';
 import { SiteApps } from './apps.js';
+import { proxy, type Forward } from './forward.js';
 import { normaliseHost, siteDatabaseUrl, siteEnv, type FleetConfig } from './config.js';
 import { Registry, migrateRegistry, type Site } from './registry.js';
 
@@ -47,6 +48,24 @@ const createSchema = z.object({
   hosts: z.array(hostSchema).min(1).max(10),
   editorHosts: z.array(hostSchema).max(10).default([]),
   env: envSchema,
+});
+/** http is allowed only to loopback and private-network hosts; anything else must be https. */
+const privateHost = (host: string) =>
+  host === 'localhost' || host === '127.0.0.1' || host === '[::1]' || host.endsWith('.internal');
+const forwardSchema = z.object({
+  upstream: z
+    .url()
+    .transform((u) => new URL(u))
+    .refine(
+      (u) =>
+        (u.protocol === 'https:' || (u.protocol === 'http:' && privateHost(u.hostname))) &&
+        u.pathname === '/' &&
+        !u.search &&
+        !u.hash &&
+        !u.username,
+      'an https origin (http only to a private host)',
+    )
+    .transform((u) => u.origin),
 });
 const patchSchema = z.object({
   hosts: z.array(hostSchema).min(1).max(10).optional(),
@@ -122,12 +141,18 @@ export async function startFleet(
   const pdf = deps.pdf ?? createPdfRenderer();
   const apps = new SiteApps(fleet, { pdf, log });
 
-  // Host → site, briefly cached; registry changes clear it on every replica.
-  const hosts = new Map<string, { at: number; found: Awaited<ReturnType<Registry['byHost']>> }>();
-  const lookup = async (host: string) => {
+  // Host → site or forward, briefly cached; registry changes clear it on every replica.
+  type Found =
+    | { site: Site; editor: boolean; forward?: undefined }
+    | { forward: Forward; site?: undefined }
+    | null;
+  const hosts = new Map<string, { at: number; found: Found }>();
+  const lookup = async (host: string): Promise<Found> => {
     const hit = hosts.get(host);
     if (hit && Date.now() - hit.at < 15_000) return hit.found;
-    const found = await registry.byHost(host);
+    const site = await registry.byHost(host);
+    const forward = site ? null : await registry.forwardFor(host);
+    const found: Found = site ?? (forward ? { forward } : null);
     hosts.set(host, { at: Date.now(), found });
     if (hosts.size > 10_000) hosts.clear();
     return found;
@@ -214,6 +239,33 @@ export async function startFleet(
     await announce(slug);
     return view(site!);
   });
+  // Forwards: hosts under the fleet's domain served by a dedicated instance elsewhere.
+  admin.get('/fleet/api/forwards', async () => registry.forwards());
+  admin.put('/fleet/api/forwards/:host', async (request, reply) => {
+    const host = hostSchema.safeParse((request.params as { host: string }).host);
+    const parsed = forwardSchema.safeParse(request.body);
+    if (!host.success) return reply.code(400).send({ error: 'host: a host name' });
+    if (!parsed.success) return reply.code(400).send({ error: z.prettifyError(parsed.error) });
+    if (host.data === fleet.host)
+      return reply.code(400).send({ error: 'that is the fleet’s own host' });
+    if (await registry.byHost(host.data))
+      return reply.code(409).send({ error: `a site serves ${host.data}` });
+    const upstreamHost = new URL(parsed.data.upstream).host;
+    if (upstreamHost === host.data || (await registry.byHost(upstreamHost)))
+      return reply.code(400).send({ error: 'the upstream must be another server' });
+    const forward = { host: host.data, upstream: parsed.data.upstream };
+    await registry.setForward(forward);
+    await announce('');
+    log({ level: 'info', msg: 'forward set', ...forward });
+    return forward;
+  });
+  admin.delete('/fleet/api/forwards/:host', async (request, reply) => {
+    const host = normaliseHost((request.params as { host: string }).host);
+    if (!(await registry.removeForward(host)))
+      return reply.code(404).send({ error: 'no such forward' });
+    await announce('');
+    return reply.code(204).send();
+  });
   for (const [action, status] of [
     ['suspend', 'suspended'],
     ['resume', 'active'],
@@ -256,6 +308,18 @@ export async function startFleet(
       const found = await lookup(host);
       if (!found)
         return page(res, 404, 'No site here', 'There is no documentation site at this address.');
+      if (found.forward)
+        return proxy(req, res, found.forward, (err) => {
+          log({ level: 'warn', msg: 'forward failed', host, error: String(err) });
+          if (!res.headersSent)
+            page(
+              res,
+              502,
+              'Site unavailable',
+              'This documentation site did not answer. Please try again in a moment.',
+            );
+          else res.destroy();
+        });
       if (found.site.status !== 'active')
         return page(
           res,

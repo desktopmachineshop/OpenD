@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import type { Db, Pool, SecretBox } from '@opend/store';
+import type { Forward } from './forward.js';
 
 /**
  * The fleet's own tables, in the `opend_fleet` schema next to the site schemas.
@@ -21,6 +22,12 @@ create table if not exists opend_fleet.sites (
 );
 create index if not exists sites_hosts on opend_fleet.sites using gin (hosts);
 create index if not exists sites_editor_hosts on opend_fleet.sites using gin (editor_hosts);
+create table if not exists opend_fleet.forwards (
+  host text primary key,
+  upstream text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
 `;
 
 export type SiteStatus = 'active' | 'suspended';
@@ -167,14 +174,43 @@ export class Registry {
     return res.rowCount === 1;
   }
 
-  /** Hosts already used by another site, to refuse duplicates. */
+  /** Hosts already used by another site or by a forward, to refuse duplicates. */
   async hostsTaken(hosts: string[], exceptSlug?: string): Promise<string[]> {
     const { rows } = await this.db.query<{ host: string }>(
       `select h as host from opend_fleet.sites, unnest(hosts || editor_hosts) h
-       where h = any($1) and slug <> coalesce($2, '')`,
+       where h = any($1) and slug <> coalesce($2, '')
+       union select host from opend_fleet.forwards where host = any($1)`,
       [hosts, exceptSlug ?? null],
     );
     return rows.map((r) => r.host);
+  }
+
+  async forwards(): Promise<Forward[]> {
+    const { rows } = await this.db.query<Forward>(
+      'select host, upstream from opend_fleet.forwards order by host',
+    );
+    return rows;
+  }
+
+  async forwardFor(host: string): Promise<Forward | null> {
+    const { rows } = await this.db.query<Forward>(
+      'select host, upstream from opend_fleet.forwards where host = $1',
+      [host],
+    );
+    return rows[0] ?? null;
+  }
+
+  async setForward(forward: Forward): Promise<void> {
+    await this.db.query(
+      `insert into opend_fleet.forwards (host, upstream) values ($1, $2)
+       on conflict (host) do update set upstream = excluded.upstream, updated_at = now()`,
+      [forward.host, forward.upstream],
+    );
+  }
+
+  async removeForward(host: string): Promise<boolean> {
+    const res = await this.db.query('delete from opend_fleet.forwards where host = $1', [host]);
+    return res.rowCount === 1;
   }
 }
 

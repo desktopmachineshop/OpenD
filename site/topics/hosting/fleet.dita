@@ -42,9 +42,23 @@
           settings. The site restarts on its next request.</stentry></strow>
         <strow><stentry><codeph>POST /fleet/api/sites/:slug/suspend</codeph>, <codeph>/resume</codeph></stentry><stentry>Pauses a site (readers see that it is paused) or brings it back.</stentry></strow>
         <strow><stentry><codeph>DELETE /fleet/api/sites/:slug</codeph></stentry><stentry>Deletes the site, its schema and its stored files.</stentry></strow>
+        <strow><stentry><codeph>PUT /fleet/api/forwards/:host</codeph></stentry><stentry>Forwards a host to
+          another server, with <codeph>{"upstream": "https://…"}</codeph>: see below.</stentry></strow>
+        <strow><stentry><codeph>GET /fleet/api/forwards</codeph>, <codeph>DELETE /fleet/api/forwards/:host</codeph></stentry><stentry>Lists forwards, or removes one.</stentry></strow>
       </simpletable>
       <p>Each site then has its own admin API at its own host, with its own admin token, for registering the
         docs repository, readers and orgs (<xref href="admin-api.dita"/>).</p>
+    </section>
+    <section id="forwards">
+      <title>Forwarding hosts to dedicated deployments</title>
+      <p>A provider that points a wildcard domain at the fleet cannot also give a dedicated deployment a name
+        under that domain directly. A forward lets the fleet answer for such a host and pass every request on
+        to the deployment's own address, unchanged apart from <codeph>Host</codeph> and the
+        <codeph>X-Forwarded-*</codeph> headers. Redirects to the upstream's address are rewritten to the public
+        host. The upstream must be an <codeph>https</codeph> origin (plain <codeph>http</codeph> only to a
+        loopback or <codeph>.internal</codeph> host), and its <codeph>PUBLIC_URL</codeph> is the forwarded host.
+        A host is either a site's or a forward's, never both. Give a site its own domain to connect without the
+        fleet in between.</p>
     </section>
     <section id="move">
       <title>Moving a site to its own deployment</title>

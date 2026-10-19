@@ -209,7 +209,7 @@ export interface ServerConfig {
     /** Such collaborators also get the staff view. */
     collaboratorStaff?: boolean;
   };
-  /** The web editor's origin: signed-in readers get "Edit this page" links. */
+  /** The web editor's origin: signed-in staff readers get "Edit this page" links. */
   editorUrl?: string;
   /** "Edit this page" links on (the default) or off, when the editor is configured. */
   editLinks?: boolean;

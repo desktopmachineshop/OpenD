@@ -1,6 +1,6 @@
 import { createHmac, randomUUID } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
-import { request as httpRequest } from 'node:http';
+import { createServer, request as httpRequest } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -283,6 +283,81 @@ describe.skipIf(!url)('a fleet of sites', () => {
         { site: 'b', ran: [] },
       ]),
     );
+  });
+
+  it('forwards hosts it holds to a dedicated instance elsewhere', async () => {
+    const seen: { method: string; url: string; headers: Record<string, unknown>; body: string }[] =
+      [];
+    const upstream = createServer((req, res) => {
+      let body = '';
+      req.on('data', (c: Buffer) => (body += c.toString('utf8')));
+      req.on('end', () => {
+        seen.push({ method: req.method!, url: req.url!, headers: req.headers, body });
+        if (req.url === '/moved') {
+          res.writeHead(302, { location: `${origin}/topics/a.html` });
+          return res.end();
+        }
+        res.writeHead(201, {
+          'content-type': 'text/plain',
+          'set-cookie': ['a=1; Path=/', 'b=2; Path=/'],
+        });
+        res.end(`hello from upstream: ${body}`);
+      });
+    });
+    await new Promise<void>((resolve) => upstream.listen(0, '127.0.0.1', resolve));
+    const origin = `http://127.0.0.1:${(upstream.address() as AddressInfo).port}`;
+    try {
+      expect(
+        (await fleetApi('PUT', '/forwards/own.docs.test', { upstream: 'http://evil.example' }))
+          .status,
+      ).toBe(400);
+      // A site's host cannot be forwarded, and a forwarded host cannot be given to a site.
+      expect((await fleetApi('PUT', '/forwards/a.docs.test', { upstream: origin })).status).toBe(
+        409,
+      );
+      const set = await fleetApi('PUT', '/forwards/Own.Docs.Test', { upstream: `${origin}/` });
+      expect(set.status).toBe(200);
+      expect(JSON.parse(set.body)).toEqual({ host: 'own.docs.test', upstream: origin });
+      expect(
+        (
+          await fleetApi('POST', '/sites', {
+            slug: 'own',
+            hosts: ['own.docs.test'],
+            env: siteEnv('own'),
+          })
+        ).status,
+      ).toBe(409);
+      expect(JSON.parse((await fleetApi('GET', '/forwards')).body)).toEqual([
+        { host: 'own.docs.test', upstream: origin },
+      ]);
+
+      const res = await call('own.docs.test', 'POST', '/search?q=x', {
+        body: 'payload',
+        headers: { 'content-type': 'text/plain', cookie: 'sid=abc' },
+      });
+      expect(res.status).toBe(201);
+      expect(res.body).toBe('hello from upstream: payload');
+      expect(res.headers['set-cookie']).toEqual(['a=1; Path=/', 'b=2; Path=/']);
+      const got = seen.at(-1)!;
+      expect(got).toMatchObject({ method: 'POST', url: '/search?q=x' });
+      expect(got.headers).toMatchObject({
+        host: origin.slice('http://'.length),
+        'x-forwarded-host': 'own.docs.test',
+        'x-forwarded-proto': 'https',
+        cookie: 'sid=abc',
+      });
+      const moved = await call('own.docs.test', 'GET', '/moved');
+      expect(moved.headers.location).toBe('https://own.docs.test/topics/a.html');
+
+      expect((await fleetApi('DELETE', '/forwards/own.docs.test')).status).toBe(204);
+      expect((await call('own.docs.test', 'GET', '/')).status).toBe(404);
+    } finally {
+      await new Promise<void>((resolve) => upstream.close(() => resolve()));
+    }
+    // An upstream that is down is a 502, not a crash.
+    await fleetApi('PUT', '/forwards/down.docs.test', { upstream: origin });
+    expect((await call('down.docs.test', 'GET', '/')).status).toBe(502);
+    await fleetApi('DELETE', '/forwards/down.docs.test');
   });
 
   it('pauses, restarts after settings change and deletes a site', async () => {
