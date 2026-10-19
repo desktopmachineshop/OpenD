@@ -1481,12 +1481,13 @@ export function apiPage(d: ApiPageData): Html {
         <p>
           AI assistants that support MCP (Model Context Protocol), such as Claude, can search and
           read these docs and propose changes as pull requests. Add a custom connector with this
-          address, then paste an API key when it asks:
+          address and sign in with GitHub or your email: the assistant sees every OpenD site you
+          read, exactly as you see it.
         </p>
         <p><code class="admin-secret">${d.mcpUrl}</code></p>
         <p class="admin-hint">
-          Tools that send their own headers can use the key directly:
-          <code>Authorization: Bearer opd_…</code>.
+          Each connection gets its own key in the list below, named after the person’s email. Revoke
+          it to cut that assistant off from this site.
         </p>
       </section>`
     : '';

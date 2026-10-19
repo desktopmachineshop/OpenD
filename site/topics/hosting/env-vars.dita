@@ -95,7 +95,7 @@
         <prophead><proptypehd>Variable</proptypehd><propvaluehd>Default</propvaluehd><propdeschd>Meaning and rules</propdeschd></prophead>
         <property id="OPEND_EMBED_SECRET"><proptype><codeph>OPEND_EMBED_SECRET</codeph></proptype><propvalue>none</propvalue><propdesc>Shared secret host apps sign embed tokens with. At least 32 characters. Set together with <codeph>OPEND_EMBED_ORIGINS</codeph>; without both, embedding is off.</propdesc></property>
         <property id="OPEND_EMBED_ORIGINS"><proptype><codeph>OPEND_EMBED_ORIGINS</codeph></proptype><propvalue>none</propvalue><propdesc>Comma-separated origins allowed to frame the help panel and call the JSON API, such as <codeph>https://console.example.com,http://localhost:5173</codeph>. Each must be <codeph>http</codeph> or <codeph>https</codeph> with no path or trailing slash.</propdesc></property>
-        <property id="OPEND_MCP_URL"><proptype><codeph>OPEND_MCP_URL</codeph></proptype><propvalue>none</propvalue><propdesc>The MCP server address for this site, shown on the admin console's <uicontrol>API &amp; AI</uicontrol> page so staff can connect AI assistants. Managed hosting sets it; see <xref href="api.dita#api/ai"/>.</propdesc></property>
+        <property id="OPEND_MCP_URL"><proptype><codeph>OPEND_MCP_URL</codeph></proptype><propvalue>none</propvalue><propdesc>The address of the managed MCP connector (one for every site), shown on the admin console's <uicontrol>API &amp; AI</uicontrol> page so staff can connect AI assistants. Managed hosting sets it; see <xref href="api.dita#api/ai"/>.</propdesc></property>
       </properties>
     </section>
 
