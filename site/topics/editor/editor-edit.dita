@@ -20,22 +20,24 @@
             place. The toolbar adds bold, italic, code and other formatting, links, bulleted and numbered
             lists, steps in a task, notes, code blocks, images and sections. <uicontrol>Block
             settings</uicontrol> sets who sees the block holding the cursor (release, product, feature,
-            audience and the other filtering attributes) and a note's type. Blocks shown only to some
-            readers are outlined and labelled.</p>
+            audience and the other filtering attributes) and a note's type. It opens beside the text, or
+            at the bottom of the screen on a phone, and stays in view while you edit; the block it changes
+            is outlined. Blocks shown only to some readers are outlined and labelled.</p>
           <p>Markup the visual editor does not edit directly, such as tables and reused content, appears as a
             locked block. It is kept exactly as it is; double-click it to change its XML. Saving writes back
             only the blocks you changed, so the rest of the file keeps its formatting.</p>
           <p>Maps, and topics the visual editor cannot convert and save back without changing them, open on
             the <uicontrol>Source</uicontrol> tab with a note saying why. Developers can switch to
             <uicontrol>Source</uicontrol> at any time to edit the DITA directly.</p>
-          <p>As you type, the preview next to the editor rebuilds with your unsaved text. It is the staff
-            view: everything is shown and conditions are marked. <uicontrol>Problems</uicontrol> lists what
+          <p>The <uicontrol>Preview</uicontrol> tab, after <uicontrol>Source</uicontrol>, shows the page
+            with your unsaved text. It is the staff view: everything is shown and conditions are marked. <uicontrol>Problems</uicontrol> lists what
             validation finds in the file, the same as <cmdname>opend validate</cmdname>; see
             <xref keyref="diagnostics"/>.</p>
         </info>
       </step>
       <step>
-        <cmd>Optional: check what a customer sees. Under the preview, choose an org and
+        <cmd>Optional: check what a customer sees. Under the preview, on the
+          <uicontrol>Preview</uicontrol> tab, choose an org and
           <uicontrol>Open</uicontrol>.</cmd>
         <info>
           <p>The page opens with that org's products, features and version, as the docs site would show it.

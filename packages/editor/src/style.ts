@@ -48,7 +48,7 @@ textarea { width: 100%; font: 13px/1.5 var(--ed-mono); padding: 8px; border: 1px
 .ed-notice { border-left: 4px solid var(--ed-ok); padding: 4px 12px; }
 .ed-ok { color: var(--ed-ok); }
 .ed-columns { display: grid; grid-template-columns: minmax(240px, 1fr) minmax(320px, 1fr); gap: 24px; }
-.ed-workspace { display: grid; grid-template-columns: 220px minmax(320px, 1fr) minmax(320px, 1fr); gap: 16px; align-items: start; }
+.ed-workspace { display: grid; grid-template-columns: 220px minmax(320px, 1fr); gap: 16px; align-items: start; }
 @media (max-width: 1000px) { .ed-columns, .ed-workspace { grid-template-columns: 1fr; } }
 .ed-tree ul { list-style: none; padding-left: 14px; margin: 0; }
 .ed-tree > ul { padding-left: 0; }
@@ -56,6 +56,7 @@ textarea { width: 100%; font: 13px/1.5 var(--ed-mono); padding: 8px; border: 1px
 .ed-tree a[aria-current="page"] { font-weight: 700; }
 .ed-dir { color: var(--ed-muted); }
 .ed-badge { font-size: 11px; border: 1px solid var(--ed-border); border-radius: 10px; padding: 0 6px; color: var(--ed-muted); }
+.ed-preview { margin-bottom: 12px; }
 .ed-preview iframe { width: 100%; height: 75vh; border: 1px solid var(--ed-border); border-radius: var(--ed-radius-sm); background: var(--ed-bg); }
 .ed-inline { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
 .ed-inline label { display: inline; margin: 0; }
@@ -165,8 +166,21 @@ select.vx-more { min-width: 0; min-height: 36px; padding: 4px 8px; }
 .ProseMirror-gapcursor::after { content: ""; display: block; position: absolute; top: -2px; width: 20px; border-top: 1px solid var(--ed-fg); }
 .ProseMirror-focused .ProseMirror-gapcursor { display: block; }
 .ProseMirror-hideselection *::selection { background: transparent; }
-.vx-props { border-top: 1px solid var(--ed-border); padding: 12px 16px; background: var(--ed-soft); border-radius: 0 0 var(--ed-radius) var(--ed-radius); }
-.vx-props h2 { font-size: 16px; }
+/* Block settings: a column beside the text that stays in view, or a sheet at the bottom of small screens. */
+.vx-workarea { display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; }
+.vx-workarea.vx-with-props { grid-template-columns: minmax(0, 1fr) minmax(260px, 320px); }
+.vx-props { position: sticky; top: 64px; max-height: calc(100vh - 80px); overflow-y: auto; margin: 8px 8px 8px 0; padding: 12px 16px;
+  border: 1px solid var(--ed-border); border-radius: var(--ed-radius); background: var(--ed-soft); box-shadow: var(--ed-shadow); }
+.vx-props-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 0 8px; }
+.vx-props h2 { font-size: 16px; margin: 0; }
+.vx-close { min-width: 32px; min-height: 32px; padding: 0 8px; font-size: 18px; line-height: 1; }
+.vx-target { outline: 2px dashed color-mix(in srgb, var(--ed-accent) 70%, transparent); outline-offset: 4px; border-radius: 2px; }
+@media (max-width: 800px) {
+  .vx-workarea.vx-with-props { grid-template-columns: minmax(0, 1fr); }
+  .vx-props { position: fixed; z-index: 5; left: 0; right: 0; bottom: 0; top: auto; max-height: 45vh; margin: 0;
+    border-radius: var(--ed-radius-lg) var(--ed-radius-lg) 0 0; border-bottom: 0; }
+  .vx-with-props .vx-editor { padding-bottom: 50vh; }
+}
 .vx-props input:not([type="checkbox"]), .vx-props select { min-width: 0; width: 100%; max-width: 28em; }
 .vx-props textarea { min-height: 10em; }
 .vx-crumbs { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 12px; }

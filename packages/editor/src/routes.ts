@@ -293,16 +293,17 @@ ${csrfField(editor.csrf)}
 <label id="source-label" for="ed-source">DITA source</label>
 <textarea id="ed-source" name="content" spellcheck="false" autocapitalize="off" autocomplete="off" rows="30" aria-describedby="ed-diagnostics-h">${h(file.text)}</textarea>
 </div>
+<section id="ed-preview-pane" class="ed-preview" aria-labelledby="preview-h"><h2 id="preview-h">Preview <span class="ed-hint">(staff view: everything shown, conditions marked)</span></h2>
+<iframe id="ed-preview" title="Preview of ${h(path)}" src="/preview/saved/${h(target)}"></iframe>
+<p class="ed-inline"><input type="hidden" name="_csrf" value="${h(editor.csrf)}" form="ed-preview-as"><input type="hidden" name="page" value="${h(target)}" form="ed-preview-as">
+<label for="as-org">Preview this page as</label> <select id="as-org" name="org" form="ed-preview-as">${orgs.map((o) => `<option value="${h(o.slug)}">${h(o.name)}</option>`).join('')}</select> <button type="submit" form="ed-preview-as"${orgs.length ? '' : ' disabled'}>Open</button></p>
+</section>
 <p><label for="ed-message">Note about this change (optional)</label><input id="ed-message" name="message" maxlength="200"></p>
 <p class="ed-actions"><button type="submit"${write.blocked ? ' disabled aria-describedby="signed-h"' : ''}>Save</button> <span id="ed-save-status" role="status" aria-live="polite"></span></p>
 </form>
 <section aria-labelledby="ed-diagnostics-h"><h2 id="ed-diagnostics-h">Problems</h2><div id="ed-diagnostics" aria-live="polite">${diagnosticsList(draft.diagnostics, path)}</div></section>
 </section>
-<section class="ed-preview" aria-labelledby="preview-h"><h2 id="preview-h">Preview <span class="ed-hint">(staff view: everything shown, conditions marked)</span></h2>
-<iframe id="ed-preview" title="Preview of ${h(path)}" src="/preview/saved/${h(target)}"></iframe>
-<form method="post" action="/preview-as" class="ed-inline">${csrfField(editor.csrf)}<input type="hidden" name="page" value="${h(target)}">
-<label for="as-org">Preview this page as</label> <select id="as-org" name="org">${orgs.map((o) => `<option value="${h(o.slug)}">${h(o.name)}</option>`).join('')}</select> <button type="submit"${orgs.length ? '' : ' disabled'}>Open</button></form>
-</section>
+<form id="ed-preview-as" method="post" action="/preview-as"></form>
 </div>`;
     const shell = shellFor(editor, rc, path, 'files');
     if (path.endsWith('.dita')) shell.scripts = ['/assets/visual.js'];

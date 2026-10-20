@@ -59,6 +59,9 @@ describe.skipIf(!url || !hasBrowser)('web editor in a browser', () => {
     await expect.poll(() => source.inputValue()).toContain('<task id="install">');
     const text = await source.inputValue();
     await source.fill(text.replace('<shortdesc>', '<shortdesc>BROWSER-MARKER '));
+    // The preview is the tab after the source.
+    await page.getByRole('tab', { name: 'Preview' }).click();
+    expect(await source.isVisible()).toBe(false);
     const frame = page.frameLocator('#ed-preview');
     await expect
       .poll(() => frame.locator('body').innerText(), { timeout: 10_000 })
@@ -76,6 +79,7 @@ describe.skipIf(!url || !hasBrowser)('web editor in a browser', () => {
     expect(h.gh.readFile(REPO, branch, 'topics/install.dita')).toContain('BROWSER-MARKER');
 
     // A broken edit shows diagnostics live, and the save is refused.
+    await page.getByRole('tab', { name: 'Source' }).click();
     await source.fill('<task id="install"><title>Broken</task>');
     await expect
       .poll(() => page.locator('#ed-diagnostics').innerText(), { timeout: 10_000 })
@@ -118,11 +122,6 @@ describe.skipIf(!url || !hasBrowser)('web editor in a browser', () => {
     await page.keyboard.press('ControlOrMeta+b');
     await page.keyboard.type(' BOLD-MARKER');
     await page.keyboard.press('ControlOrMeta+b');
-    await expect
-      .poll(() => page.frameLocator('#ed-preview').locator('body').innerText(), {
-        timeout: 10_000,
-      })
-      .toContain('VISUAL-MARKER');
 
     // A bulleted list from a new paragraph.
     await page.keyboard.press('Enter');
@@ -130,6 +129,26 @@ describe.skipIf(!url || !hasBrowser)('web editor in a browser', () => {
     await page.getByRole('button', { name: 'Bulleted list' }).click();
     await page.keyboard.press('Enter');
     await page.keyboard.type('Second point');
+
+    // Block settings stay beside the text, on the block being edited.
+    await page.getByRole('button', { name: 'Block settings' }).click();
+    const settings = page.getByRole('complementary', { name: 'Block settings' });
+    expect(await settings.isVisible()).toBe(true);
+    expect(await settings.locator('.vx-crumb[aria-current="true"]').innerText()).toBe('Paragraph');
+    expect(await editor.locator('.vx-target').innerText()).toContain('Second point');
+    const box = (await settings.boundingBox())!;
+    const text = (await editor.boundingBox())!;
+    expect(box.x).toBeGreaterThanOrEqual(text.x + text.width - 1);
+    await settings.getByRole('button', { name: 'Close block settings' }).click();
+    expect(await settings.isVisible()).toBe(false);
+
+    // The preview tab shows the visual edits.
+    await page.getByRole('tab', { name: 'Preview' }).click();
+    await expect
+      .poll(() => page.frameLocator('#ed-preview').locator('body').innerText(), {
+        timeout: 10_000,
+      })
+      .toContain('VISUAL-MARKER');
 
     await page.getByRole('button', { name: 'Save' }).click();
     await expect

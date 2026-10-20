@@ -74,6 +74,9 @@ const NAMES: Record<string, string> = {
   dd: 'Description',
 };
 
+/** Transaction meta: the block settings changed their block, so repaint its highlight. */
+const TARGET = 'vx-target';
+
 const MAIN_CONDITIONS = new Set(['release', 'product', 'feature', 'audience']);
 
 const NOTE_TYPES = [
@@ -121,6 +124,7 @@ export function installVisualEditor(win: Window): void {
   const source = doc.getElementById('ed-source') as HTMLTextAreaElement | null;
   const sourcePane = doc.getElementById('ed-source-pane');
   const visualPane = doc.getElementById('ed-visual-pane');
+  const previewPane = doc.getElementById('ed-preview-pane');
   if (!form || !source || !sourcePane || !visualPane) return;
   if (!(form.dataset.path ?? '').endsWith('.dita')) return;
 
@@ -139,17 +143,27 @@ export function installVisualEditor(win: Window): void {
   // ---- tabs ------------------------------------------------------------------
   const tabVisual = el('button', { type: 'button', role: 'tab', id: 'vx-tab-visual' }, 'Visual');
   const tabSource = el('button', { type: 'button', role: 'tab', id: 'vx-tab-source' }, 'Source');
+  const tabPreview = el('button', { type: 'button', role: 'tab', id: 'vx-tab-preview' }, 'Preview');
   const tabs = el(
     'div',
     { class: 'vx-tabs', role: 'tablist', 'aria-label': 'Editing mode' },
     tabVisual,
     tabSource,
   );
+  // The preview is a tab of its own, so the editor has the page's full width.
+  if (previewPane) tabs.append(tabPreview);
   const notice = el('p', { class: 'vx-notice', role: 'status', hidden: '' });
-  visualPane.setAttribute('role', 'tabpanel');
-  visualPane.setAttribute('aria-labelledby', 'vx-tab-visual');
-  sourcePane.setAttribute('role', 'tabpanel');
-  sourcePane.setAttribute('aria-labelledby', 'vx-tab-source');
+  const panes: [HTMLButtonElement, HTMLElement | null][] = [
+    [tabVisual, visualPane],
+    [tabSource, sourcePane],
+    [tabPreview, previewPane],
+  ];
+  for (const [tab, pane] of panes) {
+    if (!pane) continue;
+    pane.setAttribute('role', 'tabpanel');
+    pane.setAttribute('aria-labelledby', tab.id);
+    tab.setAttribute('aria-controls', pane.id);
+  }
   visualPane.before(tabs, notice);
 
   let topic: VisualTopic | null = null;
@@ -157,13 +171,12 @@ export function installVisualEditor(win: Window): void {
   let written = source.value;
   let timer: number | undefined;
 
-  const select = (visual: boolean) => {
-    tabVisual.setAttribute('aria-selected', String(visual));
-    tabSource.setAttribute('aria-selected', String(!visual));
-    tabVisual.tabIndex = visual ? 0 : -1;
-    tabSource.tabIndex = visual ? -1 : 0;
-    visualPane.hidden = !visual;
-    sourcePane.hidden = visual;
+  const select = (chosen: HTMLButtonElement) => {
+    for (const [tab, pane] of panes) {
+      tab.setAttribute('aria-selected', String(tab === chosen));
+      tab.tabIndex = tab === chosen ? 0 : -1;
+      if (pane) pane.hidden = tab !== chosen;
+    }
   };
 
   const flush = () => {
@@ -200,20 +213,29 @@ export function installVisualEditor(win: Window): void {
     if (source.value !== written || !view) {
       if (!open()) return;
     }
-    select(true);
+    select(tabVisual);
     view?.focus();
   });
   tabSource.addEventListener('click', () => {
     flush();
-    select(false);
+    select(tabSource);
+  });
+  // Flushing writes the source, whose input event refreshes the preview.
+  tabPreview.addEventListener('click', () => {
+    flush();
+    select(tabPreview);
   });
   tabs.addEventListener('keydown', (event) => {
     if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
-    const target = event.target === tabVisual ? tabSource : tabVisual;
-    if (!target.disabled) {
-      target.focus();
-      target.click();
-    }
+    const order = [...tabs.querySelectorAll<HTMLButtonElement>('[role="tab"]')].filter(
+      (t) => !t.disabled,
+    );
+    const at = order.indexOf(event.target as HTMLButtonElement);
+    if (at < 0) return;
+    const step = event.key === 'ArrowRight' ? 1 : -1;
+    const next = order[(at + step + order.length) % order.length]!;
+    next.focus();
+    next.click();
   });
   // Submitting the form saves what the visual editor holds.
   form.addEventListener('submit', flush, true);
@@ -221,9 +243,17 @@ export function installVisualEditor(win: Window): void {
 
   // ---- toolbar ------------------------------------------------------------------
   const toolbar = el('div', { class: 'vx-toolbar', role: 'toolbar', 'aria-label': 'Formatting' });
+  // Block settings sit beside the text (a sheet at the bottom on small screens), so they
+  // stay in view while the block they change is edited.
   const props = el('aside', { class: 'vx-props', 'aria-label': 'Block settings', hidden: '' });
   const surface = el('div', { class: 'vx-surface' });
-  visualPane.append(toolbar, surface, props);
+  const workarea = el('div', { class: 'vx-workarea' }, surface, props);
+  const settings = el(
+    'button',
+    { type: 'button', class: 'vx-tool', 'aria-expanded': 'false', 'aria-controls': 'vx-props' },
+    'Block settings',
+  );
+  visualPane.append(toolbar, workarea);
 
   interface Tool {
     button: HTMLButtonElement;
@@ -325,18 +355,24 @@ export function installVisualEditor(win: Window): void {
   );
 
   function settingsButton(): HTMLButtonElement {
-    const b = el(
-      'button',
-      { type: 'button', class: 'vx-tool', 'aria-expanded': 'false', 'aria-controls': 'vx-props' },
-      'Block settings',
-    );
     props.id = 'vx-props';
-    b.addEventListener('click', () => {
-      props.hidden = !props.hidden;
-      b.setAttribute('aria-expanded', String(!props.hidden));
-      renderProps();
-    });
-    return b;
+    settings.addEventListener('click', () => showProps(props.hidden !== false));
+    return settings;
+  }
+
+  function showProps(show: boolean) {
+    props.hidden = !show;
+    settings.setAttribute('aria-expanded', String(show));
+    workarea.classList.toggle('vx-with-props', show);
+    // On small screens the settings cover the bottom of the screen: keep the cursor above them.
+    const sheet = show && win.matchMedia('(max-width: 800px)').matches;
+    const margin = sheet ? { top: 5, left: 5, right: 5, bottom: 16 + win.innerHeight * 0.45 } : 5;
+    view?.setProps({ scrollMargin: margin, scrollThreshold: sheet ? margin : 0 });
+    renderProps();
+    // Repaint the highlight on the block the settings change, and bring it into view.
+    if (!view) return;
+    const tr = view.state.tr.setMeta(TARGET, true);
+    view.dispatch(sheet ? tr.scrollIntoView() : tr);
   }
 
   const refreshTools = () => {
@@ -498,28 +534,47 @@ export function installVisualEditor(win: Window): void {
   // ---- block settings ----------------------------------------------------------
   let target: number | null = null;
 
+  /** The blocks around the cursor, outermost first; keeps `target` on one of them. */
+  function syncTarget(state: EditorState): { node: PMNode; pos: number }[] {
+    const chain: { node: PMNode; pos: number }[] = [];
+    const sel = state.selection;
+    if (!(sel instanceof NodeSelection && sel.node.type === schema.nodes.raw_inline)) {
+      if (sel instanceof NodeSelection && sel.node.isBlock)
+        chain.push({ node: sel.node, pos: sel.from });
+      const $from = sel.$from;
+      for (let d = $from.depth; d > 0; d--) {
+        const node = $from.node(d);
+        if (node.type === schema.nodes.topictitle || node.type === schema.nodes.shortdesc) break;
+        chain.push({ node, pos: $from.before(d) });
+      }
+      chain.reverse();
+    }
+    if (!chain.length) target = null;
+    else if (target === null || !chain.some((c) => c.pos === target)) target = chain.at(-1)!.pos;
+    return chain;
+  }
+
   function renderProps() {
     if (props.hidden || !view) return;
     const state = view.state;
     props.textContent = '';
-    props.append(el('h2', {}, 'Block settings'));
-    // The blocks around the cursor, outermost first; pick which one to change.
-    const chain: { node: PMNode; pos: number }[] = [];
+    const close = el(
+      'button',
+      { type: 'button', class: 'vx-tool vx-close', 'aria-label': 'Close block settings' },
+      '×',
+    );
+    close.addEventListener('click', () => {
+      showProps(false);
+      settings.focus();
+    });
+    props.append(el('div', { class: 'vx-props-head' }, el('h2', {}, 'Block settings'), close));
     const sel = state.selection;
     if (sel instanceof NodeSelection && sel.node.type === schema.nodes.raw_inline) {
       props.append(el('p', {}, el('strong', {}, String(sel.node.attrs.label))));
       props.append(rawEditor(sel.from, sel.node));
       return;
     }
-    if (sel instanceof NodeSelection && sel.node.isBlock)
-      chain.push({ node: sel.node, pos: sel.from });
-    const $from = sel.$from;
-    for (let d = $from.depth; d > 0; d--) {
-      const node = $from.node(d);
-      if (node.type === schema.nodes.topictitle || node.type === schema.nodes.shortdesc) break;
-      chain.push({ node, pos: $from.before(d) });
-    }
-    chain.reverse();
+    const chain = syncTarget(state);
     if (!chain.length) {
       props.append(
         el(
@@ -530,7 +585,6 @@ export function installVisualEditor(win: Window): void {
       );
       return;
     }
-    if (target === null || !chain.some((c) => c.pos === target)) target = chain.at(-1)!.pos;
     const crumbs = el('nav', { class: 'vx-crumbs', 'aria-label': 'Blocks around the cursor' });
     for (const c of chain) {
       const b = el(
@@ -540,7 +594,7 @@ export function installVisualEditor(win: Window): void {
       );
       b.addEventListener('click', () => {
         target = c.pos;
-        renderProps();
+        if (view) view.dispatch(view.state.tr.setMeta(TARGET, true));
       });
       crumbs.append(b);
     }
@@ -728,6 +782,20 @@ export function installVisualEditor(win: Window): void {
   }
 
   // ---- editor ------------------------------------------------------------------
+  /** Outlines the block that the open block settings change. */
+  const highlight = new Plugin({
+    props: {
+      decorations(state) {
+        if (props.hidden || target === null) return null;
+        const node = state.doc.nodeAt(target);
+        if (!node?.isBlock) return null;
+        return DecorationSet.create(state.doc, [
+          Decoration.node(target, target + node.nodeSize, { class: 'vx-target' }),
+        ]);
+      },
+    },
+  });
+
   const placeholders = new Plugin({
     props: {
       decorations(state) {
@@ -786,6 +854,7 @@ export function installVisualEditor(win: Window): void {
         gapCursor(),
         normalize,
         placeholders,
+        highlight,
       ],
     });
   }
@@ -802,7 +871,11 @@ export function installVisualEditor(win: Window): void {
       },
       dispatchTransaction(tr) {
         if (!view) return;
-        view.updateState(view.state.apply(tr));
+        if (target !== null && tr.docChanged) target = tr.mapping.map(target, 1);
+        const next = view.state.apply(tr);
+        // Settle the settings' block before drawing, so its highlight follows the cursor.
+        if (!props.hidden) syncTarget(next);
+        view.updateState(next);
         if (tr.docChanged) {
           win.clearTimeout(timer);
           timer = win.setTimeout(flush, 300);
@@ -815,8 +888,7 @@ export function installVisualEditor(win: Window): void {
         if (node.type !== schema.nodes.raw_block && node.type !== schema.nodes.raw_inline)
           return false;
         target = nodePos;
-        props.hidden = false;
-        renderProps();
+        showProps(true);
         return true;
       },
     });
@@ -824,11 +896,11 @@ export function installVisualEditor(win: Window): void {
   }
 
   if (open()) {
-    select(true);
+    select(tabVisual);
     // Put the cursor at the end of the title only when the topic is new and empty.
     if (view && !(view as EditorView).state.doc.child(0).content.size) {
       const v = view as EditorView;
       v.dispatch(v.state.tr.setSelection(TextSelection.create(v.state.doc, 1)));
     }
-  } else select(false);
+  } else select(tabSource);
 }
