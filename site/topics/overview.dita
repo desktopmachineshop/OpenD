@@ -37,19 +37,12 @@
     </section>
     <section id="architecture">
       <title>Architecture</title>
-      <p>The same packages run on an author's laptop and on the server, so what an author previews is what
-        readers get.</p>
+      <p>The same packages run on an author's laptop and on the server, so what an author previews is what readers get.</p>
       <ul>
-        <li><b>Locally</b>, the <cmdname><keyword keyref="cli"/></cmdname> command validates a docs project,
-          previews it as any reader, and prints PDF publications.</li>
-        <li product="core hosted"><b>Hosted</b>, a push to the docs repository fires a GitHub webhook. A worker
-          builds and validates the commit, and the web service serves signed-in readers their filtered
-          pages. A push that fails validation never goes live.</li>
-        <li product="core hosted"><b>In the browser</b>, the web editor lets authors who do not use Git
-          change the same repository. They save to their own branch and publish through a pull request, so
-          a change still goes live only by a merge and a passing build.</li>
-        <li product="embed"><b>In your apps</b>, a small widget opens a help panel on the topic for the
-          current screen, filtered for the signed-in user.</li>
+        <li><b>Locally</b>, the <cmdname><keyword keyref="cli"/></cmdname> command validates a docs project, previews it as any reader, and prints PDF publications.</li>
+        <li><b>Hosted</b>, a push to the docs repository fires a GitHub webhook. A worker builds and validates the commit, and the web service serves signed-in readers their filtered pages. A push that fails validation never goes live.</li>
+        <li><b>In the browser</b>, the web editor lets authors who do not use Git change the same repository. They save to their own branch and publish through a pull request, so a change still goes live only by a merge and a passing build.</li>
+        <li><b>In your apps</b>, a small widget opens a help panel on the topic for the current screen, filtered for the signed-in user.</li>
       </ul>
       <fig id="fig-architecture">
         <title>The hosted platform: web, worker, Postgres and a blob store</title>
