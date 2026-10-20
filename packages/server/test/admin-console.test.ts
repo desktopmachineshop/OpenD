@@ -6,11 +6,13 @@ import { createDocsRepo, processNext, type DocsRepo } from '@opend/worker';
 import {
   createApp,
   loadConfig,
+  signHandoff,
   signManifestState,
   verifyManifestState,
   type OpendApp,
 } from '../src/index.js';
 import {
+  ADMIN_TOKEN,
   STARTER,
   admin,
   cookiesFrom,
@@ -757,6 +759,60 @@ describe.skipIf(!url)('the admin console', () => {
       expect(h.ctx.config.githubOAuth).toBeUndefined();
       expect(h.ctx.config.webhookSecret).toBeUndefined();
       expect((await h.db.pool.query('select * from secrets')).rowCount).toBe(0);
+    });
+  });
+
+  describe('sign-in from the account panel', () => {
+    let seq = 0;
+    const handoff = (
+      email: string,
+      owner: boolean,
+      over: { aud?: string; exp?: number; key?: string } = {},
+    ) =>
+      signHandoff(over.key ?? ADMIN_TOKEN, {
+        v: 1,
+        aud: over.aud ?? new URL(h.ctx.env.publicUrl).origin,
+        email,
+        owner,
+        exp: over.exp ?? Math.floor(Date.now() / 1000) + 60,
+        jti: `handoff-test-${String(++seq).padStart(4, '0')}`,
+      });
+    const open = (token: string) => get(`/admin/handoff?token=${encodeURIComponent(token)}`);
+
+    it('refuses tokens it did not sign, for another site, or expired', async () => {
+      for (const token of [
+        'nope',
+        handoff('owner@docs.example', true, { key: 'another-sites-admin-token' }),
+        handoff('owner@docs.example', true, { aud: 'https://elsewhere.example' }),
+        handoff('owner@docs.example', true, { exp: Math.floor(Date.now() / 1000) - 1 }),
+        handoff('owner@docs.example', true, { exp: Math.floor(Date.now() / 1000) + 3600 }),
+      ]) {
+        const res = await open(token);
+        expect(res.statusCode).toBe(403);
+        expect(res.headers['set-cookie']).toBeUndefined();
+      }
+    });
+
+    it('signs staff in, once per token', async () => {
+      const token = handoff('owner@docs.example', false);
+      const res = await open(token);
+      expect(res.statusCode).toBe(303);
+      expect(res.headers.location).toBe('/admin');
+      expect((await get('/admin', cookiesFrom(res))).statusCode).toBe(200);
+      const again = await open(token);
+      expect(again.statusCode).toBe(403);
+      expect(again.body).toContain('already used');
+    });
+
+    it('refuses people who are not staff, unless they own the site', async () => {
+      const reader = await open(handoff('stranger@docs.example', false));
+      expect(reader.statusCode).toBe(403);
+      expect(reader.body).toContain('not on this site’s staff');
+      const res = await open(handoff('New.Owner@docs.example', true));
+      expect(res.statusCode).toBe(303);
+      expect((await get('/admin/people', cookiesFrom(res))).body).toContain(
+        'New.Owner@docs.example',
+      );
     });
   });
 

@@ -42,6 +42,7 @@ import {
   upsertOrg,
   upsertReader,
   upsertRepo,
+  useHandoff,
   updateRepo,
   withTransaction,
   type Db,
@@ -69,6 +70,7 @@ import {
   type Flash,
   type Html,
 } from './admin-pages.js';
+import { HANDOFF_PATH, verifyHandoff } from './admin-handoff.js';
 import { ADMIN_CSS } from './admin-style.js';
 import { loginPath, safeReturnTo, setSession, siteSession } from './auth.js';
 import { API_KEY_EMAIL_DOMAIN } from './api-writes.js';
@@ -1206,6 +1208,58 @@ export function registerAdminConsole(app: FastifyInstance, ctx: AppContext): voi
     ctx.log({ level: 'info', msg: 'first staff reader set up', reader: reader.id });
     return reply.redirect('/admin?done=welcome', 303);
   });
+
+  // Signed in from the managed service's account panel (admin-handoff.ts): staff,
+  // or the site's owner there, who becomes staff. Each handoff works once.
+  const adminToken = ctx.config.adminToken;
+  if (adminToken)
+    app.get(HANDOFF_PATH, async (request, reply) => {
+      const token = (request.query as { token?: unknown }).token;
+      const claims =
+        typeof token === 'string' ? verifyHandoff(token, adminToken, ctx.env.publicUrl) : null;
+      const refuse = (text: string) =>
+        setupPage(
+          reply,
+          403,
+          html`<h1>Could not sign you in</h1>
+            <p>${text}</p>`.value,
+        );
+      if (!claims)
+        return refuse(
+          'This sign-in link has expired or is not valid. Open the admin again from your account.',
+        );
+      const reader = await withTransaction(ctx.pool, async (db) => {
+        if (!(await useHandoff(db, claims.jti, new Date(claims.exp * 1000)))) return 'used';
+        const existing = await findReaderByEmail(db, claims.email);
+        if (existing?.staff) return existing;
+        if (!claims.owner) return null;
+        let r;
+        if (existing) r = await setReaderStaff(db, existing.id, true);
+        else {
+          const orgs = await listOrgs(db);
+          if (!orgs.some((o) => o.slug === 'staff'))
+            await upsertOrg(db, { slug: 'staff', name: 'Staff' });
+          r = await upsertReader(db, {
+            orgSlug: 'staff',
+            email: claims.email,
+            name: null,
+            staff: true,
+          });
+        }
+        if (r) await audit(db, 'account-panel', 'admin.owner-staff', { email: r.email, id: r.id });
+        return r ?? null;
+      });
+      if (reader === 'used')
+        return refuse(
+          'This sign-in link was already used. Open the admin again from your account.',
+        );
+      if (!reader)
+        return refuse(`${claims.email} is not on this site’s staff. Ask its staff to add you.`);
+      if (claims.owner) ctx.caches.entitlementsChanged();
+      setSession(reply, ctx, reader.id);
+      ctx.log({ level: 'info', msg: 'signed in from the account panel', reader: reader.id });
+      return reply.redirect('/admin', 303);
+    });
 }
 
 /** "OpenD docs.example.com", within GitHub's 34-character limit. */

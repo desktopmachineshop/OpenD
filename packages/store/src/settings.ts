@@ -275,6 +275,19 @@ export async function consumeSetupToken(db: Db, token: string): Promise<boolean>
   return rowCount === 1;
 }
 
+/**
+ * Records a sign-in handoff's id (admin-handoff.ts) so it works once; false
+ * when it was already used. Ids past their expiry are dropped as new ones come.
+ */
+export async function useHandoff(db: Db, jti: string, expiresAt: Date): Promise<boolean> {
+  await db.query('delete from admin_handoffs where expires_at < now()');
+  const { rowCount } = await db.query(
+    'insert into admin_handoffs (jti, expires_at) values ($1, $2) on conflict do nothing',
+    [jti, expiresAt],
+  );
+  return rowCount === 1;
+}
+
 export async function countStaffReaders(db: Db): Promise<number> {
   const { rows } = await db.query<{ n: number }>(
     'select count(*)::int as n from readers where staff',

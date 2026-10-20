@@ -27,8 +27,11 @@ curl -X POST "$PUBLIC_URL/admin/api/setup-links" -H "authorization: Bearer $OPEN
   -H 'content-type: application/json' -d '{"minutes":30}'</codeblock>
           <p>Open the link, enter your email address and name, and you are signed in as a staff reader of the
             <codeph>staff</codeph> organization (or your existing reader is made staff). Use the address you
-            will sign in with from then on, with GitHub or your company account. On a managed site, the
-            hosting provider makes you staff when the site is created.</p>
+            will sign in with from then on, with GitHub or your company account.</p>
+          <p>On a managed site, sign in at <codeph>https://opend.app/login</codeph> instead and choose
+            <uicontrol>Open admin</uicontrol> next to the site: the account panel signs you in to the console
+            through <codeph>/admin/handoff</codeph>, with a link that works once, for a minute. The site's owner
+            is made staff the first time; other people must already be staff.</p>
         </info>
         <stepresult><p>The console's <uicontrol>Overview</uicontrol> opens, with what is left to set up.</p></stepresult>
       </step>
