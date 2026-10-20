@@ -1481,8 +1481,8 @@ export function apiPage(d: ApiPageData): Html {
         <p>
           AI assistants that support MCP (Model Context Protocol), such as Claude, can search and
           read these docs and propose changes as pull requests. Add a custom connector with this
-          address and sign in with GitHub or your email: the assistant sees every OpenD site you
-          read, exactly as you see it.
+          address and sign in with an OpenD account, Google, GitHub or your email: the assistant
+          sees every OpenD site you read, exactly as you see it, once your email is confirmed.
         </p>
         <p><code class="admin-secret">${d.mcpUrl}</code></p>
         <p class="admin-hint">
