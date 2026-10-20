@@ -15,6 +15,27 @@ export function installEditor(win: Window): void {
   const list = doc.getElementById('ed-diagnostics');
   const status = doc.getElementById('ed-save-status');
   const field = (name: string) => form.elements.namedItem(name) as HTMLInputElement | null;
+  // The Preview tab's choice of conditions applies to every preview the frame shows.
+  const viewForm = doc.getElementById('ed-view') as HTMLFormElement | null;
+  let previewPage = viewForm?.getAttribute('action') ?? '';
+  const showPreview = (url: string) => {
+    if (!frame) return;
+    const next = new URL(url, win.location.href);
+    previewPage = next.pathname;
+    if (viewForm)
+      for (const [name, value] of new FormData(viewForm))
+        if (typeof value === 'string' && value) next.searchParams.set(name, value);
+    frame.src = next.pathname + next.search;
+  };
+  viewForm?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    showPreview(previewPage);
+  });
+  doc.getElementById('ed-view-reset')?.addEventListener('click', (event) => {
+    event.preventDefault();
+    viewForm?.reset();
+    showPreview(previewPage);
+  });
 
   interface Diagnostic {
     severity: string;
@@ -100,7 +121,7 @@ export function installEditor(win: Window): void {
         if (mine !== sequence) return; // a newer edit is on its way
         if (!res.ok) throw new Error(data.error ?? 'Preview failed');
         showDiagnostics(data.diagnostics ?? []);
-        if (frame && data.previewUrl) frame.src = data.previewUrl;
+        if (data.previewUrl) showPreview(data.previewUrl);
       })
       .catch((err: unknown) => setStatus(err instanceof Error ? err.message : 'Preview failed'));
   };
@@ -151,7 +172,7 @@ export function installEditor(win: Window): void {
         const message = field('message');
         if (message) message.value = '';
         showDiagnostics(data.diagnostics ?? []);
-        if (frame && data.previewUrl) frame.src = data.previewUrl;
+        if (data.previewUrl) showPreview(data.previewUrl);
         if (data.sync === 'conflict')
           setStatus(
             `Saved ${String(data.sha).slice(0, 7)}, but the main branch has conflicting changes.`,

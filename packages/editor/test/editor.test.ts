@@ -346,11 +346,58 @@ describe.skipIf(!url)('web editor', () => {
       expect(res.statusCode).toBe(200);
       expect(res.body).toContain('&lt;task id=&quot;install&quot;&gt;');
       expect(res.body).toContain(
-        '<iframe id="ed-preview" title="Preview of topics/install.dita" src="/preview/saved/topics/install.html">',
+        '<iframe id="ed-preview" name="ed-preview" title="Preview of topics/install.dita" src="/preview/saved/topics/install.html">',
       );
       expect(res.body).toContain('No problems found.');
       const missing = await page(h, ada, '/edit?path=topics/nope.dita');
       expect(missing.statusCode).toBe(404);
+    });
+
+    it('narrows the staff preview to the conditions chosen on the Preview tab', async () => {
+      const edit = await page(h, ada, `/edit?path=${encodeURIComponent(INSTALL)}`);
+      // The chooser lists the conditions the content uses, and versions from its ranges.
+      expect(edit.body).toContain('<legend>Show the page for</legend>');
+      expect(edit.body).toMatch(
+        /<select id="view-product" name="product" form="ed-view">.*<option value="gadget">gadget<\/option>/,
+      );
+      expect(edit.body).toMatch(
+        /<select id="view-release"[^>]*><option value="">Any version<\/option><option value="2\.1">2\.1<\/option><option value="2\.0">2\.0<\/option><option value="1\.9">1\.9<\/option><option value="1\.0">1\.0<\/option><\/select>/,
+      );
+      expect(edit.body).toContain(
+        '<form id="ed-view" method="get" action="/preview/saved/topics/install.html" target="ed-preview">',
+      );
+
+      // The form's query moves into the path, so links between preview pages keep it.
+      const chosen = await page(
+        h,
+        ada,
+        '/preview/saved/topics/install.html?release=1.9&product=&audience=bad%20value&v=1',
+      );
+      expect(chosen.statusCode).toBe(302);
+      expect(chosen.headers.location).toBe('/preview/saved/_view/release=1.9/topics/install.html');
+      const old = await page(h, ada, String(chosen.headers.location));
+      expect(old.statusCode).toBe(200);
+      expect(old.body).toContain('Run the legacy installer');
+      expect(old.body).not.toContain('Run the setup wizard');
+      expect(old.body).toContain('only what readers with release 1.9 see is shown');
+      expect(old.body).toContain('href="/preview/saved/_view/release=1.9/');
+      const current = (await page(h, ada, '/preview/saved/_view/release=2.1/topics/install.html'))
+        .body;
+      expect(current).toContain('Run the setup wizard');
+      expect(current).not.toContain('Run the legacy installer');
+      // Attributes without a choice stay as the staff view shows them.
+      expect(current).toContain('Pair the Gadget');
+      const noGadget = (
+        await page(h, ada, '/preview/main/_view/product=widget/topics/install.html')
+      ).body;
+      expect(noGadget).not.toContain('Pair the Gadget');
+      // Choosing Any for everything goes back to the full staff view.
+      const all = await page(
+        h,
+        ada,
+        '/preview/saved/_view/release=1.9/topics/install.html?release=&product=',
+      );
+      expect(all.headers.location).toBe('/preview/saved/topics/install.html');
     });
 
     it('previews any page as an org through an expiring, logged preview', async () => {
