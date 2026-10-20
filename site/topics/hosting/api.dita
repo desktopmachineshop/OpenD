@@ -79,9 +79,11 @@ curl -H "Authorization: Bearer $OPEND_KEY" \
       <title>AI assistants</title>
       <p>On managed hosting, the <uicontrol>API &amp; AI</uicontrol> page shows the address of the OpenD MCP
         (Model Context Protocol) connector. Add it once as a custom connector in an AI assistant such as Claude
-        and sign in with GitHub or an emailed link. The assistant sees every OpenD site where you are a reader,
-        exactly as you see it: everything on sites where you are staff, your organisation's view elsewhere. If
-        you allow it, it can also propose changes as pull requests on sites where you are staff.</p>
+        and sign in with an OpenD account (email and password), Google, GitHub or an emailed link. The assistant
+        sees every OpenD site where you are a reader, exactly as you see it: everything on sites where you are
+        staff, your organisation's view elsewhere. If you allow it, it can also propose changes as pull requests
+        on sites where you are staff. An OpenD account counts as your address only once you confirm it from the
+        email it sends, with the account's password; until then the assistant reads public docs only.</p>
       <p>For each site it uses, the connector creates an API key named <codeph>MCP: </codeph> followed by the
         person's email, with only the access that person has. Keys appear in the list on the
         <uicontrol>API &amp; AI</uicontrol> page; revoke one to cut that assistant off from the site. Self-hosted
