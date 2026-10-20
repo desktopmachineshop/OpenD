@@ -30,7 +30,11 @@
             the <uicontrol>Source</uicontrol> tab with a note saying why. Developers can switch to
             <uicontrol>Source</uicontrol> at any time to edit the DITA directly.</p>
           <p>The <uicontrol>Preview</uicontrol> tab, after <uicontrol>Source</uicontrol>, shows the page
-            with your unsaved text. It is the staff view: everything is shown and conditions are marked. <uicontrol>Problems</uicontrol> lists what
+            with your unsaved text. It is the staff view: everything is shown and conditions are marked.
+            Under <uicontrol>Show the page for</uicontrol>, choose a value for any of the conditions the
+            content uses (a version, product, feature, audience and so on) and choose
+            <uicontrol>Show</uicontrol> to see only what readers with that combination see.
+            <uicontrol>Show everything</uicontrol> goes back to the full staff view. <uicontrol>Problems</uicontrol> lists what
             validation finds in the file, the same as <cmdname>opend validate</cmdname>; see
             <xref keyref="diagnostics"/>.</p>
         </info>

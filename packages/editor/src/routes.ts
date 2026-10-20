@@ -1,7 +1,7 @@
 import { posix } from 'node:path';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { loadMap, topicPageId } from '@opend/dita';
-import { displayText } from '@opend/model';
+import { RELEASE_ATTRIBUTE, displayText } from '@opend/model';
 import { encodePath } from '@opend/render-html';
 import {
   createEditorPreview,
@@ -25,7 +25,16 @@ import {
   layout,
   type Shell,
 } from './pages.js';
-import { banner, renderPreview, type PreviewAudience } from './preview.js';
+import {
+  banner,
+  choosesView,
+  previewView,
+  renderPreview,
+  splitView,
+  usedConditions,
+  viewSegment,
+  type PreviewAudience,
+} from './preview.js';
 import {
   EditorError,
   SIGNED_COMMITS_REQUIRED,
@@ -71,6 +80,30 @@ function topicTitles(draft: DraftBuild): Record<string, string> {
   const out: Record<string, string> = {};
   for (const t of Object.values(draft.result.release?.topics ?? {})) out[t.file] = t.title;
   return out;
+}
+
+/**
+ * The Preview tab's choice of conditions: each filtering attribute the content
+ * uses, with its values, so staff see the page as readers with one combination
+ * do. Without JavaScript the form loads the saved preview into the frame.
+ */
+function viewChooser(draft: DraftBuild, target: string): string {
+  const release = draft.result.release;
+  const used = release ? usedConditions(release) : {};
+  const fields = Object.entries(used)
+    .map(([attribute, values]) => {
+      const id = `view-${attribute}`;
+      const any = attribute === RELEASE_ATTRIBUTE ? 'Any version' : 'Any';
+      const options = values.map((v) => `<option value="${h(v)}">${h(v)}</option>`).join('');
+      return `<p><label for="${id}">${h(attribute)}</label><select id="${id}" name="${h(attribute)}" form="ed-view"><option value="">${any}</option>${options}</select></p>`;
+    })
+    .join('');
+  if (!fields) return '';
+  return `<fieldset class="ed-view"><legend>Show the page for</legend>
+<p class="ed-hint">The conditions this project's content uses. Choose values to see only what readers with them see; leave Any to show every variant.</p>
+<div class="ed-view-fields">${fields}</div>
+<p class="ed-inline"><button type="submit" form="ed-view">Show</button> <a id="ed-view-reset" href="/preview/saved/${h(target)}" target="ed-preview">Show everything</a></p>
+</fieldset>`;
 }
 
 function shellFor(
@@ -293,8 +326,9 @@ ${csrfField(editor.csrf)}
 <label id="source-label" for="ed-source">DITA source</label>
 <textarea id="ed-source" name="content" spellcheck="false" autocapitalize="off" autocomplete="off" rows="30" aria-describedby="ed-diagnostics-h">${h(file.text)}</textarea>
 </div>
-<section id="ed-preview-pane" class="ed-preview" aria-labelledby="preview-h"><h2 id="preview-h">Preview <span class="ed-hint">(staff view: everything shown, conditions marked)</span></h2>
-<iframe id="ed-preview" title="Preview of ${h(path)}" src="/preview/saved/${h(target)}"></iframe>
+<section id="ed-preview-pane" class="ed-preview" aria-labelledby="preview-h"><h2 id="preview-h">Preview <span class="ed-hint">(staff view: conditions marked)</span></h2>
+${viewChooser(draft, target)}
+<iframe id="ed-preview" name="ed-preview" title="Preview of ${h(path)}" src="/preview/saved/${h(target)}"></iframe>
 <p class="ed-inline"><input type="hidden" name="_csrf" value="${h(editor.csrf)}" form="ed-preview-as"><input type="hidden" name="page" value="${h(target)}" form="ed-preview-as">
 <label for="as-org">Preview this page as</label> <select id="as-org" name="org" form="ed-preview-as">${orgs.map((o) => `<option value="${h(o.slug)}">${h(o.name)}</option>`).join('')}</select> <button type="submit" form="ed-preview-as"${orgs.length ? '' : ' disabled'}>Open</button></p>
 </section>
@@ -304,6 +338,7 @@ ${csrfField(editor.csrf)}
 <section aria-labelledby="ed-diagnostics-h"><h2 id="ed-diagnostics-h">Problems</h2><div id="ed-diagnostics" aria-live="polite">${diagnosticsList(draft.diagnostics, path)}</div></section>
 </section>
 <form id="ed-preview-as" method="post" action="/preview-as"></form>
+<form id="ed-view" method="get" action="/preview/saved/${h(target)}" target="ed-preview"></form>
 </div>`;
     const shell = shellFor(editor, rc, path, 'files');
     if (path.endsWith('.dita')) shell.scripts = ['/assets/visual.js'];
@@ -684,6 +719,13 @@ ${rows.map((r) => `<tr><td>${h(r.at.toISOString().replace('T', ' ').slice(0, 19)
     const editor = await requireEditor(request, reply, ctx);
     if (!editor) return;
     const params = request.params as { mode: string; '*': string };
+    const { view, page: rest } = splitView(params['*']);
+    // The Preview tab's condition form submits a query; the view moves into the path.
+    const query = (request.query ?? {}) as Record<string, unknown>;
+    if (choosesView(query))
+      return reply.redirect(
+        `/preview/${encodeURIComponent(params.mode)}/${viewSegment(previewView(query))}${rest}`,
+      );
     const rc = await ctx.repoContext();
     let draft: DraftBuild;
     let text: string;
@@ -705,8 +747,15 @@ ${rows.map((r) => `<tr><td>${h(r.at.toISOString().replace('T', ' ').slice(0, 19)
         text = `${branch ? 'Your saved branch' : `The ${rc.baseBranch} branch`}. Staff view: everything is shown and conditions are marked.`;
       }
     } else throw new EditorError(404, 'No such preview.');
-    return sendPreview(reply, rc, draft, params['*'], `/preview/${params.mode}/`, {
+    const chosen = Object.entries(view).map(([a, v]) => `${a} ${v}`);
+    if (chosen.length)
+      text = text.replace(
+        'everything is shown and conditions are marked',
+        `only what readers with ${chosen.join(', ')} see is shown, and conditions are marked`,
+      );
+    return sendPreview(reply, rc, draft, rest, `/preview/${params.mode}/${viewSegment(view)}`, {
       reader: null,
+      view,
       banner: banner(text),
     });
   });

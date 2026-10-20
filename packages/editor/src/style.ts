@@ -57,6 +57,13 @@ textarea { width: 100%; font: 13px/1.5 var(--ed-mono); padding: 8px; border: 1px
 .ed-dir { color: var(--ed-muted); }
 .ed-badge { font-size: 11px; border: 1px solid var(--ed-border); border-radius: 10px; padding: 0 6px; color: var(--ed-muted); }
 .ed-preview { margin-bottom: 12px; }
+.ed-view { border: 1px solid var(--ed-border); border-radius: var(--ed-radius); padding: 8px 16px 12px; margin: 0 0 12px; }
+.ed-view legend { font-weight: 600; padding: 0 4px; }
+.ed-view .ed-hint { margin: 0 0 8px; }
+.ed-view-fields { display: flex; flex-wrap: wrap; gap: 8px 16px; }
+.ed-view-fields p { margin: 0; }
+.ed-view-fields select { min-width: 10em; }
+.ed-view .ed-inline { margin: 8px 0 0; }
 .ed-preview iframe { width: 100%; height: 75vh; border: 1px solid var(--ed-border); border-radius: var(--ed-radius-sm); background: var(--ed-bg); }
 .ed-inline { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
 .ed-inline label { display: inline; margin: 0; }

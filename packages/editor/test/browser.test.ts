@@ -66,6 +66,18 @@ describe.skipIf(!url || !hasBrowser)('web editor in a browser', () => {
     await expect
       .poll(() => frame.locator('body').innerText(), { timeout: 10_000 })
       .toContain('BROWSER-MARKER');
+    // Choosing conditions narrows the preview of the unsaved text.
+    await page.getByLabel('release').selectOption('1.9');
+    await page.getByRole('button', { name: 'Show', exact: true }).click();
+    await expect
+      .poll(() => frame.locator('body').innerText(), { timeout: 10_000 })
+      .not.toContain('Run the setup wizard');
+    expect(await frame.locator('body').innerText()).toContain('BROWSER-MARKER');
+    expect(await frame.locator('body').innerText()).toContain('Run the legacy installer');
+    await page.getByRole('link', { name: 'Show everything' }).click();
+    await expect
+      .poll(() => frame.locator('body').innerText(), { timeout: 10_000 })
+      .toContain('Run the setup wizard');
     await expect
       .poll(() => page.locator('#ed-diagnostics').innerText())
       .toContain('No problems found.');
