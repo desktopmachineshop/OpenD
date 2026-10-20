@@ -764,6 +764,21 @@ describe.skipIf(!url)('the admin console', () => {
 
   describe('sign-in from the account panel', () => {
     let seq = 0;
+    it('signs handoffs in the format the control plane makes (shared test vector)', () => {
+      expect(
+        signHandoff('opend_test_admin_token', {
+          v: 1,
+          aud: 'https://acme-docs.example.com',
+          email: 'mona@example.com',
+          owner: true,
+          exp: 1800000000,
+          jti: 'test-vector-jti-0001',
+        }),
+      ).toBe(
+        'eyJ2IjoxLCJhdWQiOiJodHRwczovL2FjbWUtZG9jcy5leGFtcGxlLmNvbSIsImVtYWlsIjoibW9uYUBleGFtcGxlLmNvbSIsIm93bmVyIjp0cnVlLCJleHAiOjE4MDAwMDAwMDAsImp0aSI6InRlc3QtdmVjdG9yLWp0aS0wMDAxIn0.KpXTJJhXpqn_ijm2OHbEA9_DJn3M21dAhLp6XRXZkak',
+      );
+    });
+
     const handoff = (
       email: string,
       owner: boolean,
