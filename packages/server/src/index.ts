@@ -23,6 +23,7 @@ export * from './pages.js';
 export * from './settings.js';
 export * from './github-connect.js';
 export * from './admin-console.js';
+export * from './admin-handoff.js';
 export * from './admin-pages.js';
 export * from './api.js';
 export { OPENAPI } from './api-spec.js';

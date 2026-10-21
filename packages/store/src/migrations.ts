@@ -406,4 +406,15 @@ create table if not exists api_keys (
 );
 `,
   },
+  {
+    id: '010_admin_handoffs',
+    sql: `
+-- Sign-in handoffs from the managed service's account panel (admin-handoff.ts):
+-- the ids of tokens already used, kept until they expire, so each works once.
+create table if not exists admin_handoffs (
+  jti text primary key,
+  expires_at timestamptz not null
+);
+`,
+  },
 ];
