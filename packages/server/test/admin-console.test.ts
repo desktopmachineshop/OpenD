@@ -31,6 +31,7 @@ const csrfOf = (res: LightMyRequestResponse) =>
 /** Every state-changing route of the console. */
 const POSTS = [
   '/admin/site/access',
+  '/admin/site/versions',
   '/admin/source',
   '/admin/source/rebuild',
   '/admin/people/orgs',
@@ -340,6 +341,39 @@ describe.skipIf(!url)('the admin console', () => {
       // And back to private.
       await submit('/admin/site', '/admin/site/access', { access: 'private', version: '' });
       expect((await get('/')).headers.location).toMatch(/^\/auth\/login/);
+    });
+
+    it('sets the version picker, and refuses versions that are not numbers', async () => {
+      const page = await get('/admin/site', owner);
+      expect(page.body).toContain('action="/admin/site/versions"');
+      expect(page.body).toMatch(/name="mode"\s+value="off"\s+checked/);
+      let res = await submit('/admin/site', '/admin/site/versions', {
+        mode: 'list',
+        versions: '2.1, 2.0,, 1.4',
+        fixedVersion: '',
+      });
+      expect(res.statusCode).toBe(303);
+      let repos = (await admin(h.app, 'GET', '/repos')).json() as object[];
+      expect(repos[0]).toMatchObject({
+        versionPicker: { mode: 'list', versions: ['2.1', '2.0', '1.4'] },
+      });
+      const entry = (await listAudit(h.db.pool, 50)).find((a) => a.action === 'repo.versions');
+      expect(entry?.actor).toBe('staff:owner@docs.example');
+      res = await submit('/admin/site', '/admin/site/versions', {
+        mode: 'fixed',
+        fixedVersion: 'latest',
+        versions: '',
+      });
+      expect(res.statusCode).toBe(400);
+      expect(res.body).toContain('Give each version as a number such as 2.1.');
+      res = await submit('/admin/site', '/admin/site/versions', {
+        mode: 'off',
+        fixedVersion: '',
+        versions: '',
+      });
+      expect(res.statusCode).toBe(303);
+      repos = (await admin(h.app, 'GET', '/repos')).json() as object[];
+      expect(repos[0]).toMatchObject({ versionPicker: { mode: 'off' } });
     });
   });
 

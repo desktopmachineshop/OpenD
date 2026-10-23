@@ -18,6 +18,7 @@ import {
   renderPage,
   renderSearch,
   renderTopic,
+  renderVersionControl,
   siteSearchQuery,
 } from '../src/index.js';
 
@@ -242,6 +243,33 @@ describe('renderNav and renderPage', () => {
     expect(renderPage(view, 'g')).toBeNull();
     expect(renderPage(view, 'missing')).toBeNull();
     expect(renderPage(view, 'a')).toContain('<title>Alpha · Docs &lt;&amp;&gt;</title>');
+  });
+});
+
+describe('renderVersionControl', () => {
+  const href = (v: string) => `/_version?v=${v}&x=<`;
+
+  it('is a label when there is nothing to switch to', () => {
+    const c = renderVersionControl({ current: '2.1', options: ['2.1'] }, href);
+    expect(c.header).toBe('<span class="site-release">Version 2.1</span>');
+    expect(c.menu).toContain('<p class="site-menu-version">2.1</p>');
+    expect(c.header + c.menu).not.toContain('<a ');
+  });
+
+  it('lists the versions as escaped links, the current one marked', () => {
+    const c = renderVersionControl({ current: '1.4', options: ['2.1', '1.4'] }, href);
+    expect(c.header).toContain('<details class="site-version"><summary>Version 1.4</summary>');
+    expect(c.header).toContain('<a href="/_version?v=2.1&amp;x=&lt;">2.1</a>');
+    expect(c.header).toContain('<a href="/_version?v=1.4&amp;x=&lt;" aria-current="true">1.4</a>');
+    expect(c.menu).toContain('<nav class="site-menu-versions" aria-label="Version">');
+  });
+
+  it('replaces the release label in the page header, and joins the menu', () => {
+    const view = viewRelease(release([topic('a', '<topic id="a"><title>A</title></topic>')]), []);
+    const page = renderPage(view, 'a', { version: { header: '<!--v-->', menu: '<!--m-->' } })!;
+    expect(page).toContain('</a><!--v-->');
+    expect(page).not.toContain('<span class="site-release">Release');
+    expect(page).toContain('id="opend-menu-panel"><!--m-->');
   });
 });
 
