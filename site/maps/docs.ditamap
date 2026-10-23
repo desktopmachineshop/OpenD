@@ -87,6 +87,7 @@
     <topicref href="../topics/hosting/github.dita" product="core"/>
     <topicref href="../topics/hosting/github-app.dita" product="core"/>
     <topicref href="../topics/hosting/access.dita" product="core"/>
+    <topicref href="../topics/hosting/version-picker.dita" product="core"/>
     <topicref href="../topics/hosting/oidc.dita" product="core"/>
     <topicref href="../topics/hosting/github-sign-in.dita" product="core"/>
     <topicref href="../topics/hosting/editor.dita" product="core"/>

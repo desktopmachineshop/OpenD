@@ -9,6 +9,7 @@ import {
   type ReaderContext,
 } from '@opend/model';
 import {
+  parseVersion,
   viewPublication,
   viewRelease,
   type PublicationView,
@@ -40,22 +41,35 @@ import {
   NOTHING_GATED,
   audienceFilter,
   audienceFor,
+  chosenVersion,
+  ownVersion,
   publicAudience,
   readerAudience,
+  versionChoice,
   type Audience,
+  type VersionChoice,
 } from './access.js';
 import { FEEDBACK_MARKER, feedbackHtml } from './analytics.js';
-import { currentAccess, redirectToLogin } from './auth.js';
+import { currentAccess, redirectToLogin, safeReturnTo, secureCookies } from './auth.js';
 import type { AppContext } from './context.js';
 import {
   ACCOUNT_MARKER,
   MENU_ACCOUNT_MARKER,
+  MENU_VERSION_MARKER,
   TOPIC_ACTIONS_MARKER,
+  VERSION_MARKER,
   accountControls,
   messagePage,
   topicActions,
+  versionControls,
 } from './pages.js';
 import { searchRelease } from './search.js';
+
+/**
+ * The version a reader chose with the version picker. Unsigned: it is only a
+ * request, honoured when the site's picker offers that version to the reader.
+ */
+export const VERSION_COOKIE = 'opend_version';
 
 /** Most hits on the site search page. */
 export const SITE_SEARCH_LIMIT = 20;
@@ -226,6 +240,8 @@ export interface Viewer {
   release: ReaderRelease;
   /** Analytics org: the reader's, or null for anonymous visitors. */
   orgSlug: string | null;
+  /** What the version picker shows, or null when the site has none. */
+  versions: VersionChoice | null;
 }
 
 /**
@@ -249,12 +265,17 @@ export async function viewerRelease(
     return access
       ? { refused: 'unpublished', message: 'No documentation site is configured yet.' }
       : { refused: 'sign-in' };
-  const audience = audienceFor(repo, access);
+  // Private sites choose nothing for anonymous requests: they are sent to sign in.
+  const versions =
+    access || repo.access === 'public'
+      ? versionChoice(repo, ownVersion(repo, access), request.cookies[VERSION_COOKIE])
+      : null;
+  const audience = audienceFor(repo, access, chosenVersion(versions));
   if (audience === 'sign-in') return { refused: 'sign-in' };
   if (audience === 'no-entitlements') return { refused: 'no-entitlements' };
   const release = await audienceRelease(ctx, repo, audience);
   if (typeof release === 'string') return { refused: 'unpublished', message: release };
-  return { access, repo, release, orgSlug: access?.orgSlug ?? null };
+  return { access, repo, release, orgSlug: access?.orgSlug ?? null, versions };
 }
 
 /**
@@ -310,6 +331,7 @@ export function registerDelivery(app: FastifyInstance, ctx: AppContext): void {
   const pageOptions = (release: ReaderRelease): PageOptions => {
     const options: PageOptions = {
       account: { header: ACCOUNT_MARKER, menu: MENU_ACCOUNT_MARKER },
+      version: { header: VERSION_MARKER, menu: MENU_VERSION_MARKER },
       topicEnd: TOPIC_ACTIONS_MARKER + FEEDBACK_MARKER,
       search: { action: '/search' },
       publications: readerPublications(ctx, release).map((p) => ({
@@ -336,6 +358,7 @@ export function registerDelivery(app: FastifyInstance, ctx: AppContext): void {
     topic?: { id: string; file: string },
   ) => {
     const account = accountControls(request, ctx, viewer.access);
+    const version = versionControls(request, viewer.versions, viewer.release.view.release.release);
     const actions = topic ? topicActions(ctx, viewer, topic.file) : '';
     const feedback = topic ? feedbackHtml(request, ctx, topic.id, 'site') : '';
     return reply
@@ -345,6 +368,8 @@ export function registerDelivery(app: FastifyInstance, ctx: AppContext): void {
       .send(
         // Function replacements: a `$` in a reader's name must not act as a replacement pattern.
         html
+          .replace(VERSION_MARKER, () => version.header)
+          .replace(MENU_VERSION_MARKER, () => version.menu)
           .replace(ACCOUNT_MARKER, () => account.header)
           .replace(MENU_ACCOUNT_MARKER, () => account.menu)
           .replace(TOPIC_ACTIONS_MARKER, () => actions)
@@ -358,6 +383,23 @@ export function registerDelivery(app: FastifyInstance, ctx: AppContext): void {
     const first = r.release.view.topicIds()[0];
     if (first) return reply.headers(PAGE_HEADERS).redirect(pageHref(first));
     return sendPage(request, reply, r, 200, renderIndex(r.release.view, pageOptions(r.release)));
+  });
+
+  // The version picker's links. The choice is checked against the picker on
+  // every request (`versionChoice`), so this only stores what was asked for.
+  app.get('/_version', async (request, reply) => {
+    const { v, returnTo } = request.query as { v?: unknown; returnTo?: unknown };
+    const version = typeof v === 'string' ? v.trim() : '';
+    if (version && version.length <= 32 && parseVersion(version))
+      reply.setCookie(VERSION_COOKIE, version, {
+        httpOnly: true,
+        sameSite: 'lax',
+        secure: secureCookies(ctx),
+        path: '/',
+        maxAge: 365 * 24 * 3600,
+      });
+    else reply.clearCookie(VERSION_COOKIE, { path: '/' });
+    return reply.headers(PAGE_HEADERS).redirect(safeReturnTo(returnTo), 303);
   });
 
   app.get('/_theme.css', async (request, reply) => {

@@ -30,6 +30,7 @@ import {
   setEntitlements,
   setReaderStaff,
   setRepoAccess,
+  setRepoVersionPicker,
   upsertOrg,
   upsertReader,
   upsertRepo,
@@ -50,6 +51,30 @@ export const entitlementsSchema = z.object({
   features: z.array(token).default([]),
   version: z.string().regex(/^v?\d+(\.\d+)*$/, 'a version such as 1.4'),
 });
+
+const pickerVersion = z
+  .string()
+  .max(32)
+  .regex(/^v?\d+(\.\d+)*$/, 'a version such as 2.1');
+
+/**
+ * The site's version picker: `off` (no picker), `reader` (show each reader
+ * their own version), `fixed` (every reader gets `version`) or `list`
+ * (readers choose among `versions`, and their own).
+ */
+export const versionPickerSchema = z.discriminatedUnion('mode', [
+  z.object({ mode: z.literal('off') }),
+  z.object({ mode: z.literal('reader') }),
+  z.object({ mode: z.literal('fixed'), version: pickerVersion }),
+  z.object({
+    mode: z.literal('list'),
+    versions: z
+      .array(pickerVersion)
+      .min(1)
+      .max(50)
+      .transform((vs) => [...new Set(vs)]),
+  }),
+]);
 
 const orgSchema = z.object({
   slug,
@@ -260,6 +285,24 @@ export function registerAdmin(app: FastifyInstance, ctx: AppContext): void {
           return r;
         });
         // Every cached view, page and publication is dropped; NOTIFY does the same on other replicas.
+        ctx.caches.releaseChanged();
+        return repo ? reply.send(repo) : reply.code(404).send({ error: 'no such repo' });
+      });
+      scope.put('/repos/:id/versions', async (request, reply) => {
+        const id = Number((request.params as { id: string }).id);
+        const picker = parse(versionPickerSchema, request.body, reply);
+        if (!picker) return reply;
+        const repo = await withTransaction(ctx.pool, async (db) => {
+          const current = Number.isInteger(id) ? await getRepo(db, id) : null;
+          if (!current) return null;
+          const r = await setRepoVersionPicker(db, id, picker);
+          await audit(db, ACTOR, 'repo.versions', {
+            repo: current.fullName,
+            versionPicker: picker,
+          });
+          return r;
+        });
+        // Pages show the picker, and readers may now be on another version: drop every cache.
         ctx.caches.releaseChanged();
         return repo ? reply.send(repo) : reply.code(404).send({ error: 'no such repo' });
       });

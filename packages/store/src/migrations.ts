@@ -417,4 +417,16 @@ create table if not exists admin_handoffs (
 );
 `,
   },
+  {
+    id: '011_version_picker',
+    sql: `
+-- The version picker of the docs site: what readers may switch between. off (no
+-- picker: each reader gets their own version), reader (their own version, shown),
+-- fixed ({"mode":"fixed","version":"2.1"}: everyone gets that version) or list
+-- ({"mode":"list","versions":[...]}: readers choose one). Operator-controlled
+-- through the admin API, like access, never read from the docs repository.
+alter table repos add column if not exists version_picker jsonb not null
+  default '{"mode":"off"}';
+`,
+  },
 ];
