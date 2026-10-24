@@ -6,6 +6,14 @@ import type { ElementNode } from './nodes.js';
  */
 export type Condition = Record<string, string>;
 
+/**
+ * How a repository groups releases into lines, each with one live release:
+ * `major` (line `2` holds every 2.x release) or `minor` (line `0.23` holds
+ * every 0.23.x release, for products released as 0.x minors).
+ */
+export type ReleaseLines = 'major' | 'minor';
+export const RELEASE_LINES: readonly ReleaseLines[] = ['major', 'minor'];
+
 export interface NavEntry {
   title: string;
   /** Present when the entry points at a topic; absent for headings (`topichead`). */

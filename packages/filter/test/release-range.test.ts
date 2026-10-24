@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { parseReleaseRange, parseVersion, versionInRange } from '../src/index.js';
+import {
+  compareReleaseLines,
+  isReleaseLine,
+  parseReleaseRange,
+  parseVersion,
+  releaseLine,
+  versionInRange,
+} from '../src/index.js';
 
 const matches = (token: string, version: string) => {
   const range = parseReleaseRange(token);
@@ -38,4 +45,32 @@ describe('release ranges', () => {
       expect(parseReleaseRange(token)).toBeNull();
     },
   );
+});
+
+describe('release lines', () => {
+  it('names a line by major or by minor version', () => {
+    expect(releaseLine('2.1.3')).toBe('2');
+    expect(releaseLine('v0.23.1', 'minor')).toBe('0.23');
+    expect(releaseLine('2', 'minor')).toBe('2.0');
+    expect(releaseLine('02.010', 'minor')).toBe('2.10');
+    expect(releaseLine('next', 'minor')).toBeNull();
+  });
+
+  it('checks line names as releaseLine writes them', () => {
+    expect(isReleaseLine('0.23', 'minor')).toBe(true);
+    expect(isReleaseLine('2', 'major')).toBe(true);
+    for (const bad of ['2', '0.23.1', 'v0.23', '00.23', 'latest'])
+      expect(isReleaseLine(bad, 'minor'), bad).toBe(false);
+    expect(isReleaseLine('0.23', 'major')).toBe(false);
+  });
+
+  it('orders lines as versions', () => {
+    expect(['0.23', '0.3', '1.0', '0.21'].sort(compareReleaseLines)).toEqual([
+      '0.3',
+      '0.21',
+      '0.23',
+      '1.0',
+    ]);
+    expect(['10', '9'].sort(compareReleaseLines)).toEqual(['9', '10']);
+  });
 });

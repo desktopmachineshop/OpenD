@@ -1,3 +1,4 @@
+import type { ReleaseLines } from '@opend/model';
 import { CHANNELS, notify, type Db } from './db.js';
 import type { Entitlements } from './readers.js';
 
@@ -22,6 +23,8 @@ export interface Repo {
    * conditions (fail-closed).
    */
   publicEntitlements: Entitlements | null;
+  /** How releases group into lines: by major (the default) or by minor version. */
+  releaseLines: ReleaseLines;
 }
 
 export interface RepoInput {
@@ -34,7 +37,7 @@ export interface RepoInput {
 
 const COLUMNS = `id, full_name as "fullName", source_url as "sourceUrl", installation_id as "installationId",
   release_refs as "releaseRefs", docs_path as "docsPath", access,
-  public_entitlements as "publicEntitlements"`;
+  public_entitlements as "publicEntitlements", release_lines as "releaseLines"`;
 
 export async function upsertRepo(db: Db, input: RepoInput): Promise<Repo> {
   const { rows } = await db.query<Repo>(
