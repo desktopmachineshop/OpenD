@@ -9,6 +9,8 @@ import {
   type ReaderContext,
 } from '@opend/model';
 import {
+  compareReleaseLines,
+  resolveContext,
   viewPublication,
   viewRelease,
   type PublicationView,
@@ -22,7 +24,9 @@ import {
   renderNotFound,
   renderPage,
   renderSearch,
+  renderVersionMenu,
   siteSearchQuery,
+  escapeHtml,
   type PageOptions,
 } from '@opend/render-html';
 import {
@@ -30,6 +34,7 @@ import {
   findRepoByName,
   getLiveReleaseId,
   getRelease,
+  getReleaseLineSettings,
   listLiveReleases,
   listRepos,
   type ReaderAccess,
@@ -40,9 +45,13 @@ import {
   NOTHING_GATED,
   audienceFilter,
   audienceFor,
+  defaultPublicLine,
   publicAudience,
+  publicLineAudience,
   readerAudience,
   type Audience,
+  type LatestLine,
+  type PublicLine,
 } from './access.js';
 import { FEEDBACK_MARKER, feedbackHtml } from './analytics.js';
 import { currentAccess, redirectToLogin } from './auth.js';
@@ -55,7 +64,11 @@ import {
   messagePage,
   topicActions,
 } from './pages.js';
+import { pdfResponder } from './pdf.js';
 import { searchRelease } from './search.js';
+
+/** Marker in cached pages, replaced per request with the version menu of public sites. */
+export const VERSIONS_MARKER = '<!--opend-versions-->';
 
 /** Most hits on the site search page. */
 export const SITE_SEARCH_LIMIT = 20;
@@ -138,10 +151,9 @@ async function newestLine(ctx: AppContext, repoId: number): Promise<string | nul
   const cached = ctx.caches.newest.get(repoId);
   if (cached) return cached.line;
   const lines = (await listLiveReleases(ctx.pool, repoId))
-    .map((r) => Number(r.releaseLine))
-    .filter(Number.isInteger)
-    .sort((a, b) => b - a);
-  const line = lines.length ? String(lines[0]) : null;
+    .map((r) => r.releaseLine)
+    .sort((a, b) => compareReleaseLines(b, a));
+  const line = lines[0] ?? null;
   ctx.caches.newest.set(repoId, { line });
   return line;
 }
@@ -180,7 +192,123 @@ export async function readerRelease(
 ): Promise<ReaderRelease | string> {
   const repo = await siteRepo(ctx);
   if (!repo) return 'No documentation site is configured yet.';
-  return audienceRelease(ctx, repo, readerAudience(reader));
+  return audienceRelease(ctx, repo, readerAudience(reader, repo.releaseLines));
+}
+
+/** The live lines of a repo and their settings, as the public site uses them; cached. */
+async function lineState(
+  ctx: AppContext,
+  repo: Repo,
+): Promise<{ lines: PublicLine[]; latest: LatestLine | null }> {
+  const cached = ctx.caches.publicLines.get(repo.id);
+  if (cached) return cached;
+  const live = await listLiveReleases(ctx.pool, repo.id);
+  const settings = await getReleaseLineSettings(ctx.pool, repo.id);
+  const labelled = live.find((l) => l.releaseLine === settings.labels.latest);
+  const latest = labelled ? { line: labelled.releaseLine, release: labelled.release } : null;
+  const served = defaultPublicLine(repo, latest) ?? (await newestLine(ctx, repo.id));
+  const marked = new Set(settings.publicLines);
+  const lines =
+    repo.access !== 'public'
+      ? []
+      : live
+          .filter((l) => l.releaseLine === served || marked.has(l.releaseLine))
+          .sort((a, b) => compareReleaseLines(b.releaseLine, a.releaseLine))
+          .map((l) => ({
+            line: l.releaseLine,
+            release: l.release,
+            isDefault: l.releaseLine === served,
+            labels: Object.entries(settings.labels)
+              .filter(([, line]) => line === l.releaseLine)
+              .map(([label]) => label),
+          }));
+  const state = { lines, latest };
+  ctx.caches.publicLines.set(repo.id, state);
+  return state;
+}
+
+/**
+ * The live lines a public site serves anonymous visitors under `/v/<line>/`,
+ * newest first: the line `/` serves them (see `defaultPublicLine`) and the
+ * lines marked public. Lines that are not live are never listed. None on
+ * private sites.
+ */
+export async function publicLines(ctx: AppContext, repo: Repo): Promise<PublicLine[]> {
+  return (await lineState(ctx, repo)).lines;
+}
+
+/** The live line labelled `latest`, or null. */
+export async function latestLine(ctx: AppContext, repo: Repo): Promise<LatestLine | null> {
+  return (await lineState(ctx, repo)).latest;
+}
+
+/** Anonymous visitors of a public site at `/` (see `publicAudience`). */
+export async function sitePublicAudience(ctx: AppContext, repo: Repo): Promise<Audience> {
+  return publicAudience(repo, await latestLine(ctx, repo));
+}
+
+/** A public line's live release, filtered for anonymous visitors of that line. */
+export async function publicLineRelease(
+  ctx: AppContext,
+  repo: Repo,
+  line: PublicLine,
+): Promise<ReaderRelease | string> {
+  return audienceRelease(ctx, repo, publicLineAudience(repo, line.line, line.release));
+}
+
+/**
+ * The version menu for a page of `currentLine`: every public line, linking to
+ * the same topic in that line's public view, or to that line's home when that
+ * view does not have it. Only when there is more than one public line, so a
+ * site that never marked a line public looks as it always did.
+ */
+async function versionMenu(
+  ctx: AppContext,
+  repo: Repo,
+  currentLine: string,
+  topicId: string | null,
+): Promise<string> {
+  const lines = await publicLines(ctx, repo);
+  if (lines.length < 2) return '';
+  const items = [];
+  for (const l of lines) {
+    const base = linePrefix(l.line);
+    let href = base;
+    if (topicId) {
+      const release = await publicLineRelease(ctx, repo, l);
+      if (typeof release !== 'string' && release.view.isVisible(topicId))
+        href = pageHref(topicId, base);
+    }
+    items.push({ line: l.line, labels: l.labels, href });
+  }
+  const current = lines.find((l) => l.line === currentLine);
+  return renderVersionMenu({ line: currentLine, labels: current?.labels ?? [] }, items);
+}
+
+/** `/v/<line>/`, the prefix of a public line's pages. */
+export function linePrefix(line: string): string {
+  return `/v/${encodeURIComponent(line)}/`;
+}
+
+/**
+ * The viewer of a public line's pages: anonymous visitors' view of that line,
+ * whoever asks (a signed-in reader's own entitlements never apply under
+ * `/v/`). Null when the site is not public or the line is not a live public
+ * line, which callers answer exactly as a path that does not exist.
+ */
+async function lineViewer(
+  ctx: AppContext,
+  request: FastifyRequest,
+  line: string,
+): Promise<Viewer | null> {
+  const repo = await siteRepo(ctx);
+  if (repo?.access !== 'public') return null;
+  const found = (await publicLines(ctx, repo)).find((l) => l.line === line);
+  if (!found) return null;
+  const release = await publicLineRelease(ctx, repo, found);
+  if (typeof release === 'string') return null;
+  const access = await currentAccess(request, ctx);
+  return { access, repo, release, orgSlug: access?.orgSlug ?? null, publicLine: found };
 }
 
 /** The reader's view of one publication, or `null` when the release has none from `file`. */
@@ -214,7 +342,7 @@ export function readerPublications(ctx: AppContext, release: ReaderRelease): Pub
 export async function publicSiteTitle(ctx: AppContext): Promise<string | undefined> {
   const repo = await siteRepo(ctx);
   if (repo?.access !== 'public') return undefined;
-  const release = await audienceRelease(ctx, repo, publicAudience(repo));
+  const release = await audienceRelease(ctx, repo, await sitePublicAudience(ctx, repo));
   return typeof release === 'string' ? undefined : release.view.release.title || undefined;
 }
 
@@ -226,6 +354,8 @@ export interface Viewer {
   release: ReaderRelease;
   /** Analytics org: the reader's, or null for anonymous visitors. */
   orgSlug: string | null;
+  /** Set for pages under `/v/<line>/`: the public line they are from. */
+  publicLine?: PublicLine;
 }
 
 /**
@@ -249,7 +379,11 @@ export async function viewerRelease(
     return access
       ? { refused: 'unpublished', message: 'No documentation site is configured yet.' }
       : { refused: 'sign-in' };
-  const audience = audienceFor(repo, access);
+  const audience = audienceFor(
+    repo,
+    access,
+    repo.access === 'public' ? await latestLine(ctx, repo) : null,
+  );
   if (audience === 'sign-in') return { refused: 'sign-in' };
   if (audience === 'no-entitlements') return { refused: 'no-entitlements' };
   const release = await audienceRelease(ctx, repo, audience);
@@ -307,27 +441,36 @@ function visibleAssets(view: ReleaseView): Set<string> {
 }
 
 export function registerDelivery(app: FastifyInstance, ctx: AppContext): void {
-  const pageOptions = (release: ReaderRelease): PageOptions => {
+  /** Page links, search, assets and PDFs of a viewer's pages: under `/`, or `/v/<line>/`. */
+  const baseOf = (viewer: Viewer) => (viewer.publicLine ? linePrefix(viewer.publicLine.line) : '/');
+
+  const pageOptions = (viewer: Viewer): PageOptions => {
+    const release = viewer.release;
+    const base = baseOf(viewer);
     const options: PageOptions = {
       account: { header: ACCOUNT_MARKER, menu: MENU_ACCOUNT_MARKER },
       topicEnd: TOPIC_ACTIONS_MARKER + FEEDBACK_MARKER,
-      search: { action: '/search' },
+      search: { action: `${base}search` },
       publications: readerPublications(ctx, release).map((p) => ({
         title: p.title || publicationSlug(p.file),
-        href: publicationHref(p),
+        href: publicationHref(p, base),
       })),
+      versions: VERSIONS_MARKER,
     };
+    if (base !== '/') options.base = base;
     // The staff view marks conditional content, as the previewer and editor do.
     if (release.audience.context === null) options.showConditions = true;
-    if (release.view.release.theme) options.themeHref = '/_theme.css';
-    if (release.view.release.logo) options.logoHref = `/${logoRoute(release.view.release.logo)}`;
+    if (release.view.release.theme) options.themeHref = `${base}_theme.css`;
+    if (release.view.release.logo)
+      options.logoHref = `${base}${logoRoute(release.view.release.logo)}`;
     return options;
   };
   const resolve = (request: FastifyRequest, reply: FastifyReply) =>
     resolveViewer(ctx, request, reply);
+  const pdf = pdfResponder(ctx);
 
   /** Fills the per-request markers of a (possibly cached) page and sends it. */
-  const sendPage = (
+  const sendPage = async (
     request: FastifyRequest,
     reply: FastifyReply,
     viewer: Viewer,
@@ -337,7 +480,10 @@ export function registerDelivery(app: FastifyInstance, ctx: AppContext): void {
   ) => {
     const account = accountControls(request, ctx, viewer.access);
     const actions = topic ? topicActions(ctx, viewer, topic.file) : '';
-    const feedback = topic ? feedbackHtml(request, ctx, topic.id, 'site') : '';
+    // Feedback is about the reader's own view, which a public line's pages are not.
+    const feedback =
+      topic && !viewer.publicLine ? feedbackHtml(request, ctx, topic.id, 'site') : '';
+    const versions = await versionMenu(ctx, viewer.repo, viewer.release.line, topic?.id ?? null);
     return reply
       .code(status)
       .headers(PAGE_HEADERS)
@@ -347,64 +493,58 @@ export function registerDelivery(app: FastifyInstance, ctx: AppContext): void {
         html
           .replace(ACCOUNT_MARKER, () => account.header)
           .replace(MENU_ACCOUNT_MARKER, () => account.menu)
+          .replace(VERSIONS_MARKER, () => versions)
           .replace(TOPIC_ACTIONS_MARKER, () => actions)
           .replace(FEEDBACK_MARKER, () => feedback),
       );
   };
 
-  app.get('/', async (request, reply) => {
-    const r = await resolve(request, reply);
-    if (!r) return reply;
-    const first = r.release.view.topicIds()[0];
-    if (first) return reply.headers(PAGE_HEADERS).redirect(pageHref(first));
-    return sendPage(request, reply, r, 200, renderIndex(r.release.view, pageOptions(r.release)));
-  });
+  const notFoundAsset = (reply: FastifyReply) =>
+    reply.code(404).headers(ASSET_HEADERS).type('text/plain').send('Not found');
 
-  app.get('/_theme.css', async (request, reply) => {
-    const r = await resolve(request, reply);
-    if (!r) return reply;
-    const theme = r.release.stored.snapshot.theme;
-    const data = theme
-      ? await ctx.blobs.get(assetKey(r.release.stored.repoId, r.release.stored.sha, theme))
+  const home = async (request: FastifyRequest, reply: FastifyReply, r: Viewer) => {
+    const first = r.release.view.topicIds()[0];
+    if (first) return reply.headers(PAGE_HEADERS).redirect(pageHref(first, baseOf(r)));
+    return sendPage(request, reply, r, 200, renderIndex(r.release.view, pageOptions(r)));
+  };
+
+  const theme = async (reply: FastifyReply, r: Viewer) => {
+    const file = r.release.stored.snapshot.theme;
+    const data = file
+      ? await ctx.blobs.get(assetKey(r.release.stored.repoId, r.release.stored.sha, file))
       : null;
     if (!data) return reply.code(404).send('Not found');
     return reply.headers(ASSET_HEADERS).type('text/css; charset=utf-8').send(data);
-  });
+  };
 
-  app.get('/_logo.:ext', async (request, reply) => {
-    const r = await resolve(request, reply);
-    if (!r) return reply;
-    const logo = r.release.stored.snapshot.logo;
+  /** `name` is the requested file name, e.g. `_logo.svg`. */
+  const logo = async (reply: FastifyReply, r: Viewer, name: string) => {
+    const file = r.release.stored.snapshot.logo;
     const data =
-      logo && request.url.split('?')[0] === `/${logoRoute(logo)}`
-        ? await ctx.blobs.get(assetKey(r.release.stored.repoId, r.release.stored.sha, logo))
+      file && name === logoRoute(file)
+        ? await ctx.blobs.get(assetKey(r.release.stored.repoId, r.release.stored.sha, file))
         : null;
-    if (!data) return reply.code(404).headers(ASSET_HEADERS).type('text/plain').send('Not found');
+    if (!data) return notFoundAsset(reply);
     return reply
       .headers(ASSET_HEADERS)
-      .type(CONTENT_TYPES[posix.extname(logo!).toLowerCase()] ?? 'application/octet-stream')
+      .type(CONTENT_TYPES[posix.extname(file!).toLowerCase()] ?? 'application/octet-stream')
       .send(data);
-  });
+  };
 
-  app.get('/_assets/*', async (request, reply) => {
-    const r = await resolve(request, reply);
-    if (!r) return reply;
-    const path = (request.params as { '*': string })['*'];
+  const asset = async (reply: FastifyReply, r: Viewer, path: string) => {
     // Fail closed: only files referenced by a topic this viewer can see.
     const data = visibleAssets(r.release.view).has(path)
       ? await ctx.blobs.get(assetKey(r.release.stored.repoId, r.release.stored.sha, path))
       : null;
-    if (!data) return reply.code(404).headers(ASSET_HEADERS).type('text/plain').send('Not found');
+    if (!data) return notFoundAsset(reply);
     return reply
       .headers(ASSET_HEADERS)
       .type(CONTENT_TYPES[posix.extname(path).toLowerCase()] ?? 'application/octet-stream')
       .send(data);
-  });
+  };
 
   // Never cached: the hits depend on the viewer's entitlements and the query.
-  app.get('/search', async (request, reply) => {
-    const r = await resolve(request, reply);
-    if (!r) return reply;
+  const search = async (request: FastifyRequest, reply: FastifyReply, r: Viewer) => {
     const query = siteSearchQuery((request.query as { q?: unknown }).q);
     const hits = query ? await searchRelease(ctx.pool, r.release, query, SITE_SEARCH_LIMIT) : [];
     if (query)
@@ -416,23 +556,24 @@ export function registerDelivery(app: FastifyInstance, ctx: AppContext): void {
         resultCount: hits.length,
       });
     const html = renderSearch(r.release.view, query, hits, {
-      ...pageOptions(r.release),
+      ...pageOptions(r),
       limit: SITE_SEARCH_LIMIT,
     });
     return sendPage(request, reply, r, 200, html);
-  });
+  };
 
-  app.get('/*', async (request, reply) => {
-    const r = await resolve(request, reply);
-    if (!r) return reply;
-    const path = decodeURIComponent((request.params as { '*': string })['*']);
+  const page = async (request: FastifyRequest, reply: FastifyReply, r: Viewer, path: string) => {
     const { view, key } = r.release;
     if (path.endsWith('.html')) {
       const topicId = path.slice(0, -'.html'.length);
       const cacheKey = `${key}|${topicId}`;
       let html = ctx.caches.pages.get(cacheKey);
       if (html === undefined) {
-        html = renderPage(view, topicId, pageOptions(r.release)) ?? '';
+        const options = pageOptions(r);
+        // The default public line is also served at `/`: that is the page's address.
+        if (r.publicLine?.isDefault)
+          options.head = `<link rel="canonical" href="${escapeHtml(`${ctx.config.publicUrl}${pageHref(topicId)}`)}">`;
+        html = renderPage(view, topicId, options) ?? '';
         ctx.caches.pages.set(cacheKey, html);
       }
       const topic = html ? view.topic(topicId) : null;
@@ -447,6 +588,119 @@ export function registerDelivery(app: FastifyInstance, ctx: AppContext): void {
       }
     }
     // Missing and hidden pages look the same.
-    return sendPage(request, reply, r, 404, renderNotFound(view, pageOptions(r.release)));
+    return sendPage(request, reply, r, 404, renderNotFound(view, pageOptions(r)));
+  };
+
+  /** Any other path of the site, for the request's own viewer. */
+  const sitePath = async (request: FastifyRequest, reply: FastifyReply, path: string) => {
+    const r = await resolve(request, reply);
+    if (!r) return reply;
+    return page(request, reply, r, path);
+  };
+
+  const notFoundPage = (reply: FastifyReply) =>
+    reply
+      .code(404)
+      .headers(PAGE_HEADERS)
+      .type('text/html; charset=utf-8')
+      .send(messagePage('Page not found', 'This page does not exist or is not available to you.'));
+
+  /**
+   * `context/<app>/<key>` (or `context/<app>?path=`) on a public site: the
+   * help topic for a context key, resolved as the help API resolves it
+   * (key, parents, app default) but in anonymous visitors' view, so it never
+   * names a topic they cannot see. Redirects to the topic page under `base`.
+   */
+  const context = async (
+    request: FastifyRequest,
+    reply: FastifyReply,
+    release: ReaderRelease,
+    base: string,
+    appName: string,
+    key: string | undefined,
+  ) => {
+    const req: { app: string; key?: string; path?: string } = { app: appName };
+    const path = (request.query as { path?: unknown }).path;
+    if (key) req.key = key;
+    else if (typeof path === 'string' && path) req.path = path;
+    const resolved = resolveContext(release.view, req);
+    if (!resolved) return notFoundPage(reply);
+    const fragment = resolved.fragment ? `#${encodeURIComponent(resolved.fragment)}` : '';
+    return reply.headers(PAGE_HEADERS).redirect(`${pageHref(resolved.topicId, base)}${fragment}`);
+  };
+
+  app.get('/', async (request, reply) => {
+    const r = await resolve(request, reply);
+    if (!r) return reply;
+    return home(request, reply, r);
   });
+
+  app.get('/_theme.css', async (request, reply) => {
+    const r = await resolve(request, reply);
+    if (!r) return reply;
+    return theme(reply, r);
+  });
+
+  app.get('/_logo.:ext', async (request, reply) => {
+    const r = await resolve(request, reply);
+    if (!r) return reply;
+    return logo(reply, r, request.url.split('?')[0]!.slice(1));
+  });
+
+  app.get('/_assets/*', async (request, reply) => {
+    const r = await resolve(request, reply);
+    if (!r) return reply;
+    return asset(reply, r, (request.params as { '*': string })['*']);
+  });
+
+  app.get('/search', async (request, reply) => {
+    const r = await resolve(request, reply);
+    if (!r) return reply;
+    return search(request, reply, r);
+  });
+
+  // Help context links for public sites. Private sites answer 404 and reveal nothing.
+  const contextRoute = async (request: FastifyRequest, reply: FastifyReply) => {
+    const { app: appName, key } = request.params as { app: string; key?: string };
+    // A topic page whose id starts with context/ is still a page.
+    if (request.url.split('?')[0]!.endsWith('.html'))
+      return sitePath(request, reply, decodeURIComponent(request.url.split('?')[0]!.slice(1)));
+    const repo = await siteRepo(ctx);
+    if (repo?.access !== 'public') return notFoundPage(reply);
+    const release = await audienceRelease(ctx, repo, await sitePublicAudience(ctx, repo));
+    if (typeof release === 'string') return notFoundPage(reply);
+    return context(request, reply, release, '/', appName, key);
+  };
+  app.get('/context/:app', contextRoute);
+  app.get('/context/:app/:key', contextRoute);
+
+  // Public lines: anonymous visitors' view of each line under /v/<line>/. Anything
+  // else under /v/ is an ordinary path (and so a 404 like any page that does not exist).
+  app.get('/v/:line', async (request, reply) => {
+    const { line } = request.params as { line: string };
+    if (await lineViewer(ctx, request, line))
+      return reply.headers(PAGE_HEADERS).redirect(linePrefix(line));
+    return sitePath(request, reply, `v/${line}`);
+  });
+  app.get('/v/:line/*', async (request, reply) => {
+    const params = request.params as { line: string; '*': string };
+    const rest = params['*'];
+    const r = await lineViewer(ctx, request, params.line);
+    if (!r) return sitePath(request, reply, decodeURIComponent(`v/${params.line}/${rest}`));
+    if (rest === '') return home(request, reply, r);
+    if (rest === '_theme.css') return theme(reply, r);
+    if (/^_logo\.[A-Za-z0-9]+$/.test(rest)) return logo(reply, r, rest);
+    if (rest.startsWith('_assets/')) return asset(reply, r, rest.slice('_assets/'.length));
+    if (rest === 'search') return search(request, reply, r);
+    if (rest.startsWith('pdf/') && !rest.slice(4).includes('/'))
+      return pdf(request, reply, r, rest.slice(4));
+    const ctxMatch = /^context\/([^/]+)(?:\/([^/]+))?$/.exec(rest);
+    if (ctxMatch && !rest.endsWith('.html'))
+      return context(request, reply, r.release, linePrefix(params.line), ctxMatch[1]!, ctxMatch[2]);
+    return page(request, reply, r, decodeURIComponent(rest));
+  });
+
+  app.get('/*', async (request, reply) =>
+    sitePath(request, reply, decodeURIComponent((request.params as { '*': string })['*'])),
+  );
 }

@@ -1,18 +1,10 @@
 import { DEFAULT_CSS, escapeHtml } from '@opend/render-html';
 import type { Diagnostic } from '@opend/model';
-import type {
-  ApiKey,
-  ApiScope,
-  BuildJob,
-  EditorUser,
-  LiveRelease,
-  Org,
-  Reader,
-  Repo,
-} from '@opend/store';
+import type { ApiKey, ApiScope, BuildJob, EditorUser, Org, Reader, Repo } from '@opend/store';
 import { ADMIN_CSS } from './admin-style.js';
 import type { PickableRepo } from './github-connect.js';
 import { GITHUB_ICON, KEY_ICON } from './pages.js';
+import type { ReleaseLinesInfo } from './release-lines.js';
 import type { SettingSource } from './settings.js';
 
 // ---- a small escaping template tag ------------------------------------------
@@ -340,7 +332,8 @@ function choices(o: {
 export interface OverviewData {
   repo: Repo | null;
   repoCount: number;
-  live: LiveRelease[];
+  /** The site repo's release lines, live or with settings; null without a repo. */
+  lines: ReleaseLinesInfo | null;
   jobs: (BuildJob & { repoName: string })[];
   readers: number;
   staff: number;
@@ -430,7 +423,9 @@ export function overviewPage(d: OverviewData): Html {
         <p><a href="/admin/github">GitHub</a></p>
       </li>`,
     );
-  const lines = d.live.length
+  const live = d.lines?.lines.filter((l) => l.live) ?? [];
+  const isPublic = d.repo?.access === 'public';
+  const lines = live.length
     ? html`<div class="admin-table-wrap">
         <table class="admin-table">
           <thead>
@@ -438,15 +433,27 @@ export function overviewPage(d: OverviewData): Html {
               <th scope="col">Release line</th>
               <th scope="col">Release</th>
               <th scope="col">Commit</th>
+              <th scope="col">Labels</th>
+              ${isPublic ? html`<th scope="col">Public</th>` : ''}
             </tr>
           </thead>
           <tbody>
-            ${d.live.map(
+            ${live.map(
               (l) =>
                 html`<tr>
-                  <td>${l.releaseLine}.x</td>
-                  <td>${badge(l.release, 'ok')}</td>
-                  <td><code>${l.sha.slice(0, 7)}</code></td>
+                  <td>${l.line}.x</td>
+                  <td>${badge(l.release ?? '', 'ok')}</td>
+                  <td><code>${(l.sha ?? '').slice(0, 7)}</code></td>
+                  <td>
+                    ${l.labels.length ? l.labels.join(', ') : html`<span class="admin-muted">None</span>`}
+                  </td>
+                  ${
+                    isPublic
+                      ? html`<td>
+                          ${l.default ? 'Yes, at /' : l.public ? html`Yes, at <code>/v/${l.line}/</code>` : 'No'}
+                        </td>`
+                      : ''
+                  }
                 </tr>`,
             )}
           </tbody>
@@ -455,6 +462,10 @@ export function overviewPage(d: OverviewData): Html {
     : html`<p class="admin-empty">
         Nothing is published yet. A build goes live when it passes validation.
       </p>`;
+  const granularity =
+    d.lines?.releaseLines === 'minor'
+      ? 'One live release per minor version (0.23.x, 0.24.x).'
+      : 'One live release per major version (1.x, 2.x).';
   return html`${head('Admin', 'Overview', 'What readers see right now, the latest builds, and recent changes.')}
     ${
       setup.length
@@ -490,7 +501,7 @@ export function overviewPage(d: OverviewData): Html {
         <h2 id="live-h">Live releases</h2>
         <a class="admin-button is-secondary is-small" href="/">Open the site</a>
       </div>
-      ${lines}
+      ${d.repo ? html`<p class="admin-muted">${granularity}</p>` : ''} ${lines}
     </section>
     <section class="admin-card" aria-labelledby="builds-h">
       <div class="admin-card-head">

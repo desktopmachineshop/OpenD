@@ -54,9 +54,11 @@ digits  = "0" .. "9" { "0" .. "9" }</codeblock>
         <codeph>v</codeph>. A reader whose version does not parse matches no release token, so content with
         a <codeph>release</codeph> attribute is hidden from them.</p>
       <p product="core hosted">On the hosted platform, a reader is served the live release of their
-        <i>release line</i>: the major number of their version. A <codeph>1.4</codeph> reader keeps getting
-        the docs built from the branch whose <parmname>release</parmname> is 1.x after 2.0 is published.
-        See <xref href="release-branches.dita"/>.</p>
+        <i>release line</i>: the major number of their version, or on a repository with lines by minor
+        version its major and minor numbers. A <codeph>1.4</codeph> reader keeps getting the docs built from
+        the branch whose <parmname>release</parmname> is 1.x after 2.0 is published; with minor lines, a
+        <codeph>0.22</codeph> reader keeps the 0.22 docs after 0.23. See
+        <xref href="release-branches.dita"/> and <xref href="../hosting/release-lines.dita"/>.</p>
     </section>
   </refbody>
 </reference>

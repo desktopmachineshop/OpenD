@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE task PUBLIC "-//OASIS//DTD DITA Task//EN" "task.dtd">
+<task id="release-lines" product="core" audience="admin">
+  <title>Release lines, labels and public versions</title>
+  <shortdesc>Each release line has one live release. Lines group releases by major version, or by minor
+    version for products released as 0.x minors. Labels such as <codeph>latest</codeph> and
+    <codeph>stable</codeph>, and public lines, give a public site a version menu.</shortdesc>
+  <taskbody>
+    <context>
+      <p>A reader is served the live release of their own line, worked out from their organization's
+        version. By default a line is a major version: <codeph>2.1</codeph> and <codeph>2.4</codeph> readers
+        both read line <codeph>2</codeph>, whose live release is the newest 2.x build. A product whose
+        customers are each on a specific minor version, such as 0.21, 0.22 and 0.23, needs a line per minor
+        version instead.</p>
+      <simpletable relcolwidth="2* 3* 3*">
+        <sthead><stentry>Setting</stentry><stentry>Line of release 0.23.1</stentry><stentry>A 0.22 reader gets</stentry></sthead>
+        <strow><stentry><codeph>major</codeph> (default)</stentry><stentry><codeph>0</codeph></stentry><stentry>The newest 0.x build</stentry></strow>
+        <strow><stentry><codeph>minor</codeph></stentry><stentry><codeph>0.23</codeph></stentry><stentry>The live 0.22 build, or "No documentation has been published for release 0.22.x yet"</stentry></strow>
+      </simpletable>
+    </context>
+    <steps>
+      <step>
+        <cmd>Choose lines by minor version for the repository.</cmd>
+        <stepxmp>
+          <codeblock>H="authorization: Bearer $OPEND_ADMIN_TOKEN"
+curl -X PUT "$PUBLIC_URL/admin/api/repos/1/release-lines" -H "$H" -H 'content-type: application/json' \
+  -d '{"releaseLines":"minor"}'</codeblock>
+          <p>Or in a seed file, next to the repository: <codeph>releaseLines: minor</codeph>.</p>
+        </stepxmp>
+        <info>
+          <p>The change applies at once, in one transaction, to what is already live: each live release
+            moves to the line its <parmname>release</parmname> belongs to. Nothing that is not live comes
+            back: after switching from <codeph>major</codeph> to <codeph>minor</codeph>, line
+            <codeph>0</codeph> becomes the line of its live release (say <codeph>0.23</codeph>), and older
+            minors go live again with their next build (request one with <codeph>POST
+            /admin/api/repos/:id/builds</codeph>). Switching back merges lines, keeping the newest build of
+            each. A build finishing during the switch publishes to a line of the new setting. Labels and
+            public lines are cleared, as they named the old lines.</p>
+        </info>
+      </step>
+      <step>
+        <cmd>Publish each line from its own branch, for example <codeph>docs/0.23</codeph> with
+          <parmname>releaseRefs</parmname> <codeph>["main", "docs/*"]</codeph>.</cmd>
+        <info><p>See <xref href="../authoring/release-branches.dita"/>.</p></info>
+      </step>
+      <step importance="optional">
+        <cmd>Label lines, for example when a release ships.</cmd>
+        <stepxmp>
+          <codeblock>curl -X PUT "$PUBLIC_URL/admin/api/repos/1/lines/0.23/label" -H "$H" \
+  -H 'content-type: application/json' -d '{"label":"latest"}'
+curl -X PUT "$PUBLIC_URL/admin/api/repos/1/lines/0.21/label" -H "$H" \
+  -H 'content-type: application/json' -d '{"label":"stable"}'</codeblock>
+        </stepxmp>
+        <info>
+          <p>A label is on one line at most: putting it on a line takes it off the other. A line can have
+            several. A line can be labelled before its first build is live, so a release workflow can label
+            it right after pushing the branch. Take a label off with <codeph>DELETE
+            /admin/api/repos/1/lines/0.23/labels/latest</codeph>.</p>
+        </info>
+      </step>
+      <step importance="optional">
+        <cmd>On a public site, mark the lines anonymous visitors may read besides the default one.</cmd>
+        <stepxmp>
+          <codeblock>curl -X PUT "$PUBLIC_URL/admin/api/repos/1/lines/0.21/public" -H "$H" \
+  -H 'content-type: application/json' -d '{"public":true}'</codeblock>
+        </stepxmp>
+      </step>
+      <step>
+        <cmd>Check the lines with <codeph>GET /admin/api/repos/1/lines</codeph>, or on the admin console's
+          overview, which lists each live line with its labels and whether it is public.</cmd>
+      </step>
+    </steps>
+    <result>
+      <section id="public-versions">
+        <title>What anonymous visitors of a public site see</title>
+        <ul>
+          <li><b>At <filepath>/</filepath></b>: the line labelled <codeph>latest</codeph> while it is live,
+            otherwise the line of the public entitlements' version (otherwise, without public entitlements,
+            the newest line). This is the <i>default line</i>, and it is always public.</li>
+          <li><b>Under <filepath>/v/<varname>line</varname>/</filepath></b>: each live public line, for
+            example <filepath>/v/0.21/topics/install.html</filepath>, filtered for the public products and
+            features on that line. Pages, navigation, search, images under
+            <filepath>/v/<varname>line</varname>/_assets/</filepath>, the theme, the logo and PDFs under
+            <filepath>/v/<varname>line</varname>/pdf/</filepath> are all that line's public view. A
+            signed-in reader gets the same public view there: their own entitlements apply only at
+            <filepath>/</filepath>.</li>
+          <li><b>A version menu</b> in the header, when more than one line is public: each line with its
+            labels, such as <uicontrol>0.23 (latest)</uicontrol>, linking to the same page in that line, or
+            to the line's first page when it has no such page. It is a plain <codeph>&lt;details&gt;</codeph>
+            with links, so it works without scripts.</li>
+          <li><b>Lines that are not public</b>, or not live, do not exist under <filepath>/v/</filepath>:
+            their addresses answer exactly as a page that does not exist, and the menu never lists them.</li>
+          <li><b>Canonical addresses.</b> Pages of the default line under <filepath>/v/</filepath> carry a
+            <codeph>&lt;link rel="canonical"&gt;</codeph> to the same page at <filepath>/</filepath>.</li>
+          <li><b>Caching.</b> Each line's public view is cached under its own key, apart from
+            <filepath>/</filepath> and from readers' views. The version menu is added to each response after
+            the cache, like the account controls. Every change of lines, labels or public lines drops the
+            caches on every replica.</li>
+        </ul>
+        <p>The prefix <filepath>/v/</filepath> is reserved for this: a topic whose page id starts with
+          <filepath>v/<varname>line</varname>/</filepath> for a public line is not reachable at
+          <filepath>/</filepath>. Private sites have no <filepath>/v/</filepath> pages and no menu.</p>
+      </section>
+    </result>
+  </taskbody>
+</task>

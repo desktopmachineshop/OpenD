@@ -1,11 +1,17 @@
 import { createHash } from 'node:crypto';
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { findPublication } from '@opend/model';
 import type { PublicationView } from '@opend/filter';
 import { publicationHasContent, renderPublication } from '@opend/render-html';
 import { assetKey } from '@opend/store';
 import type { AppContext } from './context.js';
-import { PAGE_HEADERS, publicationView, resolveViewer, type ReaderRelease } from './delivery.js';
+import {
+  PAGE_HEADERS,
+  publicationView,
+  resolveViewer,
+  type ReaderRelease,
+  type Viewer,
+} from './delivery.js';
 import { messagePage } from './pages.js';
 
 /**
@@ -19,8 +25,20 @@ export function pdfKey(releaseId: number, entitlements: string, slug: string): s
   return `pdf/${releaseId}/${hash}/${encodeURIComponent(slug)}.pdf`;
 }
 
-/** `GET /pdf/<slug>.pdf`: a publication printed for the viewer (reader, anonymous or staff). */
-export function registerPdf(app: FastifyInstance, ctx: AppContext): void {
+/** Answers a request for `<slug>.pdf` (`file`): the publication printed for the viewer. */
+export type PdfResponder = (
+  request: FastifyRequest,
+  reply: FastifyReply,
+  viewer: Viewer,
+  file: string,
+) => Promise<FastifyReply>;
+
+/**
+ * Serves publications as PDFs, for `/pdf/<slug>.pdf` and the public lines'
+ * `/v/<line>/pdf/<slug>.pdf`. Renders are shared by viewers with the same
+ * audience (see `pdfKey`), and concurrent requests for one share a render.
+ */
+export function pdfResponder(ctx: AppContext): PdfResponder {
   /** Renders in progress in this process, by blob key. */
   const inflight = new Map<string, Promise<Buffer>>();
 
@@ -57,9 +75,7 @@ export function registerPdf(app: FastifyInstance, ctx: AppContext): void {
     return pdf;
   };
 
-  app.get('/pdf/:file', async (request, reply) => {
-    const r = await resolveViewer(ctx, request, reply);
-    if (!r) return reply;
+  return async (_request, reply, r, file) => {
     const notFound = () =>
       reply
         .code(404)
@@ -68,7 +84,7 @@ export function registerPdf(app: FastifyInstance, ctx: AppContext): void {
         .send(
           messagePage('Not found', 'This publication does not exist or is not available to you.'),
         );
-    const match = /^(.+)\.pdf$/.exec((request.params as { file: string }).file);
+    const match = /^(.+)\.pdf$/.exec(file);
     const slug = match?.[1] ?? '';
     const publication = findPublication(r.release.stored.snapshot.publications, slug);
     const view = publication ? publicationView(ctx, r.release, publication.file) : null;
@@ -95,5 +111,15 @@ export function registerPdf(app: FastifyInstance, ctx: AppContext): void {
       })
       .type('application/pdf')
       .send(pdf);
+  };
+}
+
+/** `GET /pdf/<slug>.pdf`: a publication printed for the viewer (reader, anonymous or staff). */
+export function registerPdf(app: FastifyInstance, ctx: AppContext): void {
+  const respond = pdfResponder(ctx);
+  app.get('/pdf/:file', async (request, reply) => {
+    const r = await resolveViewer(ctx, request, reply);
+    if (!r) return reply;
+    return respond(request, reply, r, (request.params as { file: string }).file);
   });
 }

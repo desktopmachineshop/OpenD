@@ -52,6 +52,7 @@ import {
   type StoredRelease,
 } from '@opend/store';
 import { listRemoteRefs, releaseRefsToPoll } from '@opend/worker';
+import { compareReleaseLines } from '@opend/filter';
 import { entitlementsSchema, repoSchema, slug as slugSchema } from './admin.js';
 import {
   adminShell,
@@ -76,6 +77,7 @@ import { loginPath, safeReturnTo, setSession, siteSession } from './auth.js';
 import { API_KEY_EMAIL_DOMAIN } from './api-writes.js';
 import type { AppContext } from './context.js';
 import { siteRepo } from './delivery.js';
+import { describeReleaseLines } from './release-lines.js';
 import {
   APP_NAME_MAX,
   buildManifest,
@@ -215,8 +217,8 @@ function entitlementsFrom(body: Record<string, string>): Entitlements | null {
 /** The newest live release of a repo, for its title and declared attributes. */
 async function newestRelease(ctx: AppContext, repo: Repo | null): Promise<StoredRelease | null> {
   if (!repo) return null;
-  const live = (await listLiveReleases(ctx.pool, repo.id)).sort(
-    (a, b) => Number(b.releaseLine) - Number(a.releaseLine),
+  const live = (await listLiveReleases(ctx.pool, repo.id)).sort((a, b) =>
+    compareReleaseLines(b.releaseLine, a.releaseLine),
   );
   return live[0] ? getRelease(ctx.pool, live[0].releaseId) : null;
 }
@@ -303,7 +305,7 @@ export function registerAdminConsole(app: FastifyInstance, ctx: AppContext): voi
         body: overviewPage({
           repo,
           repoCount: repos.length,
-          live: repo ? await listLiveReleases(ctx.pool, repo.id) : [],
+          lines: repo ? await describeReleaseLines(ctx.pool, repo) : null,
           jobs: (await listJobs(ctx.pool, { limit: 10 })).map((j) => ({
             ...j,
             repoName: names.get(j.repoId) ?? '',

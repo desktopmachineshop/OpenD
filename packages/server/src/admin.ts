@@ -24,6 +24,10 @@ import {
   listJobs,
   listLiveReleases,
   retireReleaseLine,
+  removeReleaseLineLabel,
+  setReleaseLineLabel,
+  setReleaseLinePublic,
+  setRepoReleaseLines,
   listOrgs,
   listReaders,
   listRepos,
@@ -36,7 +40,10 @@ import {
   withTransaction,
   type Pool,
 } from '@opend/store';
+import { isReleaseLine, releaseLine } from '@opend/filter';
+import { RELEASE_LINES, type ReleaseLines } from '@opend/model';
 import type { AppContext } from './context.js';
+import { describeReleaseLines } from './release-lines.js';
 import { settingSources } from './settings.js';
 
 const ACTOR = 'admin-token';
@@ -102,6 +109,34 @@ export function sourceUrlSchema(production: boolean) {
     );
 }
 
+/** How a repo groups releases into lines: `major` (the default) or `minor`. */
+export const releaseLinesSchema = z.object({ releaseLines: z.enum(RELEASE_LINES) });
+/** A line label, such as `latest` or `stable`. */
+export const lineLabel = z
+  .string()
+  .regex(/^[a-z][a-z0-9-]{0,31}$/, 'lowercase letters, digits and dashes, starting with a letter');
+const labelSchema = z.object({ label: lineLabel });
+const linePublicSchema = z.object({ public: z.boolean() });
+
+/**
+ * Switches a repo's release-line granularity and moves its live releases to
+ * their new lines, in the caller's transaction (see `setRepoReleaseLines`).
+ */
+export async function changeReleaseLines(
+  db: Parameters<typeof setRepoReleaseLines>[0],
+  repoId: number,
+  lines: ReleaseLines,
+  actor: string,
+) {
+  const result = await setRepoReleaseLines(db, repoId, lines, (v) => releaseLine(v, lines));
+  if (result?.changed)
+    await audit(db, actor, 'repo.release-lines', {
+      repo: result.repo.fullName,
+      releaseLines: lines,
+    });
+  return result?.repo ?? null;
+}
+
 export const repoSchema = (production: boolean) =>
   z.object({
     fullName: z.string().regex(/^[\w.-]+\/[\w.-]+$/, 'owner/name'),
@@ -115,6 +150,8 @@ export const repoSchema = (production: boolean) =>
         'a path inside the repository',
       )
       .optional(),
+    /** Omitted: keep the repo's granularity (new repos: major). */
+    releaseLines: z.enum(RELEASE_LINES).optional(),
   });
 const analyticsQuery = z.object({
   days: z.coerce.number().int().min(1).max(3650).default(30),
@@ -221,9 +258,10 @@ export function registerAdmin(app: FastifyInstance, ctx: AppContext): void {
         const input = parse(repoSchema(ctx.config.production), request.body, reply);
         if (!input) return reply;
         const repo = await withTransaction(ctx.pool, async (db) => {
-          const r = await upsertRepo(db, input);
+          const { releaseLines, ...fields } = input;
+          const r = await upsertRepo(db, fields);
           await audit(db, ACTOR, 'repo.upsert', input);
-          return r;
+          return releaseLines ? await changeReleaseLines(db, r.id, releaseLines, ACTOR) : r;
         });
         ctx.caches.releaseChanged();
         return reply.code(201).send(repo);
@@ -262,6 +300,99 @@ export function registerAdmin(app: FastifyInstance, ctx: AppContext): void {
         // Every cached view, page and publication is dropped; NOTIFY does the same on other replicas.
         ctx.caches.releaseChanged();
         return repo ? reply.send(repo) : reply.code(404).send({ error: 'no such repo' });
+      });
+      // Release lines: granularity, labels such as latest and stable, and public lines.
+      const repoParam = async (request: FastifyRequest) => {
+        const id = Number((request.params as { id: string }).id);
+        return Number.isSafeInteger(id) ? getRepo(ctx.pool, id) : null;
+      };
+      scope.put('/repos/:id/release-lines', async (request, reply) => {
+        const input = parse(releaseLinesSchema, request.body, reply);
+        if (!input) return reply;
+        const id = Number((request.params as { id: string }).id);
+        const repo = Number.isSafeInteger(id)
+          ? await withTransaction(ctx.pool, (db) =>
+              changeReleaseLines(db, id, input.releaseLines, ACTOR),
+            )
+          : null;
+        ctx.caches.releaseChanged();
+        if (!repo) return reply.code(404).send({ error: 'no such repo' });
+        return reply.send(await describeReleaseLines(ctx.pool, repo));
+      });
+      scope.get('/repos/:id/lines', async (request, reply) => {
+        const repo = await repoParam(request);
+        if (!repo) return reply.code(404).send({ error: 'no such repo' });
+        return reply.send(await describeReleaseLines(ctx.pool, repo));
+      });
+      /** The repo and a line name valid for its granularity, or null after answering. */
+      const lineParams = async (request: FastifyRequest, reply: FastifyReply) => {
+        const repo = await repoParam(request);
+        if (!repo) {
+          await reply.code(404).send({ error: 'no such repo' });
+          return null;
+        }
+        const line = (request.params as { line: string }).line;
+        if (!isReleaseLine(line, repo.releaseLines)) {
+          await reply.code(400).send({
+            error: 'invalid request',
+            issues: [
+              `line: this repo has release lines by ${repo.releaseLines} version, such as ${repo.releaseLines === 'minor' ? '0.23' : '2'}`,
+            ],
+          });
+          return null;
+        }
+        return { repo, line };
+      };
+      scope.put('/repos/:id/lines/:line/label', async (request, reply) => {
+        const found = await lineParams(request, reply);
+        if (!found) return reply;
+        const input = parse(labelSchema, request.body, reply);
+        if (!input) return reply;
+        await withTransaction(ctx.pool, async (db) => {
+          await setReleaseLineLabel(db, found.repo.id, found.line, input.label);
+          await audit(db, ACTOR, 'release-line.label', {
+            repo: found.repo.fullName,
+            line: found.line,
+            label: input.label,
+          });
+        });
+        ctx.caches.releaseChanged();
+        return reply.send(await describeReleaseLines(ctx.pool, found.repo));
+      });
+      scope.delete('/repos/:id/lines/:line/labels/:label', async (request, reply) => {
+        const found = await lineParams(request, reply);
+        if (!found) return reply;
+        const label = (request.params as { label: string }).label;
+        const removed = await withTransaction(ctx.pool, async (db) => {
+          const ok = await removeReleaseLineLabel(db, found.repo.id, found.line, label);
+          if (ok)
+            await audit(db, ACTOR, 'release-line.unlabel', {
+              repo: found.repo.fullName,
+              line: found.line,
+              label,
+            });
+          return ok;
+        });
+        ctx.caches.releaseChanged();
+        return removed
+          ? reply.code(204).send()
+          : reply.code(404).send({ error: 'the line does not have that label' });
+      });
+      scope.put('/repos/:id/lines/:line/public', async (request, reply) => {
+        const found = await lineParams(request, reply);
+        if (!found) return reply;
+        const input = parse(linePublicSchema, request.body, reply);
+        if (!input) return reply;
+        await withTransaction(ctx.pool, async (db) => {
+          await setReleaseLinePublic(db, found.repo.id, found.line, input.public);
+          await audit(db, ACTOR, 'release-line.public', {
+            repo: found.repo.fullName,
+            line: found.line,
+            public: input.public,
+          });
+        });
+        ctx.caches.releaseChanged();
+        return reply.send(await describeReleaseLines(ctx.pool, found.repo));
       });
       scope.get('/repos/:id/releases', async (request) =>
         listLiveReleases(ctx.pool, Number((request.params as { id: string }).id)),

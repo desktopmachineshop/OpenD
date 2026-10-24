@@ -28,6 +28,49 @@ export interface PageOptions extends RenderOptions {
    * here and fills them per request, as pages are cached per entitlement set.
    */
   account?: { header: string; menu: string };
+  /**
+   * Trusted HTML after the release in the header: the version menu
+   * (`renderVersionMenu`), or a marker the hosted server fills per request.
+   */
+  versions?: string;
+  /** Trusted HTML at the end of `<head>`, e.g. a `<link rel="canonical">`. */
+  head?: string;
+}
+
+/** One line in the version menu. */
+export interface VersionMenuItem {
+  /** The line, e.g. `0.23` or `2`. */
+  line: string;
+  /** Its labels, e.g. `latest` and `stable`. */
+  labels: readonly string[];
+  /** The same page in that line, or that line's home when it has no such page. */
+  href: string;
+}
+
+function lineName(line: string, labels: readonly string[]): string {
+  return labels.length
+    ? `${escapeHtml(line)} <span class="site-versions-label">(${labels.map(escapeHtml).join(', ')})</span>`
+    : escapeHtml(line);
+}
+
+/**
+ * The version menu of a public site: a `<details>` whose panel lists the
+ * lines, each linking to the same page in that line. No script: Enter or
+ * Space on the summary opens and closes it, and Tab reaches the links.
+ * `current` is the line the page is from; it is marked when it is listed.
+ */
+export function renderVersionMenu(
+  current: { line: string; labels: readonly string[] },
+  items: readonly VersionMenuItem[],
+): string {
+  if (!items.length) return '';
+  const links = items
+    .map(
+      (i) =>
+        `<li><a href="${escapeHtml(i.href)}"${i.line === current.line ? ' aria-current="page"' : ''}>${lineName(i.line, i.labels)}</a></li>`,
+    )
+    .join('');
+  return `<details class="site-versions"><summary><span class="site-versions-prefix">Version </span><span class="opend-visually-hidden">of the documentation: </span>${lineName(current.line, current.labels)}</summary><nav class="site-versions-panel" aria-label="Documentation versions"><ul>${links}</ul></nav></details>`;
 }
 
 /** Longest search query the site accepts; longer ones are cut, as analytics does. */
@@ -160,11 +203,12 @@ function shell(
 <title>${escapeHtml(title ? `${title} · ${release.title}` : release.title)}</title>
 <style>${DEFAULT_CSS}</style>
 ${theme}
+${options.head ?? ''}
 </head>
 <body class="opend-site">
 <a class="opend-skip" href="#opend-main">Skip to content</a>
 ${options.banner ?? ''}
-<header class="site-header">${menu(nav, options)}<a class="site-title" href="${escapeHtml(base)}">${logo}<span>${escapeHtml(release.title)}</span></a><span class="site-release">Release ${escapeHtml(release.release)}</span>${publicationLinks(options)}${searchBox(options)}${options.account?.header ?? ''}</header>
+<header class="site-header">${menu(nav, options)}<a class="site-title" href="${escapeHtml(base)}">${logo}<span>${escapeHtml(release.title)}</span></a><span class="site-release">Release ${escapeHtml(release.release)}</span>${options.versions ?? ''}${publicationLinks(options)}${searchBox(options)}${options.account?.header ?? ''}</header>
 <div class="layout">
 <nav class="toc opend-nav" id="opend-toc" aria-label="Contents">${nav}</nav>
 <main id="opend-main">${main}</main>

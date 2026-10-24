@@ -18,6 +18,7 @@ import {
   renderPage,
   renderSearch,
   renderTopic,
+  renderVersionMenu,
   siteSearchQuery,
 } from '../src/index.js';
 
@@ -434,5 +435,38 @@ describe('site search', () => {
     expect(siteSearchQuery('x'.repeat(500))).toHaveLength(MAX_SEARCH_QUERY);
     // Cut by character, never through a surrogate pair.
     expect(siteSearchQuery('😀'.repeat(300))).toBe('😀'.repeat(MAX_SEARCH_QUERY));
+  });
+});
+
+describe('version menu', () => {
+  const items = [
+    { line: '0.23', labels: ['latest'], href: '/v/0.23/a.html' },
+    { line: '0.21', labels: ['stable'], href: '/v/0.21/' },
+    { line: '0.20', labels: [], href: '/v/0.20/<x>' },
+  ];
+
+  it('lists the lines as plain links in a <details>, marking the current one', () => {
+    const menu = renderVersionMenu({ line: '0.23', labels: ['latest'] }, items);
+    expect(menu).toMatch(/^<details class="site-versions"><summary>/);
+    expect(menu).toContain(
+      '<a href="/v/0.23/a.html" aria-current="page">0.23 <span class="site-versions-label">(latest)</span></a>',
+    );
+    expect(menu).toContain(
+      '<a href="/v/0.21/">0.21 <span class="site-versions-label">(stable)</span></a>',
+    );
+    expect(menu).toContain('<a href="/v/0.20/&lt;x&gt;">0.20</a>');
+    expect(menu).not.toMatch(/<script|style=|onclick/);
+    expect(menu.match(/aria-current/g)).toHaveLength(1);
+  });
+
+  it('renders nothing without lines, and sits after the release in the header', () => {
+    expect(renderVersionMenu({ line: '1', labels: [] }, [])).toBe('');
+    const view = viewRelease(release([topic('a', '<topic id="a"><title>A</title></topic>')]), []);
+    const page = renderPage(view, 'a', {
+      versions: '<!--v-->',
+      head: '<link rel="canonical" href="/a.html">',
+    })!;
+    expect(page).toContain('<span class="site-release">Release 2.1</span><!--v-->');
+    expect(page).toMatch(/<link rel="canonical" href="\/a.html">\n<\/head>/);
   });
 });

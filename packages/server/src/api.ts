@@ -10,11 +10,11 @@ import {
   type ApiScope,
   type Repo,
 } from '@opend/store';
-import { publicAudience, readerAudience, type Audience } from './access.js';
+import { readerAudience, type Audience } from './access.js';
 import { OPENAPI } from './api-spec.js';
 import { registerApiWrites } from './api-writes.js';
 import type { AppContext } from './context.js';
-import { audienceRelease, siteRepo, type ReaderRelease } from './delivery.js';
+import { audienceRelease, sitePublicAudience, siteRepo, type ReaderRelease } from './delivery.js';
 import { searchRelease } from './search.js';
 
 /**
@@ -264,22 +264,25 @@ export async function releaseFor(
   const repo = await requireRepo(ctx);
   let audience: Audience;
   if (key.audience === 'staff') {
-    const line = requested ? releaseLine(requested) : null;
+    const line = requested ? releaseLine(requested, repo.releaseLines) : null;
     if (requested && !line) throw new ApiError(400, 'version must look like 2 or 2.1');
     audience = { key: 'staff', context: null, line };
   } else if (key.audience === 'org') {
     const org = (await listOrgs(ctx.pool)).find((o) => o.slug === key.orgSlug);
     if (!org?.version) throw new ApiError(403, 'the key’s org has no entitlements');
-    audience = readerAudience({
-      products: org.products,
-      features: org.features,
-      version: org.version,
-    });
+    audience = readerAudience(
+      { products: org.products, features: org.features, version: org.version },
+      repo.releaseLines,
+    );
   } else {
     if (repo.access !== 'public') throw new ApiError(403, 'the site is private');
-    audience = publicAudience(repo);
+    audience = await sitePublicAudience(ctx, repo);
   }
-  if (requested && key.audience !== 'staff' && releaseLine(requested) !== audience.line)
+  if (
+    requested &&
+    key.audience !== 'staff' &&
+    releaseLine(requested, repo.releaseLines) !== audience.line
+  )
     throw new ApiError(403, `this key reads release ${audience.line ?? 'the newest'} only`);
   const release = await audienceRelease(ctx, repo, audience);
   if (typeof release === 'string') throw new ApiError(404, release);

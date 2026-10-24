@@ -129,22 +129,27 @@ To try it without an identity provider, set `NODE_ENV=development` and `OPEND_DE
 
 **Public or private sites.** A registered repo is private by default: every page needs a signed-in, registered reader. `PUT /admin/api/repos/:id/access` with `{"access":"public","publicEntitlements":{"products":[...],"features":[],"version":"2.1"}}` also serves anonymous visitors, filtered for that public set (without one they see only unconditioned content). Signed-in readers get their own entitlements together with the public set when both are for the same release line. Anonymous views have their own cache key, search, images, PDFs and the logo follow the same filter, and switching modes clears every replica's caches through `NOTIFY`. See [ADR 0010](docs/adr/0010-public-access-and-sign-in.md).
 
+**Release lines, labels and public versions.** Each line has one live release: by major version by default, or per minor version (`PUT /admin/api/repos/:id/release-lines` with `{"releaseLines":"minor"}`, or `releaseLines: minor` in a seed file), so a 0.22 reader keeps the 0.22 docs after 0.23. Switching moves live releases to their new lines in one transaction, newest build first, and clears labels. Labels (`latest`, `stable`) and public lines give a public site a version menu: `/` serves the `latest` line (else the public entitlements' line), and each public line's anonymous view is at `/v/<line>/`, cached under its own key; lines that are not public look like missing pages there. Public sites also redirect `/context/<app>/<key>` to the help topic for anonymous visitors.
+
 **Sign-in.** `/auth/login` is a branded page listing every configured provider: **Sign in with GitHub** (`GITHUB_OAUTH_CLIENT_ID`/`GITHUB_OAUTH_CLIENT_SECRET`, the same values as the editor's; state + PKCE; readers matched by a verified email), **Sign in with** your OIDC provider (`OIDC_DISPLAY_NAME`), and demo readers in development. With one provider it goes straight there. Pages show **Sign in** for anonymous visitors of public sites, and the reader's name and **Sign out** (a CSRF-checked form) otherwise, in the header and the mobile menu. `OPEND_GITHUB_COLLABORATOR_ORG` (with `OPEND_GITHUB_COLLABORATOR_STAFF=1`) adds people who can push to the docs repo as readers on first GitHub sign-in.
 
 **Staff and edit links.** A staff reader (`PUT /admin/api/readers/:id/staff`, or `staff: true` in a seed) sees the unfiltered staff view with conditions marked; entitlement sync never sets it. With `EDITOR_PUBLIC_URL` set on the docs site, signed-in readers get **Edit this page** under each topic, opening it in the web editor; `OPEND_SOURCE_LINKS=1` adds **View source on GitHub**. One GitHub App serves the docs site, the editor and the build webhook: see [docs/github-app.md](docs/github-app.md) and `node scripts/github-app-url.mjs <docsUrl> <editorUrl>` for a pre-filled registration link.
 
-| Admin API (`Authorization: Bearer $OPEND_ADMIN_TOKEN`)                                               |                                                                       |
-| ---------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| `GET/POST /admin/api/repos`, `POST /admin/api/repos/:id/builds`                                      | Register docs repos; rebuild a commit                                 |
-| `PUT /admin/api/repos/:id/access`                                                                    | Make a site public (with public entitlements) or private              |
-| `GET /admin/api/repos/:id/releases`, `GET /admin/api/builds[/:id]`                                   | Live releases; builds and their diagnostics                           |
-| `DELETE /admin/api/repos/:id/releases/:line`                                                         | Take a release line off the site (the next build for it puts it back) |
-| `GET/POST /admin/api/orgs`, `PUT /admin/api/orgs/:slug/entitlements`, `DELETE /admin/api/orgs/:slug` | Orgs and entitlements                                                 |
-| `GET/POST /admin/api/readers`, `DELETE /admin/api/readers/:id`                                       | Readers, matched to OIDC sign-ins by verified email                   |
-| `PUT /admin/api/readers/:id/staff`                                                                   | Grant or revoke the unfiltered staff view                             |
-| `GET /admin/api/audit`                                                                               | Audit log                                                             |
-| `GET /admin/api/settings`, `POST /admin/api/setup-links`                                             | Console settings (never secrets); first-staff setup link              |
-| `GET /admin/api/analytics/summary`, `GET /admin/api/analytics/feedback[.csv]`                        | Docs analytics and reader feedback                                    |
+| Admin API (`Authorization: Bearer $OPEND_ADMIN_TOKEN`)                                                |                                                                       |
+| ----------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| `GET/POST /admin/api/repos`, `POST /admin/api/repos/:id/builds`                                       | Register docs repos; rebuild a commit                                 |
+| `PUT /admin/api/repos/:id/access`                                                                     | Make a site public (with public entitlements) or private              |
+| `GET /admin/api/repos/:id/releases`, `GET /admin/api/builds[/:id]`                                    | Live releases; builds and their diagnostics                           |
+| `DELETE /admin/api/repos/:id/releases/:line`                                                          | Take a release line off the site (the next build for it puts it back) |
+| `PUT /admin/api/repos/:id/release-lines`, `GET /admin/api/repos/:id/lines`                            | Release lines by major or minor version; list lines and labels        |
+| `PUT /admin/api/repos/:id/lines/:line/label`, `DELETE /admin/api/repos/:id/lines/:line/labels/:label` | Label a line (`latest`, `stable`), or take a label off                |
+| `PUT /admin/api/repos/:id/lines/:line/public`                                                         | Serve a line to anonymous visitors under `/v/<line>/`                 |
+| `GET/POST /admin/api/orgs`, `PUT /admin/api/orgs/:slug/entitlements`, `DELETE /admin/api/orgs/:slug`  | Orgs and entitlements                                                 |
+| `GET/POST /admin/api/readers`, `DELETE /admin/api/readers/:id`                                        | Readers, matched to OIDC sign-ins by verified email                   |
+| `PUT /admin/api/readers/:id/staff`                                                                    | Grant or revoke the unfiltered staff view                             |
+| `GET /admin/api/audit`                                                                                | Audit log                                                             |
+| `GET /admin/api/settings`, `POST /admin/api/setup-links`                                              | Console settings (never secrets); first-staff setup link              |
+| `GET /admin/api/analytics/summary`, `GET /admin/api/analytics/feedback[.csv]`                         | Docs analytics and reader feedback                                    |
 
 See [ADR 0004](docs/adr/0004-hosted-architecture.md) for how it fits together.
 
@@ -307,7 +312,7 @@ const token = await new SignJWT({ email: user.email, org: user.openDOrg })
 
 `OpenDHelp.open()`, `close()` and `toggle()` drive the panel, and `<opend-help-button key="...">` opens a specific context.
 
-**Rendering help yourself.** Apps that render help natively can call `GET /api/v1/help/context?app=console&path=/settings/sso` (also `/topics/<id>` and `/search?q=`) with `Authorization: Bearer <token>`.
+**Rendering help yourself.** Apps that render help natively can call `GET /api/v1/help/context?app=console&path=/settings/sso` (also `/topics/<id>`, `/search?q=` and `/nav`, the reader's filtered table of contents) with `Authorization: Bearer <token>`.
 
 **Checking locally.** `opend preview` serves the same panel. Open `/_opend/help-lab` to see what every key and route resolves to for each preview reader, and click through it in the real widget.
 
