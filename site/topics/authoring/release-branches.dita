@@ -40,7 +40,8 @@ pnpm opend validate path/to/docs --ref v1</codeblock>
     <result>
       <p product="core hosted">Each successful build goes live for its release line, the major number of
         its <parmname>release</parmname>. Readers get the line matching their own version, so 1.x and 2.x
-        docs are live side by side. A build replaces the live release of its line only if it comes from a
+        docs are live side by side. A repository can group releases by minor version instead, so 0.22 and
+        0.23 are lines of their own; see <xref href="../hosting/release-lines.dita"/>. A build replaces the live release of its line only if it comes from a
         newer push, so a slow build of an old commit cannot overwrite a newer one.</p>
       <p>For the exact range syntax, see <xref keyref="release-ranges"/>.</p>
     </result>

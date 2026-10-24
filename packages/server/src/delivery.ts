@@ -9,7 +9,10 @@ import {
   type ReaderContext,
 } from '@opend/model';
 import {
+  compareReleaseLines,
   parseVersion,
+  releaseLine,
+  resolveContext,
   viewPublication,
   viewRelease,
   type PublicationView,
@@ -152,13 +155,54 @@ async function storedRelease(ctx: AppContext, id: number): Promise<StoredRelease
 async function newestLine(ctx: AppContext, repoId: number): Promise<string | null> {
   const cached = ctx.caches.newest.get(repoId);
   if (cached) return cached.line;
-  const lines = (await listLiveReleases(ctx.pool, repoId))
-    .map((r) => Number(r.releaseLine))
-    .filter(Number.isInteger)
-    .sort((a, b) => b - a);
-  const line = lines.length ? String(lines[0]) : null;
+  const line = (await liveLines(ctx, repoId))[0] ?? null;
   ctx.caches.newest.set(repoId, { line });
   return line;
+}
+
+/** The live release lines of a repo, newest first (as versions: `0.23` before `0.3`). */
+async function liveLines(ctx: AppContext, repoId: number): Promise<string[]> {
+  const cached = ctx.caches.liveLines.get(repoId);
+  if (cached) return cached.lines;
+  const lines = (await listLiveReleases(ctx.pool, repoId))
+    .map((r) => r.releaseLine)
+    .sort((a, b) => compareReleaseLines(b, a));
+  ctx.caches.liveLines.set(repoId, { lines });
+  return lines;
+}
+
+/**
+ * The repo with its version picker as readers may use it: a `list` offers only
+ * the versions whose release line (at the repo's granularity) is live, so a
+ * reader is never offered a version that has no docs. A `fixed` version is
+ * served as it is: with nothing live on its line, every reader is told so.
+ */
+async function servablePicker(ctx: AppContext, repo: Repo): Promise<Repo> {
+  const picker = repo.versionPicker;
+  if (picker.mode !== 'list') return repo;
+  const live = new Set(await liveLines(ctx, repo.id));
+  const versions = picker.versions.filter((v) => {
+    const line = releaseLine(v, repo.releaseLines);
+    return line !== null && live.has(line);
+  });
+  return { ...repo, versionPicker: { mode: 'list', versions } };
+}
+
+/**
+ * The version the version picker serves a request (its `versions` cookie
+ * checked against the picker, see `versionChoice`), and what it offers.
+ */
+export async function requestVersionChoice(
+  ctx: AppContext,
+  request: FastifyRequest,
+  repo: Repo,
+  access: ReaderAccess | null,
+): Promise<VersionChoice | null> {
+  return versionChoice(
+    await servablePicker(ctx, repo),
+    ownVersion(repo, access),
+    request.cookies[VERSION_COOKIE],
+  );
 }
 
 /** The live release of the audience's line, filtered for the audience. */
@@ -195,7 +239,7 @@ export async function readerRelease(
 ): Promise<ReaderRelease | string> {
   const repo = await siteRepo(ctx);
   if (!repo) return 'No documentation site is configured yet.';
-  return audienceRelease(ctx, repo, readerAudience(reader));
+  return audienceRelease(ctx, repo, readerAudience(reader, repo.releaseLines));
 }
 
 /** The reader's view of one publication, or `null` when the release has none from `file`. */
@@ -269,7 +313,7 @@ export async function viewerRelease(
   // Private sites choose nothing for anonymous requests: they are sent to sign in.
   const versions =
     access || repo.access === 'public'
-      ? versionChoice(repo, ownVersion(repo, access), request.cookies[VERSION_COOKIE])
+      ? await requestVersionChoice(ctx, request, repo, access)
       : null;
   const audience = audienceFor(repo, access, chosenVersion(versions));
   if (audience === 'sign-in') return { refused: 'sign-in' };
@@ -467,10 +511,51 @@ export function registerDelivery(app: FastifyInstance, ctx: AppContext): void {
     return sendPage(request, reply, r, 200, html);
   });
 
-  app.get('/*', async (request, reply) => {
+  const notFoundPage = (reply: FastifyReply) =>
+    reply
+      .code(404)
+      .headers(PAGE_HEADERS)
+      .type('text/html; charset=utf-8')
+      .send(messagePage('Page not found', 'This page does not exist or is not available to you.'));
+
+  /**
+   * Help context links of public sites: `/context/<app>/<key>`, or
+   * `/context/<app>?path=`. The key resolves as in the help API (the key, its
+   * parents, the app default), but in anonymous visitors' view, at the version
+   * this request would be served (the version picker's choice included), so
+   * a link never names a topic they cannot see. 302 to the topic page, or 404.
+   * Private sites answer 404 and reveal nothing.
+   */
+  const contextRoute = async (request: FastifyRequest, reply: FastifyReply) => {
+    const urlPath = request.url.split('?')[0]!;
+    // A topic page whose id starts with context/ is still a page.
+    if (urlPath.endsWith('.html'))
+      return sitePage(request, reply, decodeURIComponent(urlPath.slice(1)));
+    const { app: appName, key } = request.params as { app: string; key?: string };
+    const repo = await siteRepo(ctx);
+    if (repo?.access !== 'public') return notFoundPage(reply);
+    const choice = await requestVersionChoice(ctx, request, repo, null);
+    const release = await audienceRelease(ctx, repo, publicAudience(repo, chosenVersion(choice)));
+    if (typeof release === 'string') return notFoundPage(reply);
+    const req: { app: string; key?: string; path?: string } = { app: appName };
+    const path = (request.query as { path?: unknown }).path;
+    if (key) req.key = key;
+    else if (typeof path === 'string' && path) req.path = path;
+    const resolved = resolveContext(release.view, req);
+    if (!resolved) return notFoundPage(reply);
+    const fragment = resolved.fragment ? `#${encodeURIComponent(resolved.fragment)}` : '';
+    return reply.headers(PAGE_HEADERS).redirect(`${pageHref(resolved.topicId)}${fragment}`);
+  };
+  app.get('/context/:app', contextRoute);
+  app.get('/context/:app/:key', contextRoute);
+
+  app.get('/*', async (request, reply) =>
+    sitePage(request, reply, decodeURIComponent((request.params as { '*': string })['*'])),
+  );
+
+  async function sitePage(request: FastifyRequest, reply: FastifyReply, path: string) {
     const r = await resolve(request, reply);
     if (!r) return reply;
-    const path = decodeURIComponent((request.params as { '*': string })['*']);
     const { view, key } = r.release;
     if (path.endsWith('.html')) {
       const topicId = path.slice(0, -'.html'.length);
@@ -494,5 +579,5 @@ export function registerDelivery(app: FastifyInstance, ctx: AppContext): void {
     }
     // Missing and hidden pages look the same.
     return sendPage(request, reply, r, 404, renderNotFound(view, pageOptions(r.release)));
-  });
+  }
 }

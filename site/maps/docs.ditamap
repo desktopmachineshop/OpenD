@@ -52,6 +52,7 @@
     <topicref href="../topics/help/widget-api.dita"/>
     <topicref href="../topics/help/tokens.dita"/>
     <topicref href="../topics/help/json-api.dita"/>
+    <topicref href="../topics/help/context-links.dita"/>
     <topicref href="../topics/help/security.dita"/>
     <topicref href="../topics/help/troubleshooting.dita"/>
   </topichead>
@@ -91,6 +92,7 @@
     <topicref href="../topics/hosting/github-app.dita" product="core"/>
     <topicref href="../topics/hosting/access.dita" product="core"/>
     <topicref href="../topics/hosting/version-picker.dita" product="core hosted"/>
+    <topicref href="../topics/hosting/release-lines.dita" product="core"/>
     <topicref href="../topics/hosting/oidc.dita" product="core"/>
     <topicref href="../topics/hosting/github-sign-in.dita" product="core"/>
     <topicref href="../topics/hosting/editor.dita" product="core"/>

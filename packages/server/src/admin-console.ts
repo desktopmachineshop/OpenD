@@ -53,6 +53,7 @@ import {
   type StoredRelease,
 } from '@opend/store';
 import { listRemoteRefs, releaseRefsToPoll } from '@opend/worker';
+import { compareReleaseLines } from '@opend/filter';
 import {
   pdfTemplateSchema,
   PDF_TEMPLATES,
@@ -237,8 +238,8 @@ function entitlementsFrom(body: Record<string, string>): Entitlements | null {
 /** The newest live release of a repo, for its title and declared attributes. */
 async function newestRelease(ctx: AppContext, repo: Repo | null): Promise<StoredRelease | null> {
   if (!repo) return null;
-  const live = (await listLiveReleases(ctx.pool, repo.id)).sort(
-    (a, b) => Number(b.releaseLine) - Number(a.releaseLine),
+  const live = (await listLiveReleases(ctx.pool, repo.id)).sort((a, b) =>
+    compareReleaseLines(b.releaseLine, a.releaseLine),
   );
   return live[0] ? getRelease(ctx.pool, live[0].releaseId) : null;
 }
@@ -352,7 +353,7 @@ export function registerAdminConsole(app: FastifyInstance, ctx: AppContext): voi
           release: release?.snapshot.release ?? null,
           published: repo
             ? (await listLiveReleases(ctx.pool, repo.id))
-                .sort((a, b) => Number(b.releaseLine) - Number(a.releaseLine))
+                .sort((a, b) => compareReleaseLines(b.releaseLine, a.releaseLine))
                 .map((r) => r.release)
             : [],
           csrf: s.csrf,

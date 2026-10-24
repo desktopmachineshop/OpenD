@@ -429,4 +429,13 @@ alter table repos add column if not exists version_picker jsonb not null
   default '{"mode":"off"}';
 `,
   },
+  {
+    id: '012_release_lines',
+    sql: `
+-- How releases group into lines, each with one live release: 'major' (line 2
+-- holds 2.x) or 'minor' (line 0.23 holds 0.23.x). Existing repos keep 'major'.
+alter table repos add column if not exists release_lines text not null default 'major'
+  check (release_lines in ('major', 'minor'));
+`,
+  },
 ];

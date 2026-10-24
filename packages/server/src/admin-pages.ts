@@ -517,6 +517,17 @@ export function overviewPage(d: OverviewData): Html {
         <h2 id="live-h">Live releases</h2>
         <a class="admin-button is-secondary is-small" href="/">Open the site</a>
       </div>
+      ${
+        d.repo
+          ? html`<p class="admin-muted">
+              ${
+                d.repo.releaseLines === 'minor'
+                  ? 'One live release per minor version (0.23.x, 0.24.x).'
+                  : 'One live release per major version (1.x, 2.x).'
+              }
+            </p>`
+          : ''
+      }
       ${lines}
     </section>
     <section class="admin-card" aria-labelledby="builds-h">

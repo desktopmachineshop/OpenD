@@ -10,8 +10,9 @@
         <proptype><parmname>release</parmname></proptype>
         <propvalue>required</propvalue>
         <propdesc>The version this branch documents, such as <codeph>0.1</codeph> or <codeph>2.1</codeph>.
-          The hosted build also requires it to be a version number: its major part is the release line, so
-          <codeph>1.4</codeph> readers keep getting the 1.x docs after 2.0 is published.</propdesc>
+          The hosted build also requires it to be a version number: its major part is the release line
+          (its major and minor parts on a repository with minor lines), so <codeph>1.4</codeph> readers
+          keep getting the 1.x docs after 2.0 is published.</propdesc>
       </property>
       <property>
         <proptype><parmname>map</parmname></proptype>

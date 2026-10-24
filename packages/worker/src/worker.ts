@@ -157,8 +157,9 @@ async function buildAndPublish(deps: WorkerDeps, repo: Repo, job: BuildJob): Pro
     if (!release || hasErrors(diagnostics)) {
       return { kind: 'invalid', message: summarize(diagnostics), diagnostics };
     }
-    const line = releaseLine(release.release);
-    if (!line) {
+    // Both granularities accept the same versions; the line itself is computed
+    // when publishing, with the repo's granularity read under a lock.
+    if (!releaseLine(release.release, repo.releaseLines)) {
       const d: Diagnostic = {
         severity: 'error',
         code: 'invalid-config',
@@ -186,7 +187,7 @@ async function buildAndPublish(deps: WorkerDeps, repo: Repo, job: BuildJob): Pro
       repoId: repo.id,
       ref: job.ref,
       sha: job.sha,
-      releaseLine: line,
+      releaseLine: (lines) => releaseLine(release.release, lines),
       snapshot: release,
       diagnostics,
       searchIndex: searchIndexInput(release),

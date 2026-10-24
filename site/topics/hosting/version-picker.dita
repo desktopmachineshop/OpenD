@@ -77,7 +77,10 @@ curl -X PUT "$PUBLIC_URL/admin/api/repos/1/versions" -H "$H" -H 'content-type: a
           way.</li>
         <li><b>A choice is only a request.</b> It is kept in the <codeph>opend_version</codeph> cookie by the
           picker's links (<filepath>/_version?v=2.0&amp;returnTo=/page.html</filepath>) and checked on every
-          request: a version the picker no longer offers is ignored, and the reader is back on their own.</li>
+          request: a version the picker no longer offers is ignored, and the reader is back on their own. A
+          listed version whose release line has no live release is not offered.</li>
+        <li><b>Release lines.</b> A version served is mapped to its release line by the repository's setting,
+          by major or by minor version. See <xref href="release-lines.dita"/>.</li>
         <li><b>Everything follows it.</b> Pages, navigation, search, images and PDFs are served for the
           version chosen, and cached per version. The staff view moves to the chosen version's release line.
           The embedded help panel and the public API are unchanged: they always use the reader's own

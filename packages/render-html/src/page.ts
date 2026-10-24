@@ -1,5 +1,4 @@
-import type { NavEntry } from '@opend/model';
-import type { ReleaseView, SearchHit } from '@opend/filter';
+import { visibleNav, type ReleaseView, type SearchHit, type VisibleNavEntry } from '@opend/filter';
 import { DEFAULT_CSS } from './style.js';
 import { conditionLabel, pageHref, renderTopic, type RenderOptions } from './render.js';
 import { escapeHtml } from './escape.js';
@@ -100,31 +99,19 @@ export function renderNav(
 ): string {
   const base = options.base ?? '/';
   // The `<li>` items for a list of entries, and whether the current page is among them.
-  const items = (entries: readonly NavEntry[]): { html: string; current: boolean } => {
+  const items = (entries: readonly VisibleNavEntry[]): { html: string; current: boolean } => {
     let html = '';
     let current = false;
     for (const e of entries) {
-      if (e.hidden) continue;
-      const visible = e.topicId !== undefined && view.isVisible(e.topicId);
       const inner = items(e.children);
-      // Groups, submaps and entries whose topic is hidden: lift the children.
-      // A hidden topic's navtitle is never shown, as it would reveal the topic.
-      if (!visible && (!e.title || e.topicId !== undefined)) {
-        html += inner.html;
-        current ||= inner.current;
-        continue;
-      }
-      // A heading with nothing visible under it is omitted.
-      if (!visible && !inner.html) continue;
-      const isCurrent = visible && e.topicId === currentId;
+      const isCurrent = e.topicId !== undefined && e.topicId === currentId;
       current ||= isCurrent || inner.current;
       const label = escapeHtml(e.title);
       const condition = options.showConditions ? conditionLabel(e.condition) : '';
       const badge = condition ? ` <span class="opend-badge">${escapeHtml(condition)}</span>` : '';
-      const link =
-        visible && e.topicId
-          ? `<a href="${escapeHtml(pageHref(e.topicId, base))}"${isCurrent ? ' aria-current="page"' : ''}>${label}</a>`
-          : '';
+      const link = e.topicId
+        ? `<a href="${escapeHtml(pageHref(e.topicId, base))}"${isCurrent ? ' aria-current="page"' : ''}>${label}</a>`
+        : '';
       if (!inner.html) {
         html += `<li>${link}${badge}</li>`;
         continue;
@@ -137,7 +124,7 @@ export function renderNav(
     }
     return { html, current };
   };
-  const { html } = items(view.nav);
+  const { html } = items(visibleNav(view));
   return html ? `<ul>${html}</ul>` : '';
 }
 

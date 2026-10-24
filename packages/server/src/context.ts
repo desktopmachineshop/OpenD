@@ -32,6 +32,8 @@ export class Caches {
   readonly live = new LRUCache<string, { id: number | null }>({ max: 100, ttl: 60_000 });
   /** Repo id → its newest live release line, for views not tied to a line. */
   readonly newest = new LRUCache<number, { line: string | null }>({ max: 100, ttl: 60_000 });
+  /** Repo id → its live release lines, newest first (for the version picker). */
+  readonly liveLines = new LRUCache<number, { lines: string[] }>({ max: 100, ttl: 60_000 });
   /** Release id → stored release. Releases never change once written. */
   readonly releases = new LRUCache<number, StoredRelease>({ max: 8 });
   /**
@@ -52,6 +54,7 @@ export class Caches {
     this.site = null;
     this.live.clear();
     this.newest.clear();
+    this.liveLines.clear();
     this.views.clear();
     this.pages.clear();
     this.publications.clear();

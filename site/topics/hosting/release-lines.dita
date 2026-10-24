@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE task PUBLIC "-//OASIS//DTD DITA Task//EN" "task.dtd">
+<task id="release-lines" product="core" audience="admin">
+  <title>Release lines by major or minor version</title>
+  <shortdesc>Each release line has one live release. Lines group releases by major version, or by minor
+    version for products whose customers are each on a specific 0.x minor.</shortdesc>
+  <taskbody>
+    <context>
+      <p>A reader is served the live release of their own line, worked out from the version they are served:
+        their organization's version, or the one the version picker gives them. By default a line is a major
+        version: <codeph>2.1</codeph> and <codeph>2.4</codeph> readers both read line <codeph>2</codeph>,
+        whose live release is the newest 2.x build. A product released as 0.21, 0.22 and 0.23 needs a line per
+        minor version instead, or every 0.x reader gets the newest 0.x docs.</p>
+      <simpletable relcolwidth="2* 3* 3*">
+        <sthead><stentry>Setting</stentry><stentry>Line of release 0.23.1</stentry><stentry>A 0.22 reader gets</stentry></sthead>
+        <strow><stentry><codeph>major</codeph> (default)</stentry><stentry><codeph>0</codeph></stentry><stentry>The newest 0.x build</stentry></strow>
+        <strow><stentry><codeph>minor</codeph></stentry><stentry><codeph>0.23</codeph></stentry><stentry>The live 0.22 build, or "No documentation has been published for release 0.22.x yet"</stentry></strow>
+      </simpletable>
+    </context>
+    <steps>
+      <step>
+        <cmd>Choose lines by minor version for the repository.</cmd>
+        <stepxmp>
+          <codeblock>H="authorization: Bearer $OPEND_ADMIN_TOKEN"
+curl -X PUT "$PUBLIC_URL/admin/api/repos/1/release-lines" -H "$H" -H 'content-type: application/json' \
+  -d '{"releaseLines":"minor"}'</codeblock>
+          <p>Or give <parmname>releaseLines</parmname> when registering the repository with
+            <codeph>POST /admin/api/repos</codeph>, or in a seed file next to the repository:
+            <codeph>releaseLines: minor</codeph>.</p>
+        </stepxmp>
+        <info>
+          <p>The change applies at once, in one transaction, to what is already live: each live release moves
+            to the line its <parmname>release</parmname> belongs to. Nothing that is not live comes back by
+            itself: after switching from <codeph>major</codeph> to <codeph>minor</codeph>, line
+            <codeph>0</codeph> becomes the line of its live release (say <codeph>0.23</codeph>), and older
+            minors go live again with their next build (request one with <codeph>POST
+            /admin/api/repos/:id/builds</codeph>). Switching back merges lines, keeping the newest build of
+            each. A build that finishes during the switch publishes to a line of the new setting. The change is
+            audited as <codeph>repo.release-lines</codeph>, and every replica drops its caches.</p>
+        </info>
+      </step>
+      <step>
+        <cmd>Publish each minor from its own branch, for example <codeph>docs/0.23</codeph> with
+          <parmname>releaseRefs</parmname> <codeph>["docs/*"]</codeph>, and
+          <codeph>release: "0.23.0"</codeph> in that branch's <filepath>opend.config.yaml</filepath>.</cmd>
+        <info><p>See <xref href="../authoring/release-branches.dita"/>. <codeph>GET
+          /admin/api/repos/1/releases</codeph> lists the live line of each.</p></info>
+      </step>
+    </steps>
+    <result>
+      <section id="picker">
+        <title>With the version picker</title>
+        <p>A version served through the version picker maps to its line the same way: on a
+          <codeph>minor</codeph> repository, a reader who chooses <codeph>0.21</codeph> is served the live
+          0.21 build. A list offers only the versions whose line is live, so a line not yet built, or retired,
+          is left out of the menu, and a choice of it falls back to the reader's own version. See
+          <xref href="version-picker.dita"/>.</p>
+      </section>
+      <section id="newest-public">
+        <title>A public site on the newest version, with older ones to choose</title>
+        <p>For product docs published per minor, where anonymous visitors should land on the newest version
+          and may switch to older ones, run these after each release's build has gone live:</p>
+        <codeblock>curl -X PUT "$PUBLIC_URL/admin/api/repos/1/access" -H "$H" -H 'content-type: application/json' \
+  -d '{"access":"public","publicEntitlements":{"products":["core"],"features":[],"version":"0.23"}}'
+curl -X PUT "$PUBLIC_URL/admin/api/repos/1/versions" -H "$H" -H 'content-type: application/json' \
+  -d '{"mode":"list","versions":["0.23","0.22","0.21"]}'</codeblock>
+        <p>Anonymous visitors then get 0.23 at every address, with a menu of 0.23, 0.22 and 0.21. Signed-in
+          readers start on their own organization's version and can switch the same way.</p>
+      </section>
+    </result>
+  </taskbody>
+</task>

@@ -138,3 +138,45 @@ function viewNav(
     passes: (gates) => gatesPass(gates, policies, options),
   };
 }
+
+/** A navigation entry as a reader may see it; see `visibleNav`. */
+export interface VisibleNavEntry {
+  title: string;
+  /** Present only when the topic is visible to this reader. */
+  topicId?: string;
+  fragment?: string;
+  condition: Condition;
+  children: VisibleNavEntry[];
+}
+
+/**
+ * The navigation a reader is shown: what the docs site's contents, the API's
+ * nav and the help API's nav all list. `toc="no"` entries are left out with
+ * their subtrees. An entry whose topic is hidden from this reader never shows
+ * its navtitle (that would reveal the topic): its visible children take its
+ * place. Groups without a title are lifted the same way, and a heading with
+ * nothing visible under it is left out.
+ */
+export function visibleNav(view: ReleaseView): VisibleNavEntry[] {
+  const items = (entries: readonly NavEntry[]): VisibleNavEntry[] => {
+    const out: VisibleNavEntry[] = [];
+    for (const e of entries) {
+      if (e.hidden) continue;
+      const visible = e.topicId !== undefined && view.isVisible(e.topicId);
+      const children = items(e.children);
+      if (!visible && (!e.title || e.topicId !== undefined)) {
+        out.push(...children);
+        continue;
+      }
+      if (!visible && !children.length) continue;
+      const entry: VisibleNavEntry = { title: e.title, condition: e.condition, children };
+      if (visible) {
+        entry.topicId = e.topicId!;
+        if (e.fragment) entry.fragment = e.fragment;
+      }
+      out.push(entry);
+    }
+    return out;
+  };
+  return items(view.nav);
+}

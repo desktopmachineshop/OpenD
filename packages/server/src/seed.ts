@@ -11,7 +11,8 @@ import {
   withTransaction,
   type Pool,
 } from '@opend/store';
-import { entitlementsSchema, versionPickerSchema } from './admin.js';
+import { RELEASE_LINES } from '@opend/model';
+import { changeReleaseLines, entitlementsSchema, versionPickerSchema } from './admin.js';
 
 const seedSchema = z.object({
   repos: z
@@ -27,6 +28,8 @@ const seedSchema = z.object({
         publicEntitlements: entitlementsSchema.nullable().optional(),
         /** Omitted: keep the repo's current version picker (new repos: off). */
         versionPicker: versionPickerSchema.optional(),
+        /** Omitted: keep the repo's release lines (new repos: major). */
+        releaseLines: z.enum(RELEASE_LINES).optional(),
       }),
     )
     .default([]),
@@ -69,8 +72,15 @@ export async function applySeed(
   const seed = parsed.data;
   let readers = 0;
   await withTransaction(pool, async (db) => {
-    for (const { access, publicEntitlements, versionPicker, ...input } of seed.repos) {
+    for (const {
+      access,
+      publicEntitlements,
+      versionPicker,
+      releaseLines,
+      ...input
+    } of seed.repos) {
       const repo = await upsertRepo(db, input);
+      if (releaseLines) await changeReleaseLines(db, repo.id, releaseLines, 'seed');
       if (access)
         await setRepoAccess(
           db,

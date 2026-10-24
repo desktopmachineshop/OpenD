@@ -23,6 +23,7 @@
     <topicref href="../topics/hosting/github-app.dita"/>
     <topicref href="../topics/hosting/access.dita"/>
     <topicref href="../topics/hosting/version-picker.dita" product="core hosted"/>
+    <topicref href="../topics/hosting/release-lines.dita" product="core"/>
     <topicref href="../topics/hosting/oidc.dita"/>
     <topicref href="../topics/hosting/github-sign-in.dita"/>
     <topicref href="../topics/hosting/editor.dita"/>

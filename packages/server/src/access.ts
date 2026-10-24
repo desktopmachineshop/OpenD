@@ -1,4 +1,4 @@
-import { entitlementKey, type ReaderContext } from '@opend/model';
+import { entitlementKey, type ReaderContext, type ReleaseLines } from '@opend/model';
 import {
   compareVersions,
   parseVersion,
@@ -31,14 +31,22 @@ export type NoAudience = 'sign-in' | 'no-entitlements';
 export const NOTHING_GATED: ReaderContext = { products: [], features: [], version: 'none' };
 
 /** The staff view's audience: unfiltered, on the chosen line or else the reader's own. */
-function staffAudience(access: ReaderAccess, version: string | null): Audience {
+function staffAudience(
+  access: ReaderAccess,
+  version: string | null,
+  lines: ReleaseLines,
+): Audience {
   const v = version ?? access.context?.version;
-  return { key: 'staff', context: null, line: v ? releaseLine(v) : null };
+  return { key: 'staff', context: null, line: v ? releaseLine(v, lines) : null };
 }
 
-/** A reader's own entitlements. */
-export function readerAudience(context: ReaderContext): Audience {
-  return { key: entitlementKey(context), context, line: releaseLine(context.version) };
+/**
+ * A reader's entitlements, served the live release of their version's line
+ * at the repo's granularity (`lines`): `2` for 2.1 by major, `0.21` for
+ * 0.21.4 by minor.
+ */
+export function readerAudience(context: ReaderContext, lines: ReleaseLines): Audience {
+  return { key: entitlementKey(context), context, line: releaseLine(context.version, lines) };
 }
 
 /**
@@ -57,7 +65,7 @@ export function publicAudience(repo: Repo, version: string | null = null): Audie
   return {
     key: `public|${entitlementKey(context)}`,
     context,
-    line: releaseLine(context.version),
+    line: releaseLine(context.version, repo.releaseLines),
   };
 }
 
@@ -82,24 +90,28 @@ export function audienceFor(
   access: ReaderAccess | null,
   version: string | null = null,
 ): Audience | NoAudience {
-  if (access?.reader.staff) return staffAudience(access, version);
+  const lines = repo.releaseLines;
+  if (access?.reader.staff) return staffAudience(access, version, lines);
   const on = (context: ReaderContext): ReaderContext =>
     version ? { ...context, version } : context;
   if (repo.access !== 'public') {
     if (!access) return 'sign-in';
     if (!access.context) return 'no-entitlements';
-    return readerAudience(on(access.context));
+    return readerAudience(on(access.context), lines);
   }
   const own = access?.context ? on(access.context) : null;
   if (!own) return publicAudience(repo, version);
   const pub = repo.publicEntitlements;
-  if (!pub || releaseLine(version ?? pub.version) !== releaseLine(own.version))
-    return readerAudience(own);
-  return readerAudience({
-    ...own,
-    products: [...new Set([...own.products, ...pub.products])],
-    features: [...new Set([...own.features, ...pub.features])],
-  });
+  if (!pub || releaseLine(version ?? pub.version, lines) !== releaseLine(own.version, lines))
+    return readerAudience(own, lines);
+  return readerAudience(
+    {
+      ...own,
+      products: [...new Set([...own.products, ...pub.products])],
+      features: [...new Set([...own.features, ...pub.features])],
+    },
+    lines,
+  );
 }
 
 /** What the header shows a request about versions: nothing when the picker is off. */

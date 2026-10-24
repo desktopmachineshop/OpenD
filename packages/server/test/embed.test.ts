@@ -314,6 +314,51 @@ describe.skipIf(!url)('embedded help (hosted)', () => {
       expect(found.hits[0].snippet).toContain('setup wizard');
     });
 
+    it('returns the navigation filtered for the token’s reader', async () => {
+      interface Nav {
+        title: string;
+        topicId?: string;
+        children: Nav[];
+      }
+      const navFor = async (reader: keyof typeof READERS) => {
+        const t = await token({ email: READERS[reader]!.email, org: READERS[reader]!.org });
+        const res = await get('/api/v1/help/nav', { authorization: `Bearer ${t}`, origin: HOST });
+        expect(res.statusCode).toBe(200);
+        expect(res.headers['cache-control']).toBe('private, no-store');
+        expect(res.headers['access-control-allow-origin']).toBe(HOST);
+        return res.json() as { title: string; release: string; line: string; nav: Nav[] };
+      };
+      const flat = (entries: Nav[]): Nav[] => entries.flatMap((e) => [e, ...flat(e.children)]);
+      for (const [name, reader] of Object.entries(READERS)) {
+        const body = await navFor(name);
+        expect(body.line).toBe(reader.context.version.split('.')[0]);
+        const entries = flat(body.nav);
+        const ids = entries.flatMap((e) => (e.topicId ? [e.topicId] : []));
+        expect(ids).toContain('topics/overview');
+        // Every topic id opens with the topics endpoint; headings always have something under them.
+        const auth = {
+          authorization: `Bearer ${await token({ email: reader.email, org: reader.org })}`,
+        };
+        for (const id of ids)
+          expect((await get(`/api/v1/help/topics/${id}`, auth)).statusCode, id).toBe(200);
+        for (const e of entries) if (!e.topicId) expect(e.children.length).toBeGreaterThan(0);
+        // Leak markers that can appear in titles.
+        const text = JSON.stringify(body);
+        for (const [phrase, rule] of MARKERS.filter(([p]) =>
+          ['Pair a Gadget', 'Configure single sign-on', 'Audit log events'].includes(p),
+        ))
+          expect(text.includes(phrase), `${name}: ${phrase}`).toBe(rule(reader.context));
+        expect(text.includes('"Gadget"'), `${name}: Gadget heading`).toBe(
+          reader.context.products.includes('gadget'),
+        );
+        expect(ids.includes('topics/gadget-pairing')).toBe(
+          reader.context.products.includes('gadget'),
+        );
+        expect(ids.includes('topics/release-notes-1')).toBe(name === 'v1-basic');
+      }
+      expect((await get('/api/v1/help/nav', { origin: HOST })).statusCode).toBe(401);
+    });
+
     it('requires a valid token and an allowed origin', async () => {
       expect((await get('/api/v1/help/search?q=x', { origin: HOST })).statusCode).toBe(401);
       const t = await token({ email: 'ann@acme.example', org: 'acme' });

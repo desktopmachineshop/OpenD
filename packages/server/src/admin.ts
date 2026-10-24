@@ -1,8 +1,16 @@
 import { timingSafeEqual } from 'node:crypto';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
-import { pdfTemplateSchema, resolvePdfTemplate, siteThemeSchema } from '@opend/model';
 import {
+  RELEASE_LINES,
+  pdfTemplateSchema,
+  resolvePdfTemplate,
+  siteThemeSchema,
+  type ReleaseLines,
+} from '@opend/model';
+import { releaseLine } from '@opend/filter';
+import {
+  setRepoReleaseLines,
   SETTING,
   deleteSetting,
   putSetting,
@@ -142,6 +150,29 @@ export function sourceUrlSchema(production: boolean) {
     );
 }
 
+/** How a repo groups releases into lines: `major` (the default) or `minor`. */
+export const releaseLinesSchema = z.object({ releaseLines: z.enum(RELEASE_LINES) });
+
+/**
+ * Switches a repo's release-line granularity and moves its live releases to
+ * their new lines, in the caller's transaction (see `setRepoReleaseLines`).
+ * Null when the repo does not exist.
+ */
+export async function changeReleaseLines(
+  db: Parameters<typeof setRepoReleaseLines>[0],
+  repoId: number,
+  lines: ReleaseLines,
+  actor: string,
+) {
+  const result = await setRepoReleaseLines(db, repoId, lines, (v) => releaseLine(v, lines));
+  if (result?.changed)
+    await audit(db, actor, 'repo.release-lines', {
+      repo: result.repo.fullName,
+      releaseLines: lines,
+    });
+  return result?.repo ?? null;
+}
+
 export const repoSchema = (production: boolean) =>
   z.object({
     fullName: z.string().regex(/^[\w.-]+\/[\w.-]+$/, 'owner/name'),
@@ -155,6 +186,8 @@ export const repoSchema = (production: boolean) =>
         'a path inside the repository',
       )
       .optional(),
+    /** Omitted: keep the repo's release lines (new repos: major). */
+    releaseLines: z.enum(RELEASE_LINES).optional(),
   });
 const analyticsQuery = z.object({
   days: z.coerce.number().int().min(1).max(3650).default(30),
@@ -261,9 +294,10 @@ export function registerAdmin(app: FastifyInstance, ctx: AppContext): void {
         const input = parse(repoSchema(ctx.config.production), request.body, reply);
         if (!input) return reply;
         const repo = await withTransaction(ctx.pool, async (db) => {
-          const r = await upsertRepo(db, input);
+          const { releaseLines, ...fields } = input;
+          const r = await upsertRepo(db, fields);
           await audit(db, ACTOR, 'repo.upsert', input);
-          return r;
+          return releaseLines ? await changeReleaseLines(db, r.id, releaseLines, ACTOR) : r;
         });
         ctx.caches.releaseChanged();
         return reply.code(201).send(repo);
@@ -318,6 +352,19 @@ export function registerAdmin(app: FastifyInstance, ctx: AppContext): void {
           return r;
         });
         // Pages show the picker, and readers may now be on another version: drop every cache.
+        ctx.caches.releaseChanged();
+        return repo ? reply.send(repo) : reply.code(404).send({ error: 'no such repo' });
+      });
+      scope.put('/repos/:id/release-lines', async (request, reply) => {
+        const id = Number((request.params as { id: string }).id);
+        const input = parse(releaseLinesSchema, request.body, reply);
+        if (!input) return reply;
+        const repo = Number.isSafeInteger(id)
+          ? await withTransaction(ctx.pool, (db) =>
+              changeReleaseLines(db, id, input.releaseLines, ACTOR),
+            )
+          : null;
+        // Live releases may have moved to other lines: drop every cache.
         ctx.caches.releaseChanged();
         return repo ? reply.send(repo) : reply.code(404).send({ error: 'no such repo' });
       });

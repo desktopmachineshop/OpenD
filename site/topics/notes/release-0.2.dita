@@ -43,6 +43,27 @@
           <codeph>settings.appearance.theme</codeph> and <codeph>settings.appearance.pdf</codeph>.</li>
       </ul>
     </section>
+    <section id="after-0.2.0">
+      <title>Since 0.2.0</title>
+      <ul>
+        <li audience="admin" product="core">Release lines by minor version: a repository can keep one live
+          release per minor (0.22, 0.23) instead of per major, so each reader keeps the docs of their own 0.x
+          minor, and the version picker serves the line of the version chosen. New admin API route
+          <codeph>PUT /admin/api/repos/:id/release-lines</codeph>, a <parmname>releaseLines</parmname> field
+          on <codeph>POST /admin/api/repos</codeph> and in seed files, the <codeph>repo.release-lines</codeph>
+          audit action and migration <codeph>012_release_lines</codeph>. See
+          <xref href="../hosting/release-lines.dita"/>.</li>
+        <li audience="admin developer">The version picker offers only listed versions that have a live
+          release.</li>
+        <li audience="developer" product="embed"><codeph>GET /api/v1/help/nav</codeph>: the token reader's
+          navigation, for apps that draw a help sidebar. See <xref href="../help/json-api.dita"/>.</li>
+        <li audience="developer" product="embed">Context links for public sites,
+          <filepath>/context/<varname>app</varname>/<varname>key</varname></filepath>, that redirect to the
+          topic. See <xref href="../help/context-links.dita"/>.</li>
+        <li audience="developer"><codeph>GET /api/v1/nav</codeph> no longer lists the navtitle of a topic the
+          key's audience cannot see.</li>
+      </ul>
+    </section>
     <section id="upgrade" product="core">
       <title>Upgrading from 0.1</title>
       <p>Deploy the new image. The migration adds one column with the picker off, so readers see no change

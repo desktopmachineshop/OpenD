@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { LRUCache } from 'lru-cache';
 import { displayText, firstChild } from '@opend/model';
-import { resolveContext, type ReleaseView } from '@opend/filter';
+import { resolveContext, visibleNav, type ReleaseView, type VisibleNavEntry } from '@opend/filter';
 import { frameScript, widgetScript } from '@opend/embed';
 import {
   handleEmbedRequest,
@@ -311,6 +311,18 @@ export function registerEmbed(app: FastifyInstance, ctx: AppContext): void {
     return reply.send(body);
   });
 
+  // The reader's navigation, filtered exactly as the docs site's contents.
+  app.get('/api/v1/help/nav', async (request, reply) => {
+    const r = await apiReader(request, reply);
+    if (!r) return reply;
+    return reply.send({
+      title: r.release.view.release.title,
+      release: r.release.view.release.release,
+      line: r.release.line,
+      nav: helpNavJson(visibleNav(r.release.view)),
+    });
+  });
+
   app.get('/api/v1/help/search', async (request, reply) => {
     const r = await apiReader(request, reply);
     if (!r) return reply;
@@ -324,5 +336,21 @@ export function registerEmbed(app: FastifyInstance, ctx: AppContext): void {
       resultCount: hits.length,
     });
     return reply.send({ query: q, hits });
+  });
+}
+
+/** One entry of `/api/v1/help/nav`: a topic (with `topicId`) or a heading (without). */
+export interface HelpNavEntry {
+  title: string;
+  /** The id `/api/v1/help/topics/<topicId>` accepts; absent for headings. */
+  topicId?: string;
+  children: HelpNavEntry[];
+}
+
+function helpNavJson(entries: readonly VisibleNavEntry[]): HelpNavEntry[] {
+  return entries.map((e) => {
+    const out: HelpNavEntry = { title: e.title, children: helpNavJson(e.children) };
+    if (e.topicId) out.topicId = e.topicId;
+    return out;
   });
 }

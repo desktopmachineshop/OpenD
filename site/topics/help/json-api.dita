@@ -57,6 +57,28 @@
         <parmname>fragment</parmname>.</p>
     </section>
 
+    <section id="nav">
+      <title>GET /api/v1/help/nav</title>
+      <p>The reader's table of contents, for a help sidebar: filtered exactly as the docs site's contents.
+        Topics the reader cannot see are left out, and never lend their title to anything; a heading with
+        nothing visible under it is left out too, and so are <codeph>toc="no"</codeph> entries.</p>
+      <codeblock>{
+  "title": "Widget Platform Docs",
+  "release": "2.1",
+  "line": "2",
+  "nav": [
+    { "title": "Getting started", "children": [
+      { "title": "Overview", "topicId": "topics/overview", "children": [] },
+      { "title": "Install the Widget", "topicId": "topics/install", "children": [] } ] }
+  ]
+}</codeblock>
+      <properties relcolwidth="2* 5*">
+        <prophead><proptypehd>Field</proptypehd><propdeschd>Meaning</propdeschd></prophead>
+        <property><proptype><parmname>title</parmname>, <parmname>release</parmname>, <parmname>line</parmname></proptype><propdesc>The site's title, and the release and release line the reader is served.</propdesc></property>
+        <property><proptype><parmname>nav</parmname></proptype><propdesc>The entries, in map order. Each has a <parmname>title</parmname> and <parmname>children</parmname>; a topic also has its <parmname>topicId</parmname>, which <filepath>/api/v1/help/topics/</filepath> accepts. An entry without <parmname>topicId</parmname> is a heading, and always has children.</propdesc></property>
+      </properties>
+    </section>
+
     <section id="search">
       <title>GET /api/v1/help/search?q=</title>
       <p>Searches only the topics this reader can see, and only the parts of them this reader can see.
