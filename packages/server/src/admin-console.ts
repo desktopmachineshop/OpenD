@@ -33,6 +33,7 @@ import {
   setEntitlements,
   setReaderStaff,
   setRepoAccess,
+  setRepoVersionPicker,
   settingFlag,
   settingString,
   setupTokenValid,
@@ -60,7 +61,12 @@ import {
   type PdfTemplate,
 } from '@opend/model';
 import { publicationHref } from '@opend/render-html';
-import { entitlementsSchema, repoSchema, slug as slugSchema } from './admin.js';
+import {
+  entitlementsSchema,
+  repoSchema,
+  slug as slugSchema,
+  versionPickerSchema,
+} from './admin.js';
 import {
   adminShell,
   apiPage,
@@ -125,6 +131,7 @@ const DONE: Record<string, string> = {
   welcome:
     'Welcome. You are a staff reader: connect GitHub and choose the docs repository to get going.',
   access: 'Access saved. Every page follows it from now on.',
+  versions: 'Version picker saved. Every page follows it from now on.',
   repo: 'Docs repository saved.',
   'repo-build': 'Docs repository saved and a build queued. It goes live when it passes validation.',
   build: 'Build queued. It goes live when it passes validation.',
@@ -343,6 +350,11 @@ export function registerAdminConsole(app: FastifyInstance, ctx: AppContext): voi
           siteTitle: release?.snapshot.title || 'OpenD',
           attributes: attributesOf(release),
           release: release?.snapshot.release ?? null,
+          published: repo
+            ? (await listLiveReleases(ctx.pool, repo.id))
+                .sort((a, b) => Number(b.releaseLine) - Number(a.releaseLine))
+                .map((r) => r.release)
+            : [],
           csrf: s.csrf,
         }),
       };
@@ -667,6 +679,37 @@ export function registerAdminConsole(app: FastifyInstance, ctx: AppContext): voi
     // Every cached view and page is dropped; NOTIFY does the same on other replicas.
     ctx.caches.releaseChanged();
     return 'access';
+  });
+
+  action('/admin/site/versions', 'site', async (s, body) => {
+    const versions = (body.versions ?? '')
+      .split(',')
+      .map((v) => v.trim())
+      .filter(Boolean);
+    const parsed = versionPickerSchema.safeParse(
+      body.mode === 'fixed'
+        ? { mode: 'fixed', version: (body.fixedVersion ?? '').trim() }
+        : body.mode === 'list'
+          ? { mode: 'list', versions }
+          : { mode: body.mode },
+    );
+    if (!parsed.success)
+      throw new InputError(
+        body.mode === 'fixed' || body.mode === 'list'
+          ? 'Give each version as a number such as 2.1.'
+          : 'Choose what readers can pick.',
+      );
+    const repo = await siteRepo(ctx);
+    if (!repo) throw new InputError('Register the docs repository first.');
+    await withTransaction(ctx.pool, async (db) => {
+      await setRepoVersionPicker(db, repo.id, parsed.data);
+      await audit(db, s.actor, 'repo.versions', {
+        repo: repo.fullName,
+        versionPicker: parsed.data,
+      });
+    });
+    ctx.caches.releaseChanged();
+    return 'versions';
   });
 
   // ---- appearance ----------------------------------------------------------

@@ -564,7 +564,69 @@ export interface SitePageData {
   siteTitle: string;
   attributes: { product: string[]; feature: string[] };
   release: string | null;
+  /** The live release of each line, newest first, e.g. `['2.1', '1.4']`. */
+  published: string[];
   csrf: string;
+}
+
+const VERSION_MODES = [
+  ['off', 'Off', 'No picker. Each reader gets the version their organization is entitled to.'],
+  [
+    'reader',
+    'Reader’s version',
+    'Show each signed-in reader the version they get, from their organization’s entitlements.',
+  ],
+  ['fixed', 'Fixed version', 'Everyone gets the one version below, whatever their own.'],
+  [
+    'list',
+    'Choose from a list',
+    'Readers pick from the versions below. Their own version is always offered too, and is where they start.',
+  ],
+] as const;
+
+function versionPickerForm(repo: Repo, published: string[], csrf: string): Html {
+  const picker = repo.versionPicker;
+  const fixed = picker.mode === 'fixed' ? picker.version : (published[0] ?? '');
+  const list = picker.mode === 'list' ? picker.versions.join(', ') : published.join(', ');
+  const hint = published.length
+    ? `Published release lines: ${published.join(', ')}. Any version such as 2.0 or 1.4 works.`
+    : 'A version such as 2.1.';
+  return html`<form
+    class="admin-card admin-form"
+    method="post"
+    action="/admin/site/versions"
+    aria-labelledby="versions-h"
+  >
+    ${csrfField(csrf)}
+    <h2 id="versions-h">Version picker</h2>
+    <p class="admin-hint">
+      What readers see next to the site title, and which version of the docs they are served.
+      Products and features still come from each reader’s entitlements. On a public site, anonymous
+      visitors get the same choice.
+    </p>
+    <fieldset class="admin-fieldset">
+      <legend class="admin-legend">What readers can choose</legend>
+      <div class="admin-options">
+        ${VERSION_MODES.map(
+          ([mode, title, text]) =>
+            html`<label class="admin-option"
+              ><input
+                type="radio"
+                name="mode"
+                value="${mode}"
+                ${raw(picker.mode === mode ? ' checked' : '')}
+              /><span><strong>${title}</strong><span>${text}</span></span></label
+            >`,
+        )}
+      </div>
+    </fieldset>
+    <div class="admin-form-row">
+      ${field({ name: 'fixedVersion', label: 'Fixed version', value: fixed, hint: 'For “Fixed version”.' })}${field({ name: 'versions', label: 'Versions in the list', value: list, hint: `For “Choose from a list”, comma-separated. ${hint}` })}
+    </div>
+    <div class="admin-buttons">
+      <button class="admin-button" type="submit">Save version picker</button>
+    </div>
+  </form>`;
 }
 
 export function sitePage(d: SitePageData): Html {
@@ -657,7 +719,8 @@ export function sitePage(d: SitePageData): Html {
       <div class="admin-buttons">
         <button class="admin-button" type="submit">Save access</button>
       </div>
-    </form>`;
+    </form>
+    ${versionPickerForm(d.repo, d.published, d.csrf)}`;
 }
 
 // ---- docs source -----------------------------------------------------------

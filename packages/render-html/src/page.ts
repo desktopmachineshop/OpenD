@@ -31,6 +31,47 @@ export interface PageOptions extends RenderOptions {
    * here and fills them per request, as pages are cached per entitlement set.
    */
   account?: { header: string; menu: string };
+  /**
+   * Trusted HTML for the version control (see `renderVersionControl`): `header`
+   * in place of the "Release" label after the site title, `menu` near the top
+   * of the narrow-screen menu panel. Markers too on the hosted server.
+   */
+  version?: { header: string; menu: string };
+}
+
+/** What `renderVersionControl` shows: the version served and what the reader may switch to. */
+export interface VersionControl {
+  current: string;
+  /** Newest first. With more than one, the reader may switch; otherwise it is a label. */
+  options: string[];
+}
+
+/**
+ * The version control: a label with the version served, or, when there is
+ * more than one option, a `<details>` list of links (`href(version)`) to
+ * switch, so it works without scripts. `header` goes in the wide-screen
+ * header, `menu` in the narrow-screen menu panel.
+ */
+export function renderVersionControl(
+  control: VersionControl,
+  href: (version: string) => string,
+): { header: string; menu: string } {
+  const current = escapeHtml(control.current);
+  if (control.options.length < 2)
+    return {
+      header: `<span class="site-release">Version ${current}</span>`,
+      menu: `<div class="site-menu-versions"><p class="site-menu-heading">Version</p><p class="site-menu-version">${current}</p></div>`,
+    };
+  const links = control.options
+    .map(
+      (v) =>
+        `<li><a href="${escapeHtml(href(v))}"${v === control.current ? ' aria-current="true"' : ''}>${escapeHtml(v)}</a></li>`,
+    )
+    .join('');
+  return {
+    header: `<details class="site-version"><summary>Version ${current}</summary><ul class="site-version-list" aria-label="Versions">${links}</ul></details>`,
+    menu: `<nav class="site-menu-versions" aria-label="Version"><p class="site-menu-heading">Version</p><ul>${links}</ul></nav>`,
+  };
 }
 
 /** Longest search query the site accepts; longer ones are cut, as analytics does. */
@@ -132,14 +173,15 @@ function menu(nav: string, options: PageOptions): string {
   const account = options.account?.menu
     ? `<div class="site-menu-account">${options.account.menu}</div>`
     : '';
-  if (!nav && !search && !pdfs && !account) return '';
+  const versions = options.version?.menu ?? '';
+  if (!nav && !search && !pdfs && !account && !versions) return '';
   const contents = nav
     ? `<nav class="opend-nav site-menu-nav" aria-label="Contents">${nav}</nav>`
     : '';
   const publications = pdfs
     ? `<nav class="site-menu-pdfs" aria-label="Download PDF"><p class="site-menu-heading">Publications</p><ul>${pdfs}</ul></nav>`
     : '';
-  return `<details class="site-menu"><summary aria-controls="opend-menu-panel"><span class="site-menu-button">${MENU_ICON}<span>Menu</span></span></summary><div class="site-menu-panel" id="opend-menu-panel">${search}${contents}${publications}${account}</div></details>`;
+  return `<details class="site-menu"><summary aria-controls="opend-menu-panel"><span class="site-menu-button">${MENU_ICON}<span>Menu</span></span></summary><div class="site-menu-panel" id="opend-menu-panel">${search}${versions}${contents}${publications}${account}</div></details>`;
 }
 
 /** Three bars, and a cross shown instead while the menu is open. */
@@ -182,7 +224,7 @@ ${theme}${siteTheme}
 <body class="opend-site">
 <a class="opend-skip" href="#opend-main">Skip to content</a>
 ${options.banner ?? ''}
-<header class="site-header">${menu(nav, options)}<a class="site-title" href="${escapeHtml(base)}">${logo}<span>${escapeHtml(release.title)}</span></a><span class="site-release">Release ${escapeHtml(release.release)}</span>${publicationLinks(options)}${searchBox(options)}${options.account?.header ?? ''}</header>
+<header class="site-header">${menu(nav, options)}<a class="site-title" href="${escapeHtml(base)}">${logo}<span>${escapeHtml(release.title)}</span></a>${options.version?.header ?? `<span class="site-release">Release ${escapeHtml(release.release)}</span>`}${publicationLinks(options)}${searchBox(options)}${options.account?.header ?? ''}</header>
 <div class="layout">
 <nav class="toc opend-nav" id="opend-toc" aria-label="Contents">${nav}</nav>
 <main id="opend-main">${main}</main>

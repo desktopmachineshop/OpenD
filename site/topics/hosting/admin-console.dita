@@ -56,7 +56,8 @@ curl -X POST "$PUBLIC_URL/admin/api/setup-links" -H "authorization: Bearer $OPEN
         <info><p><uicontrol>Private</uicontrol> or <uicontrol>Public</uicontrol>, and for a public site the
           products, features and release anonymous visitors see, chosen from those the published release
           declares in <filepath>opend.config.yaml</filepath>. See <xref href="access.dita"/>. The site title
-          comes from the repository and is shown read-only.</p></info>
+          comes from the repository and is shown read-only. <uicontrol>Version picker</uicontrol> sets what
+          readers can choose beside the site title; see <xref href="version-picker.dita"/>.</p></info>
       </step>
       <step>
         <cmd>Add organizations and readers on the <uicontrol>People</uicontrol> page.</cmd>

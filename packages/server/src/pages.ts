@@ -1,8 +1,9 @@
 import { posix } from 'node:path';
 import type { FastifyRequest } from 'fastify';
-import { DEFAULT_CSS, escapeHtml } from '@opend/render-html';
+import { DEFAULT_CSS, escapeHtml, renderVersionControl } from '@opend/render-html';
 import type { ReaderAccess, Repo } from '@opend/store';
 import { readerCsrfToken, safeReturnTo } from './auth.js';
+import type { VersionChoice } from './access.js';
 import type { AppContext } from './context.js';
 import { SERVER_CSS } from './style.js';
 
@@ -29,6 +30,9 @@ export function messagePage(title: string, message: string, link?: { href: strin
 /** Markers in cached pages, replaced per request with the viewer's account controls. */
 export const ACCOUNT_MARKER = '<!--opend-account-->';
 export const MENU_ACCOUNT_MARKER = '<!--opend-menu-account-->';
+/** Markers in cached pages, replaced per request with the version picker or the release label. */
+export const VERSION_MARKER = '<!--opend-version-->';
+export const MENU_VERSION_MARKER = '<!--opend-menu-version-->';
 /** Marker on cached topic pages, replaced per request with "Edit this page" and source links. */
 export const TOPIC_ACTIONS_MARKER = '<!--opend-topic-actions-->';
 
@@ -71,6 +75,26 @@ export function accountControls(
     header: `<div class="site-account">${admin}<span class="site-account-who" title="${escapeHtml(email + staff)}"><span class="site-avatar" aria-hidden="true">${initial}</span><span class="site-account-name"><span class="opend-visually-hidden">Signed in as </span>${escapeHtml(display)}</span></span>${form}</div>`,
     menu: `<p class="site-menu-heading">Account</p><p class="site-menu-who">Signed in as <strong>${escapeHtml(display)}</strong>${display === email ? '' : ` (${escapeHtml(email)})`}${staff}</p>${admin ? `<p class="site-menu-who"><a href="/admin">Admin console</a></p>` : ''}${form}`,
   };
+}
+
+/** `/_version?v=&returnTo=`: switches the reader to `version` and returns them to the page. */
+export function versionHref(version: string, returnTo: string): string {
+  return `/_version?v=${encodeURIComponent(version)}&returnTo=${encodeURIComponent(safeReturnTo(returnTo))}`;
+}
+
+/**
+ * The header's and the menu's version controls: the version picker when the
+ * site has one, otherwise the release label the page would have had. Each
+ * link returns to the page the reader is on.
+ */
+export function versionControls(
+  request: FastifyRequest,
+  choice: VersionChoice | null,
+  release: string,
+): { header: string; menu: string } {
+  if (!choice)
+    return { header: `<span class="site-release">Release ${escapeHtml(release)}</span>`, menu: '' };
+  return renderVersionControl(choice, (v) => versionHref(v, request.url));
 }
 
 const PENCIL_ICON =

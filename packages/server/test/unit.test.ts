@@ -12,6 +12,9 @@ import {
 import {
   NOTHING_GATED,
   audienceFor,
+  chosenVersion,
+  ownVersion,
+  versionChoice,
   sourceHref,
   type Audience,
   loadConfig,
@@ -236,7 +239,11 @@ describe('createBlobStore', () => {
 });
 
 describe('audienceFor', () => {
-  const repo = (access: 'private' | 'public', pub: Repo['publicEntitlements'] = null): Repo => ({
+  const repo = (
+    access: 'private' | 'public',
+    pub: Repo['publicEntitlements'] = null,
+    versionPicker: Repo['versionPicker'] = { mode: 'off' },
+  ): Repo => ({
     id: 1,
     fullName: 'acme/docs',
     sourceUrl: 'https://github.com/acme/docs.git',
@@ -245,6 +252,7 @@ describe('audienceFor', () => {
     docsPath: '.',
     access,
     publicEntitlements: pub,
+    versionPicker,
   });
   const reader = (context: ReaderAccess['context'], staff = false): ReaderAccess => ({
     reader: {
@@ -309,6 +317,116 @@ describe('audienceFor', () => {
       });
       expect(audienceFor(r, reader(own, true))).toEqual({ key: 'staff', context: null, line: '2' });
     }
+  });
+
+  it('serves a chosen version with the reader’s own products and features', () => {
+    const a = audienceFor(repo('private'), reader(own), '1.4') as Audience;
+    expect(a).toEqual({
+      key: entitlementKey({ ...own, version: '1.4' }),
+      context: { ...own, version: '1.4' },
+      line: '1',
+    });
+    expect(audienceFor(repo('private'), null, '1.4')).toBe('sign-in');
+    expect(audienceFor(repo('private'), reader(null), '1.4')).toBe('no-entitlements');
+    expect(audienceFor(repo('private'), reader(own, true), '1.4')).toEqual({
+      key: 'staff',
+      context: null,
+      line: '1',
+    });
+  });
+
+  it('moves anonymous visitors and the public union to a chosen version', () => {
+    const anon = audienceFor(repo('public', pub), null, '1.2') as Audience;
+    expect(anon.context).toEqual({ ...pub, version: '1.2' });
+    expect(anon.key).toBe(`public|${entitlementKey({ ...pub, version: '1.2' })}`);
+    // Without a public set, a chosen version opens release-gated content only.
+    const bare = audienceFor(repo('public'), null, '1.2') as Audience;
+    expect(bare.context).toEqual({ products: [], features: [], version: '1.2' });
+    expect(bare.line).toBe('1');
+    // The public set follows the chosen version, so the union holds on any line.
+    expect((audienceFor(repo('public', pub), reader(own), '1.2') as Audience).context).toEqual({
+      products: ['gadget', 'widget'],
+      features: ['sso'],
+      version: '1.2',
+    });
+  });
+});
+
+describe('versionChoice', () => {
+  const repo = (
+    versionPicker: Repo['versionPicker'],
+    access: Repo['access'] = 'private',
+  ): Repo => ({
+    id: 1,
+    fullName: 'acme/docs',
+    sourceUrl: 'https://github.com/acme/docs.git',
+    installationId: null,
+    releaseRefs: ['main'],
+    docsPath: '.',
+    access,
+    publicEntitlements: access === 'public' ? { products: [], features: [], version: '2.4' } : null,
+    versionPicker,
+  });
+  const list = repo({ mode: 'list', versions: ['1.4', '2.1', '2.0'] });
+
+  it('shows nothing when the picker is off', () => {
+    expect(versionChoice(repo({ mode: 'off' }), '2.0', '1.4')).toBeNull();
+  });
+
+  it('shows readers their own version, and changes nothing served', () => {
+    const choice = versionChoice(repo({ mode: 'reader' }), '2.0', '1.4');
+    expect(choice).toEqual({ mode: 'reader', current: '2.0', options: ['2.0'] });
+    expect(chosenVersion(choice)).toBeNull();
+    expect(versionChoice(repo({ mode: 'reader' }), null, undefined)).toBeNull();
+  });
+
+  it('serves everyone a fixed version, whatever they ask for', () => {
+    const choice = versionChoice(repo({ mode: 'fixed', version: '2.1' }), '1.4', '1.4');
+    expect(choice).toEqual({ mode: 'fixed', current: '2.1', options: ['2.1'] });
+    expect(chosenVersion(choice)).toBe('2.1');
+    expect(versionChoice(repo({ mode: 'fixed', version: '2.1' }), null, undefined)?.current).toBe(
+      '2.1',
+    );
+  });
+
+  it('offers the list and the reader’s own version, newest first, starting on their own', () => {
+    expect(versionChoice(list, '1.9', undefined)).toEqual({
+      mode: 'list',
+      current: '1.9',
+      options: ['2.1', '2.0', '1.9', '1.4'],
+    });
+    expect(versionChoice(list, '1.9', '2.0')?.current).toBe('2.0');
+    expect(chosenVersion(versionChoice(list, '1.9', '1.4'))).toBe('1.4');
+  });
+
+  it('ignores a requested version the list does not offer', () => {
+    expect(versionChoice(list, '1.9', '3.0')?.current).toBe('1.9');
+    expect(versionChoice(list, '1.9', '9')?.current).toBe('1.9');
+    expect(versionChoice(list, null, '3.0')?.current).toBe('2.1');
+    expect(versionChoice(list, 'none', undefined)?.options).toEqual(['2.1', '2.0', '1.4']);
+  });
+
+  it('starts from the entitlements, or the public set for anonymous visitors', () => {
+    const reader = (context: ReaderAccess['context'], staff = false): ReaderAccess => ({
+      reader: {
+        id: 1,
+        orgId: 1,
+        email: 'r@example.com',
+        name: null,
+        oidcIssuer: null,
+        oidcSubject: null,
+        staff,
+      },
+      orgSlug: 'acme',
+      context,
+    });
+    const own = { products: [], features: [], version: '1.4' };
+    expect(ownVersion(list, reader(own))).toBe('1.4');
+    expect(ownVersion(list, null)).toBeNull();
+    const pub = repo({ mode: 'off' }, 'public');
+    expect(ownVersion(pub, null)).toBe('2.4');
+    expect(ownVersion(pub, reader(null))).toBe('2.4');
+    expect(ownVersion(pub, reader(null, true))).toBeNull();
   });
 });
 
