@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { releaseLine } from '@opend/filter';
-import { displayText, firstChild, type NavEntry } from '@opend/model';
+import { releaseLine, visibleNav, type VisibleNavEntry } from '@opend/filter';
+import { displayText, firstChild } from '@opend/model';
 import { pageHref, renderMarkdown, renderTopic } from '@opend/render-html';
 import {
   listLiveReleases,
@@ -155,7 +155,7 @@ export function registerApi(app: FastifyInstance, ctx: AppContext): void {
       return {
         version: release.line,
         title: release.view.release.title,
-        nav: navJson(release.view.nav, base()),
+        nav: navJson(visibleNav(release.view), base()),
       };
     }),
   );
@@ -293,15 +293,14 @@ interface NavJson {
   children: NavJson[];
 }
 
-function navJson(entries: readonly NavEntry[], base: string): NavJson[] {
-  return entries
-    .filter((e) => !e.hidden)
-    .map((e) => {
-      const out: NavJson = { title: e.title, children: navJson(e.children, base) };
-      if (e.topicId) {
-        out.topicId = e.topicId;
-        out.url = `${base}/${pageHref(e.topicId, '')}${e.fragment ? `#${e.fragment}` : ''}`;
-      }
-      return out;
-    });
+/** The reader's navigation (see `visibleNav`): hidden topics never appear, not even their navtitles. */
+function navJson(entries: readonly VisibleNavEntry[], base: string): NavJson[] {
+  return entries.map((e) => {
+    const out: NavJson = { title: e.title, children: navJson(e.children, base) };
+    if (e.topicId) {
+      out.topicId = e.topicId;
+      out.url = `${base}/${pageHref(e.topicId, '')}${e.fragment ? `#${e.fragment}` : ''}`;
+    }
+    return out;
+  });
 }

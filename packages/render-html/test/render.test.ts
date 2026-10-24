@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CompiledRelease, CompiledTopic, ElementNode } from '@opend/model';
-import { readerPolicy, viewRelease } from '@opend/filter';
+import { readerPolicy, viewRelease, visibleNav } from '@opend/filter';
 import {
   METADATA_ELEMENTS,
   DROPPED_ELEMENTS,
@@ -311,6 +311,17 @@ describe('collapsible navigation', () => {
     expect(staff).toContain('<summary class="nav-heading">Gadget heading</summary>');
     expect(staff).toContain('Subtopics of Gadget navtitle');
     expect(staff).toContain('<a href="/g2.html" aria-current="page">');
+  });
+
+  it('lists the same entries in visibleNav, which the API and help nav use', () => {
+    const nav = visibleNav(view);
+    expect(JSON.stringify(nav)).not.toMatch(/Gadget|Secret|"g2"|"g"/);
+    expect(nav.map((e) => [e.title, e.topicId])).toEqual([
+      ['Start', undefined],
+      ['More', undefined],
+      ['Gamma', 'c'],
+    ]);
+    expect(nav[0]!.children[0]).toMatchObject({ topicId: 'a', children: [{ topicId: 'b' }] });
   });
 
   it('puts a Menu control for the contents in the header, and the logo when there is one', () => {
