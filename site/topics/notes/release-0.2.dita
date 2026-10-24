@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE topic PUBLIC "-//OASIS//DTD DITA Topic//EN" "topic.dtd">
+<!-- release="0.2..": every reader on 0.2 or later sees these notes. -->
+<topic id="release-0.2" release="0.2.." audience="author admin developer">
+  <title>Release notes for 0.2</title>
+  <shortdesc>Readers can choose the version of the docs they read, and staff decide which versions they may
+    choose.</shortdesc>
+  <prolog>
+    <resourceid appname="opend-console" appid="whats-new-0.2"/>
+  </prolog>
+  <body>
+    <section id="version-picker">
+      <title>Version picker</title>
+      <ul>
+        <li>The label beside the site title can now be a version picker. Readers select it to read the docs of
+          another version; pages, navigation, search, images and PDFs follow their choice. See
+          <xref href="../start/switch-version.dita"/>.</li>
+        <li audience="admin">Staff choose what it offers under <uicontrol>Site &amp; access</uicontrol> →
+          <uicontrol>Version picker</uicontrol> in the admin console: nothing (the default), each reader's own
+          version, one fixed version for everyone, or a list of versions to choose from. See
+          <xref href="../hosting/version-picker.dita"/>.</li>
+        <li audience="admin">Switching changes only the version. Products and features still come from the
+          reader's entitlements.</li>
+        <li audience="admin" product="core">New admin API route <codeph>PUT /admin/api/repos/:id/versions</codeph>,
+          a <parmname>versionPicker</parmname> field in seed files, the <codeph>repo.versions</codeph> audit
+          action and migration <codeph>011_version_picker</codeph>, applied on start.</li>
+      </ul>
+    </section>
+    <section id="upgrade" product="core">
+      <title>Upgrading from 0.1</title>
+      <p>Deploy the new image. The migration adds one column with the picker off, so readers see no change
+        until staff turn it on. See <xref href="../hosting/upgrades.dita"/>.</p>
+    </section>
+  </body>
+</topic>

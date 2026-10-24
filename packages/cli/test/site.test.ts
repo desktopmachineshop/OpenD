@@ -64,7 +64,7 @@ describe('the OpenD documentation site', async () => {
 
   it('builds and validates with no errors or warnings', () => {
     expect([...project.diagnostics, ...project.contextDiagnostics]).toEqual([]);
-    expect(release.release).toBe('0.1');
+    expect(release.release).toBe('0.2');
     expect(Object.keys(release.topics).length).toBeGreaterThanOrEqual(50);
   });
 

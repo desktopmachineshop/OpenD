@@ -1,6 +1,6 @@
 {
   "name": "@opend/editor",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Web editor: DITA source editing, draft preview, and save/publish through a GitHub App",
   "license": "MIT",
   "type": "module",

@@ -3,7 +3,7 @@
 <concept id="search" audience="author admin developer">
   <title>Search the docs</title>
   <shortdesc>Every page of the docs site has a search box in its header. It finds only the pages, and the
-    parts of pages, that you are allowed to read, in your own release.</shortdesc>
+    parts of pages, that you are allowed to read, in the release you are reading.</shortdesc>
   <conbody>
     <section id="readers">
       <title>Searching</title>
@@ -27,8 +27,8 @@
 
     <section id="scope">
       <title>What is searched</title>
-      <p>Search uses the same reader filter as the pages. It looks only at the release your account reads,
-        for example the 2.x docs, and only at text you can see: a hidden page never appears in the results,
+      <p>Search uses the same reader filter as the pages. It looks only at the release you are reading,
+        for example the 2.x docs (see <xref href="switch-version.dita"/>), and only at text you can see: a hidden page never appears in the results,
         and words from a section, paragraph or alternative hidden from you never match, rank or appear in
         a passage. Titles count most, then short descriptions, then the rest of the page.</p>
       <p>Results are worked out for each request and never cached or shared between readers.

@@ -13,6 +13,7 @@
     <topicref href="../topics/start/validate.dita"/>
     <topicref href="../topics/start/preview.dita"/>
     <topicref href="../topics/start/search.dita"/>
+    <topicref href="../topics/start/switch-version.dita"/>
     <topicref href="../topics/start/help-lab.dita" product="embed"/>
     <topicref href="../topics/start/cli-reference.dita"/>
     <topicref href="../topics/start/these-docs.dita"/>
@@ -87,7 +88,7 @@
     <topicref href="../topics/hosting/github.dita" product="core"/>
     <topicref href="../topics/hosting/github-app.dita" product="core"/>
     <topicref href="../topics/hosting/access.dita" product="core"/>
-    <topicref href="../topics/hosting/version-picker.dita" product="core"/>
+    <topicref href="../topics/hosting/version-picker.dita" product="core hosted"/>
     <topicref href="../topics/hosting/oidc.dita" product="core"/>
     <topicref href="../topics/hosting/github-sign-in.dita" product="core"/>
     <topicref href="../topics/hosting/editor.dita" product="core"/>
@@ -107,6 +108,7 @@
   </topichead>
 
   <topichead navtitle="Release notes">
+    <topicref href="../topics/notes/release-0.2.dita"/>
     <topicref href="../topics/notes/release-0.1.dita"/>
   </topichead>
 

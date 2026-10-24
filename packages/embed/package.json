@@ -1,6 +1,6 @@
 {
   "name": "@opend/embed",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Embeddable OpenD help: the host-page widget, the in-frame script and their postMessage protocol",
   "license": "MIT",
   "type": "module",
