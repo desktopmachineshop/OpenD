@@ -1,6 +1,6 @@
 {
   "name": "@opend/pdf",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Prints self-contained HTML to PDF with headless Chromium",
   "license": "MIT",
   "type": "module",

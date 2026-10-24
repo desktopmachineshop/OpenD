@@ -63,9 +63,10 @@
         <li>PDF publications from bookmaps, filtered per reader.</li>
         <li>A web editor for authors who do not use Git, with live preview and publishing through pull
           requests.</li>
+        <li>A version picker, so readers can choose which version of the docs they read.</li>
       </ul>
       <p>Multi-tenancy and an operator console come later and reuse the same packages. See
-        <xref href="notes/release-0.1.dita"/>.</p>
+        <xref href="notes/release-0.2.dita"/> and <xref href="notes/release-0.1.dita"/>.</p>
     </section>
     <section id="where-next">
       <title>Where to go next</title>

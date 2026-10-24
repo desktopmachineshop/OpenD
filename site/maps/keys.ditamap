@@ -16,7 +16,7 @@
     <topicmeta><keywords><keyword>opend-server</keyword></keywords></topicmeta>
   </keydef>
   <keydef keys="current-release">
-    <topicmeta><keywords><keyword>0.1</keyword></keywords></topicmeta>
+    <topicmeta><keywords><keyword>0.2</keyword></keywords></topicmeta>
   </keydef>
   <keydef keys="node-version">
     <topicmeta><keywords><keyword>Node 22.12 or later</keyword></keywords></topicmeta>

@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE task PUBLIC "-//OASIS//DTD DITA Task//EN" "task.dtd">
+<task id="switch-version" audience="author admin developer">
+  <title>Choose the version you read</title>
+  <shortdesc>The label beside the site title shows which version of the docs you are reading. When the site
+    offers more than one, select it to switch to another version.</shortdesc>
+  <taskbody>
+    <context>
+      <p>You normally read the docs for the version your organization runs. What the label offers is set by
+        the site's staff:</p>
+      <ul>
+        <li><uicontrol>Release 2.1</uicontrol>: the site has no version picker. You read your own version.</li>
+        <li><uicontrol>Version 2.1</uicontrol> with no arrow: the version you are reading. You cannot switch
+          here.</li>
+        <li><uicontrol>Version 2.1</uicontrol> with an arrow: a menu of versions you can switch to.</li>
+      </ul>
+    </context>
+    <steps>
+      <step>
+        <cmd>Select the version label beside the site title.</cmd>
+        <info><p>On a narrow screen, select <uicontrol>Menu</uicontrol>: the versions are listed under
+          <uicontrol>Version</uicontrol>, below the search box.</p></info>
+      </step>
+      <step>
+        <cmd>Select the version you want to read.</cmd>
+        <stepresult>
+          <p>The page you were on opens again in that version. If it does not exist there, you see a page
+            saying it was not found, with that version's contents beside it.</p>
+        </stepresult>
+      </step>
+    </steps>
+    <result>
+      <ul>
+        <li>Your choice stays for every page, search and PDF on the site until you switch again, in this
+          browser.</li>
+        <li>Switching changes only the version. You still see only the products and features your organization
+          is entitled to.</li>
+        <li>Your own version is always in the list, so you can switch back to it.</li>
+        <li product="embed">The help panel inside your apps always shows your own version.</li>
+      </ul>
+    </result>
+  </taskbody>
+</task>

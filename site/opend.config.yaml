@@ -3,7 +3,7 @@
 title: OpenD Documentation
 
 # The release this branch documents: the version of the @opend/* packages.
-release: '0.1'
+release: '0.2'
 
 # Root map for the website navigation.
 map: maps/docs.ditamap

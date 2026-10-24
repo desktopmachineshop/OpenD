@@ -1,6 +1,6 @@
 {
   "name": "@opend/build",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Compiles a DITA source tree into a CompiledRelease snapshot",
   "license": "MIT",
   "type": "module",
