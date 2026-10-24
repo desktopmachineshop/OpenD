@@ -36,6 +36,7 @@ import {
   type Repo,
   type StoredRelease,
 } from '@opend/store';
+import { appearance, siteThemeHref } from './appearance.js';
 import {
   NOTHING_GATED,
   audienceFilter,
@@ -320,6 +321,8 @@ export function registerDelivery(app: FastifyInstance, ctx: AppContext): void {
     // The staff view marks conditional content, as the previewer and editor do.
     if (release.audience.context === null) options.showConditions = true;
     if (release.view.release.theme) options.themeHref = '/_theme.css';
+    const siteTheme = siteThemeHref(appearance(ctx));
+    if (siteTheme) options.siteThemeHref = siteTheme;
     if (release.view.release.logo) options.logoHref = `/${logoRoute(release.view.release.logo)}`;
     return options;
   };
@@ -429,7 +432,8 @@ export function registerDelivery(app: FastifyInstance, ctx: AppContext): void {
     const { view, key } = r.release;
     if (path.endsWith('.html')) {
       const topicId = path.slice(0, -'.html'.length);
-      const cacheKey = `${key}|${topicId}`;
+      // The appearance version is in the key: pages link the theme stylesheet by version.
+      const cacheKey = `${key}|${appearance(ctx).version}|${topicId}`;
       let html = ctx.caches.pages.get(cacheKey);
       if (html === undefined) {
         html = renderPage(view, topicId, pageOptions(r.release)) ?? '';

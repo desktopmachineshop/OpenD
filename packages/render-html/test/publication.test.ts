@@ -1,10 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import type { CompiledRelease, CompiledTopic, NavEntry } from '@opend/model';
+import {
+  resolvePdfTemplate,
+  type CompiledRelease,
+  type CompiledTopic,
+  type NavEntry,
+} from '@opend/model';
 import { readerPolicy, viewPublication, viewRelease, type FilterPolicy } from '@opend/filter';
 import { parseXml } from '@opend/dita';
 import {
   publicationHasContent,
   publicationImages,
+  publicationLayout,
   renderPage,
   renderPublication,
 } from '../src/index.js';
@@ -193,7 +199,54 @@ describe('renderPublication', () => {
     });
     expect(html.indexOf('--opend-accent: red')).toBeGreaterThan(html.indexOf('@page'));
     expect(html).not.toContain('</style><script>');
-    expect(html.match(/<\/style>/g)).toHaveLength(3);
+    expect(html.match(/<\/style>/g)).toHaveLength(4);
+  });
+
+  it('prints with the standard template by default', async () => {
+    const { html } = await render([v1]);
+    expect(html).toContain('@page { size: A4 portrait; margin: 20mm 18mm 18mm 18mm; }');
+    expect(html).toContain('<section class="pub-cover pub-cover-classic">');
+    expect(html).toContain('class="pub-toc"');
+  });
+
+  it('draws the cover the template asks for, with its note', async () => {
+    const banner = await render([v1], {
+      template: resolvePdfTemplate({ template: 'report', coverNote: 'Internal <only>' }),
+    });
+    expect(banner.html).toContain('<section class="pub-cover pub-cover-banner">');
+    expect(banner.html).toContain('<div class="pub-banner">');
+    expect(banner.html).toContain('<p class="pub-note">Internal &lt;only&gt;</p>');
+    const none = await render([v1], {
+      template: resolvePdfTemplate({ cover: 'none', toc: false }),
+    });
+    expect(none.html).not.toContain('class="pub-cover');
+    expect(none.html).toContain('<header class="pub-titleblock">');
+    expect(none.html).not.toContain('class="pub-toc"');
+  });
+
+  it('loads the site theme and the template’s CSS after the project theme', async () => {
+    const { html } = await render([v1], {
+      themeCss: '.project {}',
+      siteThemeCss: '.site-theme {}',
+      template: { ...resolvePdfTemplate(null), customCss: '.custom {} </style><b>' },
+    });
+    const order = ['@page { size: A4', '.project {}', '.site-theme {}', '.custom {}'].map((s) =>
+      html.indexOf(s),
+    );
+    expect(order).toEqual([...order].sort((a, b) => a - b));
+    expect(order[0]).toBeGreaterThan(-1);
+    expect(html).not.toContain('</style><b>');
+  });
+
+  it('gives the printer a layout with the running text filled in', () => {
+    const view = viewPublication(release, 'maps/admin.bookmap', [v1])!;
+    const layout = publicationLayout(view, {
+      template: resolvePdfTemplate({ header: '{site} {release}', footer: '{title} {date}' }),
+      now: new Date('2026-10-16T12:00:00Z'),
+    });
+    expect(layout.headerText).toBe('Widget <Docs> 2.1');
+    expect(layout.footerText).toBe('Admin Guide 2026-10-16');
+    expect(layout.format).toBe('A4');
   });
 
   it('says when nothing is visible', async () => {

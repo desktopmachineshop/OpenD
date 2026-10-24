@@ -59,6 +59,14 @@
           <filepath>theme/logo.svg</filepath> does.</propdesc>
       </property>
       <property>
+        <proptype><parmname>pdf</parmname></proptype>
+        <propvalue>the <codeph>standard</codeph> template</propvalue>
+        <propdesc>How publications print: a built-in <parmname>template</parmname> (<codeph>standard</codeph>,
+          <codeph>report</codeph>, <codeph>compact</codeph> or <codeph>handbook</codeph>) and any of its settings
+          to change, such as <parmname>pageSize</parmname>, <parmname>cover</parmname> or
+          <parmname>footer</parmname>. See <xref href="../pdf/pdf-templates.dita"/>.</propdesc>
+      </property>
+      <property>
         <proptype><parmname>title</parmname></proptype>
         <propvalue><codeph>Documentation</codeph></propvalue>
         <propdesc>The site title in the page header and the PDF cover. Set it to an empty string to use the
@@ -79,7 +87,10 @@ attributes:
   audience: [author, admin, developer, internal]
 buildFilter: filters/publish.ditaval
 theme: theme/site.css
-logo: theme/logo.svg</codeblock>
+logo: theme/logo.svg
+pdf:
+  template: standard
+  footer: OpenD {release}</codeblock>
       <p>Quote the release. Unquoted, YAML reads <codeph>0.1</codeph> as a number, and the config is
         rejected.</p>
       <p>Every path must stay inside the docs root: no leading <codeph>/</codeph> and no

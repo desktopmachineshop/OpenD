@@ -57,6 +57,7 @@
     <topicref href="../topics/pdf/bookmaps.dita"/>
     <topicref href="../topics/pdf/pdf-filtering.dita"/>
     <topicref href="../topics/pdf/pdf-theming.dita"/>
+    <topicref href="../topics/pdf/pdf-templates.dita"/>
   </chapter>
 
   <appendix href="../topics/authoring/dita-subset.dita"/>

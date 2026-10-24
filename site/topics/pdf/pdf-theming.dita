@@ -65,6 +65,15 @@
         </info>
       </step>
       <step>
+        <cmd>Optional: choose how PDFs are laid out.</cmd>
+        <stepxmp>
+          <codeblock>pdf:
+  template: report</codeblock>
+        </stepxmp>
+        <info><p>Page size, margins, cover, contents and running header and footer come from a PDF template;
+          see <xref href="pdf-templates.dita"/>.</p></info>
+      </step>
+      <step>
         <cmd>Check the result on a page, in the help lab's panel and in the print HTML, at phone and
           desktop widths and in the light and dark schemes.</cmd>
       </step>
@@ -79,6 +88,9 @@
       <note type="restriction">In PDFs the theme is inlined into a document without a base URL, so
         <codeph>url()</codeph> references to fonts or images in it are not loaded. Use fonts installed on the
         server, or the system font stack.</note>
+      <p product="core hosted">Staff of a hosted site can also set a theme on the admin console's
+        <uicontrol>Appearance</uicontrol> page, without changing the repository. It loads after this theme, so
+        it wins where both set the same thing; see <xref href="../hosting/appearance.dita"/>.</p>
     </result>
   </taskbody>
 </task>

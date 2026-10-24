@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE task PUBLIC "-//OASIS//DTD DITA Task//EN" "task.dtd">
+<task id="appearance" product="core hosted" audience="admin">
+  <title>Change the site's look from the admin console</title>
+  <shortdesc>The admin console's <uicontrol>Appearance</uicontrol> page sets the theme of the docs site, the
+    help panel and PDFs, and the template every PDF prints with. Changes apply to every page at once, with no
+    rebuild and no change to the repository.</shortdesc>
+  <taskbody>
+    <context>
+      <p>The repository can style the site too, with <parmname>theme</parmname> and <parmname>pdf</parmname> in
+        <filepath>opend.config.yaml</filepath> (<xref href="../pdf/pdf-theming.dita"/>,
+        <xref href="../pdf/pdf-templates.dita"/>). What you set on the <uicontrol>Appearance</uicontrol> page
+        loads after the repository's theme and replaces its PDF settings, so it wins. A badge on each card says
+        where the current look comes from: <uicontrol>Set here</uicontrol>, the repository, or the
+        default.</p>
+    </context>
+    <steps>
+      <step>
+        <cmd>Open <menucascade><uicontrol>Admin</uicontrol><uicontrol>Appearance</uicontrol></menucascade>.</cmd>
+      </step>
+      <step id="theme">
+        <cmd>Under <uicontrol>Site theme</uicontrol>, choose the look and select <uicontrol>Save
+          theme</uicontrol>.</cmd>
+        <info>
+          <ul>
+            <li><uicontrol>Colour preset</uicontrol>: <uicontrol>Default</uicontrol> (OpenD's emerald, or the
+              repository's own colours), <uicontrol>Ocean</uicontrol>, <uicontrol>Indigo</uicontrol>,
+              <uicontrol>Violet</uicontrol>, <uicontrol>Teal</uicontrol>, <uicontrol>Rose</uicontrol>,
+              <uicontrol>Amber</uicontrol> or <uicontrol>Graphite</uicontrol>. Each sets an accent and matching
+              neutral greys for the light and the dark scheme, all with AA contrast.</li>
+            <li><uicontrol>Custom accent colour</uicontrol>: your brand colour, in place of the preset's. Without
+              a dark-scheme accent, a lighter tint is used in dark mode. Accents need at least 3:1 contrast
+              against the page background; text on buttons picks white or black, whichever reads better.</li>
+            <li><uicontrol>Body font</uicontrol> and <uicontrol>Heading font</uicontrol>: system sans-serif,
+              humanist sans-serif, serif, rounded or monospace, from the fonts on the reader's device. No web
+              fonts are loaded.</li>
+            <li><uicontrol>Corners</uicontrol> (square, default or round), <uicontrol>Reading width</uicontrol>
+              (narrow, default, wide or full width) and <uicontrol>Colour scheme</uicontrol> (follow the
+              reader's system, always light or always dark).</li>
+            <li><uicontrol>Custom CSS</uicontrol>: rules loaded last on every page, in the help panel and in
+              PDFs, up to 50,000 characters. Override the <codeph>--opend-*</codeph> properties listed in
+              <xref href="../pdf/pdf-theming.dita"/>, or style the page's classes.</li>
+          </ul>
+        </info>
+        <stepresult><p>Pages link the theme as <filepath>/_site-theme.css</filepath>, with its version in the
+          address, so browsers fetch the new one at once. <uicontrol>Reset the theme</uicontrol> goes back to
+          the repository's look.</p></stepresult>
+      </step>
+      <step id="pdf">
+        <cmd>Under <uicontrol>PDF template</uicontrol>, choose a template and select <uicontrol>Apply
+          template</uicontrol>.</cmd>
+        <info><p><uicontrol>Standard</uicontrol>, <uicontrol>Report</uicontrol>, <uicontrol>Compact</uicontrol>
+          or <uicontrol>Handbook</uicontrol>; see <xref href="../pdf/pdf-templates.dita"/>. Applying a template
+          replaces the PDF settings with its own and keeps your print CSS.</p></info>
+      </step>
+      <step>
+        <cmd>Adjust the <uicontrol>PDF settings</uicontrol> and select <uicontrol>Save PDF
+          settings</uicontrol>.</cmd>
+        <info><p>Page size, font, orientation, margins, text size, cover and cover note, contents, chapter
+          breaks, page numbers, running header and footer, and <uicontrol>Print CSS</uicontrol> loaded last in
+          every PDF. PDFs also follow the site theme, always in the light scheme.
+          <uicontrol>Reset the PDF template</uicontrol> goes back to the repository's
+          <parmname>pdf</parmname> settings.</p></info>
+      </step>
+      <step>
+        <cmd>Check the result with the links under <uicontrol>Check the result</uicontrol>: the docs site and
+          each publication's PDF, as you see them.</cmd>
+        <info><p>Every PDF is printed again after a change, the first time someone downloads it.</p></info>
+      </step>
+    </steps>
+    <result>
+      <p>Each save is audited as <codeph>settings.appearance.theme</codeph> or
+        <codeph>settings.appearance.pdf</codeph>. Tools can read and set both with
+        <codeph>GET</codeph> and <codeph>PUT /admin/api/appearance</codeph>; see
+        <xref href="admin-api.dita"/>.</p>
+    </result>
+  </taskbody>
+</task>

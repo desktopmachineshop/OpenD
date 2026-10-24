@@ -103,6 +103,21 @@ describe('buildRelease diagnostics', () => {
     );
     expect(missing.diagnostics.map((d) => d.code)).toEqual(['missing-logo']);
   });
+
+  it('records the PDF template settings, and rejects unknown ones', () => {
+    const files = {
+      'main.ditamap': '<map><topicref href="a.dita"/></map>',
+      'a.dita': '<topic id="a"><title>A</title></topic>',
+    };
+    const config = 'release: "1.0"\nmap: main.ditamap\npdf:\n  template: report\n  toc: false\n';
+    const ok = buildRelease(tree({ ...files, 'opend.config.yaml': config }));
+    expect(ok.diagnostics).toEqual([]);
+    expect(ok.release?.pdf).toEqual({ template: 'report', toc: false });
+    const bad = buildRelease(
+      tree({ ...files, 'opend.config.yaml': config.replace('toc: false', 'paper: A3') }),
+    );
+    expect(bad.diagnostics.map((d) => d.code)).toEqual(['invalid-config']);
+  });
 });
 
 describe('readGitRef', () => {

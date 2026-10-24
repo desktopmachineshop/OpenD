@@ -2,7 +2,12 @@ import { existsSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
 import { chromium } from 'playwright-core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createPdfRenderer, type PdfRenderer } from '../src/index.js';
+import {
+  DEFAULT_LAYOUT,
+  createPdfRenderer,
+  runningTemplates,
+  type PdfRenderer,
+} from '../src/index.js';
 
 const executablePath = process.env.OPEND_CHROMIUM_PATH || chromium.executablePath();
 const hasBrowser = existsSync(executablePath);
@@ -11,6 +16,29 @@ const hasBrowser = existsSync(executablePath);
 function pageCount(pdf: Buffer): number {
   return pdf.toString('latin1').match(/\/Type\s*\/Page[^s]/g)?.length ?? 0;
 }
+
+describe('runningTemplates', () => {
+  it('prints the document title and page numbers without a layout', () => {
+    const { header, footer } = runningTemplates(null);
+    expect(header).toContain('<span class="title"></span>');
+    expect(footer).toContain('<span class="pageNumber"></span> / <span class="totalPages"></span>');
+  });
+
+  it('prints the layout’s own text, escaped, and leaves out page numbers on request', () => {
+    const { header, footer } = runningTemplates({
+      ...DEFAULT_LAYOUT,
+      margin: { top: '10mm', right: '7mm', bottom: '10mm', left: '9mm' },
+      headerText: 'A <b>&</b> B',
+      footerText: 'Confidential',
+      pageNumbers: false,
+    });
+    expect(header).toContain('A &lt;b&gt;&amp;&lt;/b&gt; B');
+    expect(header).toContain('margin:0 7mm 0 9mm;');
+    expect(header).not.toContain('class="title"');
+    expect(footer).toContain('Confidential');
+    expect(footer).not.toContain('pageNumber');
+  });
+});
 
 describe.skipIf(!hasBrowser)('createPdfRenderer', () => {
   let renderer: PdfRenderer;
@@ -55,6 +83,21 @@ describe.skipIf(!hasBrowser)('createPdfRenderer', () => {
     );
     expect(pdf.subarray(0, 5).toString()).toBe('%PDF-');
     expect(hits).toBe(0);
+  });
+
+  it('prints the page size and orientation of the layout', async () => {
+    const html =
+      '<!doctype html><style>@page { size: A5 landscape; margin: 10mm; }</style><p>Hi</p>';
+    const pdf = await renderer.render(html, {
+      ...DEFAULT_LAYOUT,
+      format: 'A5',
+      landscape: true,
+      margin: { top: '10mm', right: '10mm', bottom: '10mm', left: '10mm' },
+    });
+    // A5 landscape is 595 × 420 points.
+    const box = /\/MediaBox\s*\[\s*0 0 ([\d.]+) ([\d.]+)/.exec(pdf.toString('latin1'))!;
+    expect(Math.round(Number(box[1]))).toBe(595);
+    expect(Math.round(Number(box[2]))).toBe(420);
   });
 
   it('relaunches after close', async () => {

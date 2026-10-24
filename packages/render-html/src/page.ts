@@ -7,6 +7,8 @@ import { escapeHtml } from './escape.js';
 export interface PageOptions extends RenderOptions {
   /** URL of the theme stylesheet, if the project has one. */
   themeHref?: string;
+  /** URL of the site theme set in the admin console. It loads after `themeHref`, so it wins. */
+  siteThemeHref?: string;
   /** URL of the project logo, shown before the site title in the header. */
   logoHref?: string;
   /** Trusted HTML inserted at the top of the page body, e.g. the previewer banner. */
@@ -161,6 +163,9 @@ function shell(
   const theme = options.themeHref
     ? `<link rel="stylesheet" href="${escapeHtml(options.themeHref)}">`
     : '';
+  const siteTheme = options.siteThemeHref
+    ? `<link rel="stylesheet" href="${escapeHtml(options.siteThemeHref)}">`
+    : '';
   const logo = options.logoHref
     ? `<img class="site-logo" src="${escapeHtml(options.logoHref)}" alt="">`
     : '';
@@ -172,7 +177,7 @@ function shell(
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escapeHtml(title ? `${title} · ${release.title}` : release.title)}</title>
 <style>${DEFAULT_CSS}</style>
-${theme}
+${theme}${siteTheme}
 </head>
 <body class="opend-site">
 <a class="opend-skip" href="#opend-main">Skip to content</a>

@@ -309,6 +309,10 @@ export const SETTING = {
   oidc: 'oidc',
   /** `{ url?: string, editLinks?: boolean, sourceLinks?: boolean }`. */
   editor: 'editor',
+  /** The site theme (`SiteTheme` in `@opend/model`); absent for the repository's look. */
+  siteTheme: 'appearance.theme',
+  /** The PDF template (`PdfTemplate`); absent for the repository's `pdf` settings. */
+  pdfTemplate: 'appearance.pdf',
 } as const;
 
 export const SECRET = {

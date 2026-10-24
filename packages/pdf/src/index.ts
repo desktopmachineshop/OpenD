@@ -1,13 +1,42 @@
 import { chromium, type Browser } from 'playwright-core';
 
+/**
+ * Page set-up for one document. Its page size and margins must match the
+ * document's own `@page` rule, as the running header and footer are drawn
+ * in the margins.
+ */
+export interface PrintLayout {
+  /** Paper format, e.g. `A4`, `Letter`, `Legal` or `A5`. */
+  format: string;
+  landscape: boolean;
+  /** CSS lengths, e.g. `20mm`. */
+  margin: { top: string; right: string; bottom: string; left: string };
+  /** Plain text at the top of every page; empty for none. */
+  headerText: string;
+  /** Plain text at the foot of every page, before the page number; empty for none. */
+  footerText: string;
+  /** Print "page / pages" at the foot of every page. */
+  pageNumbers: boolean;
+}
+
+/** The layout used when a document gives none: A4, the document title as the header, page numbers. */
+export const DEFAULT_LAYOUT: PrintLayout = {
+  format: 'A4',
+  landscape: false,
+  margin: { top: '20mm', right: '18mm', bottom: '18mm', left: '18mm' },
+  headerText: '',
+  footerText: '',
+  pageNumbers: true,
+};
+
 /** Prints self-contained HTML documents to PDF. */
 export interface PdfRenderer {
   /**
    * Renders one document. It must be self-contained: scripts are disabled and
    * every network request is refused, so images must be inlined as data URIs.
-   * The document `<title>` is printed in the page header.
+   * Without a layout, the document `<title>` is printed in the page header.
    */
-  render(html: string): Promise<Buffer>;
+  render(html: string, layout?: PrintLayout): Promise<Buffer>;
   /** Closes the browser. A later `render` launches a new one. */
   close(): Promise<void>;
 }
@@ -30,8 +59,27 @@ export interface PdfRendererOptions {
   timeoutMs?: number;
 }
 
-const HEADER = `<div style="width:100%;margin:0 18mm;font:8px system-ui,sans-serif;color:#6b7280;"><span class="title"></span></div>`;
-const FOOTER = `<div style="width:100%;margin:0 18mm;font:8px system-ui,sans-serif;color:#6b7280;text-align:right;"><span class="pageNumber"></span> / <span class="totalPages"></span></div>`;
+const escape = (text: string): string =>
+  text.replace(
+    /[&<>"']/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!,
+  );
+
+/** Chromium draws these in the page margins; they cannot use the document's styles. */
+const RUNNING_STYLE = 'width:100%;font:8px system-ui,sans-serif;color:#6b7280;';
+
+/** The running header and footer templates for a layout. `null` header: the document title. */
+export function runningTemplates(layout: PrintLayout | null): { header: string; footer: string } {
+  const l = layout ?? DEFAULT_LAYOUT;
+  const side = `margin:0 ${l.margin.right} 0 ${l.margin.left};`;
+  const headerText = layout ? escape(l.headerText) : '<span class="title"></span>';
+  const header = `<div style="${RUNNING_STYLE}${side}">${headerText}</div>`;
+  const numbers = l.pageNumbers
+    ? '<span class="pageNumber"></span> / <span class="totalPages"></span>'
+    : '';
+  const footer = `<div style="${RUNNING_STYLE}${side}display:flex;justify-content:space-between;gap:12px;"><span>${escape(l.footerText)}</span><span>${numbers}</span></div>`;
+  return { header, footer };
+}
 
 /**
  * A renderer that launches one headless Chromium on first use and reuses it
@@ -80,7 +128,7 @@ export function createPdfRenderer(options: PdfRendererOptions = {}): PdfRenderer
   };
 
   return {
-    async render(html) {
+    async render(html, layout) {
       await acquire();
       try {
         const context = await (await launch()).newContext({ javaScriptEnabled: false });
@@ -93,14 +141,17 @@ export function createPdfRenderer(options: PdfRendererOptions = {}): PdfRenderer
           page.setDefaultTimeout(timeout);
           await page.emulateMedia({ media: 'print', colorScheme: 'light' });
           await page.setContent(html, { waitUntil: 'load', timeout });
+          const l = layout ?? DEFAULT_LAYOUT;
+          const running = runningTemplates(layout ?? null);
           return await page.pdf({
-            format: 'A4',
+            format: l.format,
+            landscape: l.landscape,
             preferCSSPageSize: true,
             printBackground: true,
             displayHeaderFooter: true,
-            headerTemplate: HEADER,
-            footerTemplate: FOOTER,
-            margin: { top: '20mm', bottom: '18mm', left: '18mm', right: '18mm' },
+            headerTemplate: running.header,
+            footerTemplate: running.footer,
+            margin: l.margin,
             outline: true,
             tagged: true,
           });

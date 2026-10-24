@@ -1,3 +1,6 @@
+import { THEME_PRESETS } from '@opend/model';
+import { BASE_PALETTE } from '@opend/render-html';
+
 /**
  * Styles for the admin console, on top of the docs stylesheet (`DEFAULT_CSS`),
  * whose header, sidebar and menu it reuses. Only `--opend-*` tokens, so it
@@ -72,6 +75,10 @@ export const ADMIN_CSS = `
 .admin-hint { margin: 0; font-size: 13.5px; color: var(--opend-muted); }
 .admin-field input[type="text"], .admin-field input[type="email"], .admin-field input[type="url"], .admin-field input[type="password"], .admin-field select { width: 100%; min-height: 42px; padding: 8px 12px; border: 1px solid var(--opend-border-strong); border-radius: var(--opend-radius); background: var(--opend-surface); box-sizing: border-box; }
 .admin-field input:focus-visible, .admin-field select:focus-visible { outline: 3px solid var(--opend-focus); outline-offset: 1px; border-color: var(--opend-accent); border-radius: var(--opend-radius); }
+.admin-field textarea { width: 100%; min-height: 9rem; padding: 10px 12px; border: 1px solid var(--opend-border-strong); border-radius: var(--opend-radius); background: var(--opend-surface); box-sizing: border-box; font: 13.5px/1.5 var(--opend-mono); resize: vertical; }
+.admin-field textarea:focus-visible { outline: 3px solid var(--opend-focus); outline-offset: 1px; border-color: var(--opend-accent); border-radius: var(--opend-radius); }
+.admin-field input[type="color"] { width: 4.5rem; min-height: 42px; padding: 4px; border: 1px solid var(--opend-border-strong); border-radius: var(--opend-radius); background: var(--opend-surface); cursor: pointer; }
+.admin-field input[type="color"]:focus-visible { outline: 3px solid var(--opend-focus); outline-offset: 1px; }
 .admin-field input:disabled, .admin-field select:disabled { opacity: 0.6; cursor: not-allowed; background: var(--opend-surface-alt); }
 .admin-fieldset { margin: 0; padding: 0; border: 0; min-width: 0; }
 .admin-fieldset > legend { padding: 0; margin: 0 0 8px; }
@@ -136,6 +143,24 @@ export const ADMIN_CSS = `
 .opend-simple .admin-button:hover { border-color: var(--opend-link-hover); background: var(--opend-link-hover); color: var(--opend-on-accent); }
 .admin-muted { color: var(--opend-muted); }
 .admin-code { display: block; padding: 10px 12px; border: 1px solid var(--opend-border); border-radius: var(--opend-radius-sm); background: var(--opend-code-bg); font-family: var(--opend-mono); font-size: 13.5px; overflow-wrap: anywhere; }
+
+/* Appearance: theme presets as cards with a light and a dark swatch each. */
+.admin-presets { display: grid; grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr)); gap: 10px; }
+.admin-presets .admin-option { align-items: center; }
+.admin-swatch { display: inline-flex; flex: none; overflow: hidden; width: 44px; height: 28px; border: 1px solid var(--opend-border-strong); border-radius: var(--opend-radius-sm); }
+.admin-swatch > i { flex: 1; background: var(--swatch-light); }
+.admin-swatch > i + i { background: var(--swatch-dark); }
+${Object.entries(THEME_PRESETS)
+  .map(([id, p]) => {
+    const accent: { light: string; dark: string } = p.accent ?? {
+      light: BASE_PALETTE.light.accent,
+      dark: BASE_PALETTE.dark.accent,
+    };
+    return `.admin-swatch-${id} { --swatch-light: ${accent.light}; --swatch-dark: ${accent.dark}; }`;
+  })
+  .join('\n')}
+.admin-reset { margin: -8px 0 20px; }
+.admin-preview-links { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 0; padding: 0; list-style: none; font-size: 14.5px; }
 
 @media (max-width: 60rem) {
   .opend-admin main { padding: 20px 16px 56px; }

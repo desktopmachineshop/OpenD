@@ -52,10 +52,19 @@ import {
   type StoredRelease,
 } from '@opend/store';
 import { listRemoteRefs, releaseRefsToPoll } from '@opend/worker';
+import {
+  pdfTemplateSchema,
+  PDF_TEMPLATES,
+  publicationSlug,
+  siteThemeSchema,
+  type PdfTemplate,
+} from '@opend/model';
+import { publicationHref } from '@opend/render-html';
 import { entitlementsSchema, repoSchema, slug as slugSchema } from './admin.js';
 import {
   adminShell,
   apiPage,
+  appearancePage,
   connectPage,
   editorPage,
   githubPage,
@@ -71,6 +80,7 @@ import {
   type Html,
 } from './admin-pages.js';
 import { HANDOFF_PATH, verifyHandoff } from './admin-handoff.js';
+import { accentProblem, appearance, effectivePdfTemplate } from './appearance.js';
 import { ADMIN_CSS } from './admin-style.js';
 import { loginPath, safeReturnTo, setSession, siteSession } from './auth.js';
 import { API_KEY_EMAIL_DOMAIN } from './api-writes.js';
@@ -132,6 +142,11 @@ const DONE: Record<string, string> = {
   editor: 'Editor settings saved.',
   author: 'Author saved.',
   'key-revoked': 'API key revoked. Anything using it stops working at once.',
+  theme: 'Theme saved. Every page uses it from now on.',
+  'theme-reset': 'Theme reset: the site looks as the repository sets it.',
+  pdf: 'PDF settings saved. Publications are printed again with them.',
+  'pdf-template': 'Template applied. Adjust the settings below, or keep them as they are.',
+  'pdf-reset': 'PDF template reset: publications follow the repository’s pdf settings.',
 };
 
 const ORG_SLUG = /^[A-Za-z0-9][A-Za-z0-9-]{0,38}$/;
@@ -374,6 +389,26 @@ export function registerAdminConsole(app: FastifyInstance, ctx: AppContext): voi
         }),
       };
     },
+    appearance: async (s) => {
+      const release = await newestRelease(ctx, await siteRepo(ctx));
+      const look = appearance(ctx);
+      return {
+        title: 'Appearance',
+        body: appearancePage({
+          theme: look.theme ?? siteThemeSchema.parse({}),
+          themeStored: look.theme !== null,
+          repoTheme: Boolean(release?.snapshot.theme),
+          pdf: effectivePdfTemplate(look, release?.snapshot.pdf),
+          pdfStored: look.pdf !== null,
+          repoPdf: Boolean(release?.snapshot.pdf),
+          publications: (release?.snapshot.publications ?? []).map((p) => ({
+            title: p.title || publicationSlug(p.file),
+            href: publicationHref(p),
+          })),
+          csrf: s.csrf,
+        }),
+      };
+    },
     'sign-in': async (s) => {
       const snap = ctx.settings.current;
       const sources = settingSources(ctx.env, snap);
@@ -543,6 +578,7 @@ export function registerAdminConsole(app: FastifyInstance, ctx: AppContext): voi
     ['/admin/site', 'site'],
     ['/admin/source', 'source'],
     ['/admin/people', 'people'],
+    ['/admin/appearance', 'appearance'],
     ['/admin/sign-in', 'sign-in'],
     ['/admin/github', 'github'],
     ['/admin/editor', 'editor'],
@@ -631,6 +667,89 @@ export function registerAdminConsole(app: FastifyInstance, ctx: AppContext): voi
     // Every cached view and page is dropped; NOTIFY does the same on other replicas.
     ctx.caches.releaseChanged();
     return 'access';
+  });
+
+  // ---- appearance ----------------------------------------------------------
+
+  /** Form text with the browser's CRLF line breaks made plain newlines. */
+  const css = (value: string | undefined) => (value ?? '').replace(/\r\n?/g, '\n');
+
+  const saveAppearance = async (s: Staff, key: string, value: unknown) => {
+    await withTransaction(ctx.pool, async (db) => {
+      if (value === null) await deleteSetting(db, key);
+      else await putSetting(db, key, value, s.actor);
+      await audit(db, s.actor, `settings.${key}`, value === null ? { reset: true } : value);
+    });
+    await changed();
+  };
+
+  action('/admin/appearance/theme', 'appearance', async (s, body) => {
+    const parsed = siteThemeSchema.safeParse({
+      preset: body.preset,
+      font: body.font,
+      headingFont: body.headingFont,
+      radius: body.radius,
+      width: body.width,
+      colorScheme: body.colorScheme,
+      customCss: css(body.customCss),
+      ...(body.customAccent === '1' ? { accent: body.accent } : {}),
+      ...(body.customAccentDark === '1' ? { accentDark: body.accentDark } : {}),
+    });
+    if (!parsed.success)
+      throw new InputError(
+        `Check the theme: ${parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`,
+      );
+    const problem = accentProblem(parsed.data);
+    if (problem) throw new InputError(problem);
+    await saveAppearance(s, SETTING.siteTheme, parsed.data);
+    return 'theme';
+  });
+
+  action('/admin/appearance/theme/reset', 'appearance', async (s) => {
+    await saveAppearance(s, SETTING.siteTheme, null);
+    return 'theme-reset';
+  });
+
+  action('/admin/appearance/pdf/template', 'appearance', async (s, body) => {
+    const id = body.template as PdfTemplate['template'];
+    if (!Object.hasOwn(PDF_TEMPLATES, id ?? '')) throw new InputError('Choose a template.');
+    // The template's settings, keeping the print CSS already saved.
+    const current = appearance(ctx).pdf;
+    await saveAppearance(s, SETTING.pdfTemplate, {
+      ...PDF_TEMPLATES[id].settings,
+      customCss: current?.customCss ?? '',
+    });
+    return 'pdf-template';
+  });
+
+  action('/admin/appearance/pdf', 'appearance', async (s, body) => {
+    const parsed = pdfTemplateSchema.safeParse({
+      template: body.template,
+      pageSize: body.pageSize,
+      orientation: body.orientation,
+      margins: body.margins,
+      fontSize: body.fontSize,
+      cover: body.cover,
+      coverNote: (body.coverNote ?? '').trim(),
+      toc: body.toc === '1',
+      chapterBreaks: body.chapterBreaks === '1',
+      header: (body.header ?? '').trim(),
+      footer: (body.footer ?? '').trim(),
+      pageNumbers: body.pageNumbers === '1',
+      font: body.font,
+      customCss: css(body.pdfCss),
+    });
+    if (!parsed.success)
+      throw new InputError(
+        `Check the PDF settings: ${parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`,
+      );
+    await saveAppearance(s, SETTING.pdfTemplate, parsed.data);
+    return 'pdf';
+  });
+
+  action('/admin/appearance/pdf/reset', 'appearance', async (s) => {
+    await saveAppearance(s, SETTING.pdfTemplate, null);
+    return 'pdf-reset';
   });
 
   // ---- docs source ---------------------------------------------------------

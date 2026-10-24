@@ -220,7 +220,7 @@ export async function startPreview(options: PreviewOptions): Promise<PreviewServ
       // Print HTML (`.html`) shows authors the print layout without a browser.
       const [, slug = '', format] = pdf;
       const publication = findPublication(release.publications, slug);
-      const html =
+      const printed =
         publication &&
         (await previewPublicationHtml(
           project,
@@ -230,10 +230,10 @@ export async function startPreview(options: PreviewOptions): Promise<PreviewServ
           policies,
           `http://${req.headers.host ?? 'localhost'}/`,
         ));
-      if (!html) send(res, 404, 'text/plain; charset=utf-8', 'Not found');
-      else if (format === 'html') send(res, 200, 'text/html; charset=utf-8', html);
+      if (!printed) send(res, 404, 'text/plain; charset=utf-8', 'Not found');
+      else if (format === 'html') send(res, 200, 'text/html; charset=utf-8', printed.html);
       else {
-        const body = await pdfRenderer().render(html);
+        const body = await pdfRenderer().render(printed.html, printed.layout);
         res.writeHead(200, {
           'content-type': 'application/pdf',
           'content-disposition': `inline; filename="${slug.replace(/[^\w.-]/g, '_')}.pdf"`,
