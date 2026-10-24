@@ -9,21 +9,22 @@
       <title>Routes</title>
       <simpletable relcolwidth="3* 5*">
         <sthead><stentry>Route</stentry><stentry>What it does</stentry></sthead>
-        <strow><stentry><filepath>GET /context/<varname>app</varname>/<varname>key</varname></filepath></stentry><stentry>Resolves the key as described in <xref href="fallback.dita"/> (the key, its parents, then the app default) in anonymous visitors' view of the default line, and answers 302 to the topic page, with <codeph>#<varname>fragment</varname></codeph> when the key points at a section.</stentry></strow>
-        <strow><stentry><filepath>GET /context/<varname>app</varname>?path=<varname>path</varname></filepath></stentry><stentry>The same, for a path of your app, mapped to a key by the routes in <filepath>help-contexts.yaml</filepath>.</stentry></strow>
-        <strow><stentry><filepath>GET /v/<varname>line</varname>/context/<varname>app</varname>/<varname>key</varname></filepath></stentry><stentry>The same in the public view of a public line, redirecting under <filepath>/v/<varname>line</varname>/</filepath>. See <xref href="../hosting/release-lines.dita"/>.</stentry></strow>
+        <strow><stentry><filepath>GET /context/<varname>app</varname>/<varname>key</varname></filepath></stentry><stentry>Resolves the key as described in <xref href="fallback.dita"/> (the key, its parents, then the app default) in anonymous visitors' view, and answers 302 to the topic page, with <codeph>#<varname>fragment</varname></codeph> when the key points at a section.</stentry></strow>
+        <strow><stentry><filepath>GET /context/<varname>app</varname>?path=<varname>path</varname></filepath></stentry><stentry>The same, for a path of your app, mapped to a key by the routes in <filepath>help-contexts.yaml</filepath>. Without a key or path, the app's default.</stentry></strow>
       </simpletable>
-      <codeblock>&lt;a href="https://docs.example.com/v/0.23/context/console/settings.sso"&gt;Help&lt;/a&gt;</codeblock>
+      <codeblock>&lt;a href="https://docs.example.com/context/console/settings.sso"&gt;Help&lt;/a&gt;</codeblock>
     </section>
     <section id="rules">
       <title>What they answer</title>
       <ul>
-        <li>Always the anonymous view, even for a signed-in reader, so the same link opens the same topic
-          for everyone. A key whose targets are all hidden from anonymous visitors falls back, and never
-          names a hidden topic.</li>
-        <li>404 when nothing resolves, when the app is unknown, or when the line is not public.</li>
-        <li>On a private site, always 404: these links reveal nothing there. Use the help panel or the JSON
-          API with a token instead (<xref href="widget.dita"/>, <xref href="json-api.dita"/>).</li>
+        <li>Always the anonymous view, even for a signed-in reader, so the same link opens the same topic for
+          everyone. A key whose targets are all hidden from anonymous visitors falls back, and never names a
+          hidden topic.</li>
+        <li>At the version the request is served: the public set's version, or the one the visitor chose with
+          the version picker. See <xref href="../hosting/version-picker.dita"/>.</li>
+        <li>404 when nothing resolves or the app is unknown.</li>
+        <li>On a private site, always 404: these links reveal nothing there. Use the help panel or the JSON API
+          with a token instead (<xref href="widget.dita"/>, <xref href="json-api.dita"/>).</li>
       </ul>
     </section>
   </refbody>

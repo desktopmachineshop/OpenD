@@ -10,7 +10,6 @@ import type {
   StoredRelease,
 } from '@opend/store';
 import type { GitHubConnection, Log } from '@opend/worker';
-import type { LatestLine, PublicLine } from './access.js';
 import type { Analytics } from './analytics.js';
 import type { ServerConfig } from './config.js';
 import type { GitHubOAuth } from '@opend/editor';
@@ -33,14 +32,8 @@ export class Caches {
   readonly live = new LRUCache<string, { id: number | null }>({ max: 100, ttl: 60_000 });
   /** Repo id → its newest live release line, for views not tied to a line. */
   readonly newest = new LRUCache<number, { line: string | null }>({ max: 100, ttl: 60_000 });
-  /**
-   * Repo id → the live lines its public site serves under `/v/<line>/`, newest
-   * first, and the live line labelled `latest` (which `/` serves anonymous visitors).
-   */
-  readonly publicLines = new LRUCache<number, { lines: PublicLine[]; latest: LatestLine | null }>({
-    max: 100,
-    ttl: 60_000,
-  });
+  /** Repo id → its live release lines, newest first (for the version picker). */
+  readonly liveLines = new LRUCache<number, { lines: string[] }>({ max: 100, ttl: 60_000 });
   /** Release id → stored release. Releases never change once written. */
   readonly releases = new LRUCache<number, StoredRelease>({ max: 8 });
   /**
@@ -61,7 +54,7 @@ export class Caches {
     this.site = null;
     this.live.clear();
     this.newest.clear();
-    this.publicLines.clear();
+    this.liveLines.clear();
     this.views.clear();
     this.pages.clear();
     this.publications.clear();

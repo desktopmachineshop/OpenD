@@ -29,11 +29,7 @@
       <ul>
         <li>Push to publish: a GitHub webhook queues a build, the worker builds and validates the exact commit,
           and a failing push never goes live.</li>
-        <li>Release lines: 1.x and 2.x docs live side by side, each reader served their own line. A
-          repository can have a line per minor version instead (0.22, 0.23), labels such as
-          <codeph>latest</codeph> and <codeph>stable</codeph>, and on a public site more than one public line,
-          under <filepath>/v/<varname>line</varname>/</filepath> with a version menu in the header. See
-          <xref href="../hosting/release-lines.dita"/>.</li>
+        <li>Release lines: 1.x and 2.x docs live side by side, each reader served their own line.</li>
         <li>OIDC reader sign-in, matched by verified email; filtered pages, navigation and images, cached per
           entitlement set.</li>
         <li>Site-wide search: a search box in the header of every page and a results page that finds only
@@ -70,10 +66,7 @@
           <filepath>help-contexts.yaml</filepath>.</li>
         <li>An embeddable help panel with per-reader search, the <codeph>OpenDHelp</codeph> widget and
           <codeph>&lt;opend-help-button&gt;</codeph>, host-signed tokens and partitioned sessions.</li>
-        <li>A JSON API for apps that render help themselves, with the reader's navigation, and the previewer's
-          help lab.</li>
-        <li>Context links for public sites, <filepath>/context/<varname>app</varname>/<varname>key</varname></filepath>,
-          that redirect to the topic. See <xref href="../help/context-links.dita"/>.</li>
+        <li>A JSON API for apps that render help themselves, and the previewer's help lab.</li>
       </ul>
     </section>
     <section id="pdf">

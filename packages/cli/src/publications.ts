@@ -1,11 +1,13 @@
-import type { CompiledRelease, Publication } from '@opend/model';
+import { resolvePdfTemplate, type CompiledRelease, type Publication } from '@opend/model';
 import { viewPublication, viewRelease, type FilterPolicy } from '@opend/filter';
 import { readSourceFile } from '@opend/build';
 import {
   escapeHtml,
   publicationHasContent,
   publicationHref,
+  publicationLayout,
   renderPublication,
+  type PrintLayout,
 } from '@opend/render-html';
 import type { LoadedProject, PreviewAudience } from './project.js';
 
@@ -21,7 +23,8 @@ export function visiblePublications(
 }
 
 /**
- * The print HTML of a publication for the preview reader, or `null` when it
+ * The print HTML of a publication for the preview reader, with the page
+ * set-up of the project's PDF template, or `null` when it
  * does not exist or holds nothing they can see. Previews always resolve
  * conditional keys, so the staff view prints the first alternative.
  */
@@ -32,7 +35,7 @@ export async function previewPublicationHtml(
   audience: PreviewAudience,
   policies: readonly FilterPolicy[],
   siteBase: string,
-): Promise<string | null> {
+): Promise<{ html: string; layout: PrintLayout } | null> {
   const view = viewPublication(release, publication.file, policies);
   if (!view || !publicationHasContent(view)) return null;
   const read = async (path: string) => {
@@ -47,13 +50,14 @@ export async function previewPublicationHtml(
     assets: async (path) => (release.assets.includes(path) ? read(path) : null),
     site: viewRelease(release, policies),
     siteBase,
+    template: resolvePdfTemplate(release.pdf),
   };
   if (release.theme) {
     const theme = await read(release.theme);
     if (theme) options.themeCss = theme.toString('utf8');
   }
   if (audience.kind !== 'all' && audience.context.org) options.orgName = audience.context.org;
-  return renderPublication(view, options);
+  return { html: await renderPublication(view, options), layout: publicationLayout(view, options) };
 }
 
 /** `/_opend/publications`: every publication and whether the preview reader sees it. */

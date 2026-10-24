@@ -1,6 +1,6 @@
 {
   "name": "@opend/dita",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "DITA subset parser: topics, maps, keyspace and content reference resolution",
   "license": "MIT",
   "type": "module",

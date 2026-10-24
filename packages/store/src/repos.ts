@@ -9,6 +9,18 @@ import type { Entitlements } from './readers.js';
  */
 export type RepoAccess = 'private' | 'public';
 
+/**
+ * What the site's version picker offers readers. `off`: no picker, each reader
+ * gets their own version. `reader`: their own version, shown in the header.
+ * `fixed`: every reader gets `version`. `list`: readers choose among
+ * `versions` (and their own).
+ */
+export type VersionPicker =
+  | { mode: 'off' }
+  | { mode: 'reader' }
+  | { mode: 'fixed'; version: string }
+  | { mode: 'list'; versions: string[] };
+
 export interface Repo {
   id: number;
   fullName: string;
@@ -23,6 +35,8 @@ export interface Repo {
    * conditions (fail-closed).
    */
   publicEntitlements: Entitlements | null;
+  /** What readers may switch between; see `VersionPicker`. */
+  versionPicker: VersionPicker;
   /** How releases group into lines: by major (the default) or by minor version. */
   releaseLines: ReleaseLines;
 }
@@ -37,7 +51,8 @@ export interface RepoInput {
 
 const COLUMNS = `id, full_name as "fullName", source_url as "sourceUrl", installation_id as "installationId",
   release_refs as "releaseRefs", docs_path as "docsPath", access,
-  public_entitlements as "publicEntitlements", release_lines as "releaseLines"`;
+  public_entitlements as "publicEntitlements", version_picker as "versionPicker",
+  release_lines as "releaseLines"`;
 
 export async function upsertRepo(db: Db, input: RepoInput): Promise<Repo> {
   const { rows } = await db.query<Repo>(
@@ -111,6 +126,23 @@ export async function setRepoAccess(
   const { rows } = await db.query<Repo>(
     `update repos set access = $2, public_entitlements = $3 where id = $1 returning ${COLUMNS}`,
     [id, access, publicEntitlements === null ? null : JSON.stringify(publicEntitlements)],
+  );
+  await notify(db, CHANNELS.releaseChanged, String(id));
+  return rows[0] ?? null;
+}
+
+/**
+ * Sets the site's version picker. Like `setRepoAccess`, it notifies every
+ * replica to drop its caches. Returns null when the repo does not exist.
+ */
+export async function setRepoVersionPicker(
+  db: Db,
+  id: number,
+  picker: VersionPicker,
+): Promise<Repo | null> {
+  const { rows } = await db.query<Repo>(
+    `update repos set version_picker = $2 where id = $1 returning ${COLUMNS}`,
+    [id, JSON.stringify(picker)],
   );
   await notify(db, CHANNELS.releaseChanged, String(id));
   return rows[0] ?? null;

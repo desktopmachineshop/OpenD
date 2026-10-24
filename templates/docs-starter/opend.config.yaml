@@ -25,3 +25,7 @@ theme: theme/site.css
 
 # Optional header logo, shown before the title: .svg, .png, .jpg, .gif or .webp.
 # logo: theme/logo.svg
+# How PDFs print: standard, report, compact or handbook, and any settings to change.
+# pdf:
+#   template: report
+#   coverNote: Confidential

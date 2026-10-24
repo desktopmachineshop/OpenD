@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE reference PUBLIC "-//OASIS//DTD DITA Reference//EN" "reference.dtd">
+<reference id="pdf-templates" audience="author admin">
+  <title>Choose a PDF template</title>
+  <shortdesc>A PDF template sets the page size, margins, text size, cover, contents and running header and
+    footer of every publication. Pick one of four built-in templates with <parmname>pdf</parmname> in
+    <filepath>opend.config.yaml</filepath>, and change any of its settings.</shortdesc>
+  <refbody>
+    <section id="templates">
+      <title>Built-in templates</title>
+      <simpletable relcolwidth="1* 4*">
+        <sthead><stentry>Template</stentry><stentry>What it gives you</stentry></sthead>
+        <strow><stentry><codeph>standard</codeph></stentry><stentry>The default. A4 portrait, normal margins,
+          10.5 pt text, a title page with the title in the accent colour, contents, each chapter on a new page,
+          the publication title in the header and page numbers in the footer.</stentry></strow>
+        <strow><stentry><codeph>report</codeph></stentry><stentry>US Letter with wide margins, a banner title
+          page (a full-width band in the accent colour), the site title in the header and
+          <codeph>{title} · Release {release}</codeph> in the footer.</stentry></strow>
+        <strow><stentry><codeph>compact</codeph></stentry><stentry>Dense A4 for printing: narrow margins,
+          9.5 pt text, no title page (a title block opens the first page) and chapters that run on.</stentry></strow>
+        <strow><stentry><codeph>handbook</codeph></stentry><stentry>Pocket-sized A5 in a serif face, with a
+          plain left-aligned title page, no header and the publication title in the footer.</stentry></strow>
+      </simpletable>
+    </section>
+    <properties id="settings" relcolwidth="2* 3* 5*">
+      <title>Settings</title>
+      <prophead><proptypehd>Setting</proptypehd><propvaluehd>Values</propvaluehd><propdeschd>What it
+        does</propdeschd></prophead>
+      <property>
+        <proptype><parmname>template</parmname></proptype>
+        <propvalue><codeph>standard</codeph>, <codeph>report</codeph>, <codeph>compact</codeph>,
+          <codeph>handbook</codeph></propvalue>
+        <propdesc>The built-in template the other settings change. Default <codeph>standard</codeph>.
+          Every other setting defaults to the template's own value.</propdesc>
+      </property>
+      <property>
+        <proptype><parmname>pageSize</parmname></proptype>
+        <propvalue><codeph>A4</codeph>, <codeph>Letter</codeph>, <codeph>Legal</codeph>, <codeph>A5</codeph></propvalue>
+        <propdesc>The paper size.</propdesc>
+      </property>
+      <property>
+        <proptype><parmname>orientation</parmname></proptype>
+        <propvalue><codeph>portrait</codeph>, <codeph>landscape</codeph></propvalue>
+        <propdesc>Which way up the page is.</propdesc>
+      </property>
+      <property>
+        <proptype><parmname>margins</parmname></proptype>
+        <propvalue><codeph>normal</codeph>, <codeph>narrow</codeph>, <codeph>wide</codeph></propvalue>
+        <propdesc>Page margins: 20/18 mm, 14/12 mm or 26/25 mm (top and bottom / sides).</propdesc>
+      </property>
+      <property>
+        <proptype><parmname>fontSize</parmname></proptype>
+        <propvalue><codeph>small</codeph>, <codeph>normal</codeph>, <codeph>large</codeph></propvalue>
+        <propdesc>Body text of 9.5, 10.5 or 11.5 points.</propdesc>
+      </property>
+      <property>
+        <proptype><parmname>font</parmname></proptype>
+        <propvalue><codeph>default</codeph>, <codeph>system</codeph>, <codeph>humanist</codeph>,
+          <codeph>serif</codeph>, <codeph>rounded</codeph>, <codeph>mono</codeph></propvalue>
+        <propdesc>The body font. <codeph>default</codeph> follows the site theme. Only fonts installed on the
+          server that prints the PDF are used.</propdesc>
+      </property>
+      <property>
+        <proptype><parmname>cover</parmname></proptype>
+        <propvalue><codeph>classic</codeph>, <codeph>banner</codeph>, <codeph>minimal</codeph>,
+          <codeph>none</codeph></propvalue>
+        <propdesc>The title page. <codeph>none</codeph> puts a title block at the top of the first page
+          instead.</propdesc>
+      </property>
+      <property>
+        <proptype><parmname>coverNote</parmname></proptype>
+        <propvalue>text</propvalue>
+        <propdesc>An extra line on the cover, such as <codeph>Confidential</codeph>.</propdesc>
+      </property>
+      <property>
+        <proptype><parmname>toc</parmname></proptype>
+        <propvalue><codeph>true</codeph>, <codeph>false</codeph></propvalue>
+        <propdesc>Print the contents after the cover.</propdesc>
+      </property>
+      <property>
+        <proptype><parmname>chapterBreaks</parmname></proptype>
+        <propvalue><codeph>true</codeph>, <codeph>false</codeph></propvalue>
+        <propdesc>Start every top-level chapter, and the first page after the contents, on a new page.</propdesc>
+      </property>
+      <property>
+        <proptype><parmname>header</parmname></proptype>
+        <propvalue>text</propvalue>
+        <propdesc>Text at the top of every page; empty for none. <codeph>{title}</codeph> (the publication),
+          <codeph>{site}</codeph> (the site title), <codeph>{release}</codeph> and <codeph>{date}</codeph>
+          (when the PDF was printed) are filled in.</propdesc>
+      </property>
+      <property>
+        <proptype><parmname>footer</parmname></proptype>
+        <propvalue>text</propvalue>
+        <propdesc>Text at the foot of every page, before the page number, with the same placeholders.</propdesc>
+      </property>
+      <property>
+        <proptype><parmname>pageNumbers</parmname></proptype>
+        <propvalue><codeph>true</codeph>, <codeph>false</codeph></propvalue>
+        <propdesc>Print <codeph>page / pages</codeph> at the foot of every page.</propdesc>
+      </property>
+    </properties>
+    <example id="example">
+      <title>Example</title>
+      <codeblock>pdf:
+  template: report
+  pageSize: A4          # the report layout, on A4 paper
+  coverNote: Confidential: for customers only
+  footer: '{title} · {date}'</codeblock>
+      <p>Quote text that starts with <codeph>{</codeph>: unquoted, YAML reads it as a mapping. A setting the
+        template does not know, or a value it does not allow, is reported as <codeph>invalid-config</codeph>.
+        Print CSS goes in the project <parmname>theme</parmname>; see <xref href="pdf-theming.dita"/>.</p>
+      <p product="core hosted">On a hosted site, staff can choose a template on the admin console's
+        <uicontrol>Appearance</uicontrol> page instead. Saved there, it replaces these settings for every
+        release until it is reset; see <xref href="../hosting/appearance.dita"/>.</p>
+    </example>
+  </refbody>
+</reference>

@@ -13,6 +13,7 @@ import {
   type EmbedOptions,
 } from '@opend/render-html';
 import { findReaderByEmail, getReaderAccess, type ReaderAccess } from '@opend/store';
+import { appearance, siteThemeHref } from './appearance.js';
 import { FEEDBACK_MARKER, feedbackHtml } from './analytics.js';
 import { currentAccess, setEmbedSession } from './auth.js';
 import type { AppContext } from './context.js';
@@ -127,6 +128,8 @@ export function registerEmbed(app: FastifyInstance, ctx: AppContext): void {
     const appName = params.get('app');
     if (appName) o.app = appName;
     if (view?.release.theme) o.themeHref = '/_theme.css';
+    const siteTheme = siteThemeHref(appearance(ctx));
+    if (siteTheme) o.siteThemeHref = siteTheme;
     return o;
   };
 

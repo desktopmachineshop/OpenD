@@ -11,8 +11,6 @@ import type { Db, PoolClient } from './db.js';
  */
 export const EXPORT_TABLES = [
   'repos',
-  'release_line_labels',
-  'public_release_lines',
   'orgs',
   'entitlements',
   'readers',

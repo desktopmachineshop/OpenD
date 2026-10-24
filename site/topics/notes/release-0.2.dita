@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE topic PUBLIC "-//OASIS//DTD DITA Topic//EN" "topic.dtd">
+<!-- release="0.2..": every reader on 0.2 or later sees these notes. -->
+<topic id="release-0.2" release="0.2.." audience="author admin developer">
+  <title>Release notes for 0.2</title>
+  <shortdesc>Readers can choose the version of the docs they read, staff can restyle the site and its PDFs
+    from the admin console, and PDFs print with templates.</shortdesc>
+  <prolog>
+    <resourceid appname="opend-console" appid="whats-new-0.2"/>
+  </prolog>
+  <body>
+    <section id="version-picker">
+      <title>Version picker</title>
+      <ul>
+        <li>The label beside the site title can now be a version picker. Readers select it to read the docs of
+          another version; pages, navigation, search, images and PDFs follow their choice. See
+          <xref href="../start/switch-version.dita"/>.</li>
+        <li audience="admin">Staff choose what it offers under <uicontrol>Site &amp; access</uicontrol> →
+          <uicontrol>Version picker</uicontrol> in the admin console: nothing (the default), each reader's own
+          version, one fixed version for everyone, or a list of versions to choose from. See
+          <xref href="../hosting/version-picker.dita"/>.</li>
+        <li audience="admin">Switching changes only the version. Products and features still come from the
+          reader's entitlements.</li>
+        <li audience="admin" product="core">New admin API route <codeph>PUT /admin/api/repos/:id/versions</codeph>,
+          a <parmname>versionPicker</parmname> field in seed files, the <codeph>repo.versions</codeph> audit
+          action and migration <codeph>011_version_picker</codeph>, applied on start.</li>
+      </ul>
+    </section>
+    <section id="appearance">
+      <title>Site themes and PDF templates</title>
+      <ul>
+        <li>PDFs print with a template: <codeph>standard</codeph>, <codeph>report</codeph>,
+          <codeph>compact</codeph> or <codeph>handbook</codeph>, with page size, margins, text size, cover,
+          contents, chapter breaks, running header and footer and page numbers to adjust. Projects choose one
+          with <parmname>pdf</parmname> in <filepath>opend.config.yaml</filepath>. See
+          <xref href="../pdf/pdf-templates.dita"/>.</li>
+        <li audience="admin" product="core hosted">A new <uicontrol>Appearance</uicontrol> page in the admin
+          console sets the site theme (eight colour presets or your own accents, fonts, corners, reading width,
+          colour scheme and custom CSS) and the PDF template, with no rebuild. See
+          <xref href="../hosting/appearance.dita"/>.</li>
+        <li audience="admin" product="core">New admin API routes <codeph>GET</codeph> and
+          <codeph>PUT /admin/api/appearance</codeph>, and the audit actions
+          <codeph>settings.appearance.theme</codeph> and <codeph>settings.appearance.pdf</codeph>.</li>
+      </ul>
+    </section>
+    <section id="after-0.2.0">
+      <title>Since 0.2.0</title>
+      <ul>
+        <li audience="admin" product="core">Release lines by minor version: a repository can keep one live
+          release per minor (0.22, 0.23) instead of per major, so each reader keeps the docs of their own 0.x
+          minor, and the version picker serves the line of the version chosen. New admin API route
+          <codeph>PUT /admin/api/repos/:id/release-lines</codeph>, a <parmname>releaseLines</parmname> field
+          on <codeph>POST /admin/api/repos</codeph> and in seed files, the <codeph>repo.release-lines</codeph>
+          audit action and migration <codeph>012_release_lines</codeph>. See
+          <xref href="../hosting/release-lines.dita"/>.</li>
+        <li audience="admin developer">The version picker offers only listed versions that have a live
+          release.</li>
+        <li audience="developer" product="embed"><codeph>GET /api/v1/help/nav</codeph>: the token reader's
+          navigation, for apps that draw a help sidebar. See <xref href="../help/json-api.dita"/>.</li>
+        <li audience="developer" product="embed">Context links for public sites,
+          <filepath>/context/<varname>app</varname>/<varname>key</varname></filepath>, that redirect to the
+          topic. See <xref href="../help/context-links.dita"/>.</li>
+        <li audience="developer"><codeph>GET /api/v1/nav</codeph> no longer lists the navtitle of a topic the
+          key's audience cannot see.</li>
+      </ul>
+    </section>
+    <section id="upgrade" product="core">
+      <title>Upgrading from 0.1</title>
+      <p>Deploy the new image. The migration adds one column with the picker off, so readers see no change
+        until staff turn it on. Sites keep their look until staff set a theme or template. See <xref href="../hosting/upgrades.dita"/>.</p>
+    </section>
+  </body>
+</topic>

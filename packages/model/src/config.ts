@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { pdfConfigSchema } from './appearance.js';
 
 /** Profiling attribute matched against the reader's version, using release ranges. */
 export const RELEASE_ATTRIBUTE = 'release';
@@ -75,6 +76,8 @@ export const projectConfigSchema = z
         message: 'must be an .svg, .png, .jpg, .jpeg, .gif or .webp image',
       })
       .optional(),
+    /** Layout of the project's PDFs: a built-in template and the settings to change in it. */
+    pdf: pdfConfigSchema.optional(),
     /** Site title shown in the page header. */
     title: z.string().default('Documentation'),
   })

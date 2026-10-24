@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE task PUBLIC "-//OASIS//DTD DITA Task//EN" "task.dtd">
+<task id="version-picker" product="core hosted" audience="admin">
+  <title>Let readers choose the version they read</title>
+  <shortdesc>The version picker beside the site title decides which version of the docs readers are served:
+    their own, one fixed version, one they choose from a list you set, or no picker at all.</shortdesc>
+  <taskbody>
+    <context>
+      <p>Each reader normally gets the version their organization is entitled to, and anonymous visitors of a
+        public site get the version of the public set. The version picker belongs to the registered repository
+        and is kept in the database, like the access mode, so only staff can change it. New repositories
+        have it off.</p>
+      <simpletable relcolwidth="2* 4* 3*">
+        <sthead><stentry>Mode</stentry><stentry>Version served</stentry><stentry>Beside the site title</stentry></sthead>
+        <strow><stentry><codeph>off</codeph></stentry><stentry>The reader's own</stentry><stentry>The release label, as without a picker</stentry></strow>
+        <strow><stentry><codeph>reader</codeph></stentry><stentry>The reader's own</stentry><stentry>That version, for example <uicontrol>Version 1.4</uicontrol></stentry></strow>
+        <strow><stentry><codeph>fixed</codeph></stentry><stentry>The fixed version, for everyone</stentry><stentry>That version</stentry></strow>
+        <strow><stentry><codeph>list</codeph></stentry><stentry>The one the reader chose; at first, their own</stentry><stentry>A menu of the listed versions and the reader's own, newest first</stentry></strow>
+      </simpletable>
+    </context>
+    <steps>
+      <step>
+        <cmd>Open <uicontrol>Site &amp; access</uicontrol> in the admin console at
+          <filepath>/admin/site</filepath>.</cmd>
+        <info><p>Only staff readers can open the console. See <xref href="admin-console.dita"/>.</p></info>
+      </step>
+      <step>
+        <cmd>Under <uicontrol>Version picker</uicontrol>, choose what readers can pick: <uicontrol>Off</uicontrol>,
+          <uicontrol>Reader’s version</uicontrol>, <uicontrol>Fixed version</uicontrol> or
+          <uicontrol>Choose from a list</uicontrol>.</cmd>
+      </step>
+      <step>
+        <cmd>For <uicontrol>Fixed version</uicontrol>, type the version everyone gets in
+          <uicontrol>Fixed version</uicontrol>, such as <userinput>2.1</userinput>. For
+          <uicontrol>Choose from a list</uicontrol>, type the versions to offer in
+          <uicontrol>Versions in the list</uicontrol>, separated by commas, such as
+          <userinput>2.1, 2.0, 1.4</userinput>.</cmd>
+        <info><p>The hint under the field lists the release lines already published. You can list any version,
+          such as a minor release within a line: content conditioned on <codeph>release</codeph> is filtered
+          for exactly that version.</p></info>
+      </step>
+      <step>
+        <cmd>Select <uicontrol>Save version picker</uicontrol>.</cmd>
+        <stepresult>
+          <p>Every replica drops its cached pages at once, so the next page shows the new picker. The change is
+            recorded in the audit log as <codeph>repo.versions</codeph>.</p>
+        </stepresult>
+      </step>
+      <step importance="optional" product="core">
+        <cmd>Or set it through the admin API.</cmd>
+        <stepxmp>
+          <codeblock>H="authorization: Bearer $OPEND_ADMIN_TOKEN"
+curl -X PUT "$PUBLIC_URL/admin/api/repos/1/versions" -H "$H" -H 'content-type: application/json' \
+  -d '{"mode":"list","versions":["2.1","2.0","1.4"]}'
+# or {"mode":"fixed","version":"2.1"}, {"mode":"reader"}, {"mode":"off"}</codeblock>
+        </stepxmp>
+      </step>
+      <step importance="optional" product="core">
+        <cmd>Or set it in a seed file, next to the repository.</cmd>
+        <stepxmp>
+          <codeblock>repos:
+  - fullName: acme/docs
+    sourceUrl: https://github.com/acme/docs.git
+    versionPicker: { mode: list, versions: ['2.1', '2.0', '1.4'] }</codeblock>
+        </stepxmp>
+        <info><p>A seed without <parmname>versionPicker</parmname> leaves the picker as it is.</p></info>
+      </step>
+    </steps>
+    <result>
+      <ul>
+        <li><b>Only the version changes.</b> Products and features still come from the reader's entitlements
+          (and the public set on a public site), so a reader who switches to 2.0 sees 2.0's content for the
+          products they hold. Release conditions and the release line follow the version served.</li>
+        <li><b>Listing a version opens it.</b> Every reader may switch to any listed version, whatever their
+          own. On a public site that includes anonymous visitors: with no public set, they then see content
+          gated only by release, never by product or feature. A fixed version is served to everyone in the same
+          way.</li>
+        <li><b>A choice is only a request.</b> It is kept in the <codeph>opend_version</codeph> cookie by the
+          picker's links (<filepath>/_version?v=2.0&amp;returnTo=/page.html</filepath>) and checked on every
+          request: a version the picker no longer offers is ignored, and the reader is back on their own. A
+          listed version whose release line has no live release is not offered.</li>
+        <li><b>Release lines.</b> A version served is mapped to its release line by the repository's setting,
+          by major or by minor version. See <xref href="release-lines.dita"/>.</li>
+        <li><b>Everything follows it.</b> Pages, navigation, search, images and PDFs are served for the
+          version chosen, and cached per version. The staff view moves to the chosen version's release line.
+          The embedded help panel and the public API are unchanged: they always use the reader's own
+          version.</li>
+        <li>The picker is a list of links in a <codeph>&lt;details&gt;</codeph> menu, so it works without
+          scripts, and sits in the <uicontrol>Menu</uicontrol> panel on narrow screens. What readers see is
+          described in <xref href="../start/switch-version.dita"/>.</li>
+      </ul>
+    </result>
+  </taskbody>
+</task>

@@ -3,13 +3,20 @@ name: Publish image
 # Versioned images for self-hosters and the managed service:
 #   main      -> ghcr.io/<owner>/opend:edge and :sha-<short>
 #   v1.2.3    -> :1.2.3, :1.2 and :latest
+# Run it by hand on main with a version (Actions -> Publish image -> Run workflow)
+# to cut a release: it tags the commit v<version> and publishes the same images.
 on:
   push:
     branches: [main]
     tags: ['v*.*.*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release to cut from main, such as 0.2.0
+        required: true
 
 permissions:
-  contents: read
+  contents: write
   packages: write
 
 jobs:
@@ -17,6 +24,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # A tag pushed with GITHUB_TOKEN starts no workflow, so this run publishes the release itself.
+      - name: Tag the release
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          [[ "$GITHUB_REF" == refs/heads/main ]] || { echo "Cut releases from main."; exit 1; }
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Give the version as 1.2.3."; exit 1; }
+          git tag "v$VERSION"
+          git push origin "v$VERSION"
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
         with:
@@ -32,7 +49,9 @@ jobs:
             type=sha,prefix=sha-
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=semver,pattern={{version}},value=v${{ inputs.version }},enable=${{ github.event_name == 'workflow_dispatch' }}
+            type=semver,pattern={{major}}.{{minor}},value=v${{ inputs.version }},enable=${{ github.event_name == 'workflow_dispatch' }}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch' }}
           labels: |
             org.opencontainers.image.title=OpenD
             org.opencontainers.image.licenses=MIT

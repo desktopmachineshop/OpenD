@@ -33,7 +33,7 @@ interface SessionValue {
   e: number;
 }
 
-function secureCookies(ctx: AppContext): boolean {
+export function secureCookies(ctx: AppContext): boolean {
   return ctx.config.publicUrl.startsWith('https://');
 }
 

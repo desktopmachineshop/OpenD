@@ -10,7 +10,7 @@
         repository, so only an operator can change it. New repositories are private.</p>
       <simpletable relcolwidth="2* 3* 3*">
         <sthead><stentry>Who</stentry><stentry>Private site</stentry><stentry>Public site</stentry></sthead>
-        <strow><stentry>Anonymous visitor</stentry><stentry>Sent to the sign-in page</stentry><stentry>The public entitlements, on the line labelled <codeph>latest</codeph> if there is one</stentry></strow>
+        <strow><stentry>Anonymous visitor</stentry><stentry>Sent to the sign-in page</stentry><stentry>The public entitlements</stentry></strow>
         <strow><stentry>Signed-in reader</stentry><stentry>Their organization's entitlements</stentry><stentry>Their entitlements together with the public ones, when both are for the same release line; otherwise only their own</stentry></strow>
         <strow><stentry>Reader whose organization has no entitlements</stentry><stentry>"No access yet"</stentry><stentry>The public entitlements</stentry></strow>
         <strow><stentry>Staff reader</stentry><stentry>Everything, conditions marked</stentry><stentry>Everything, conditions marked</stentry></strow>
@@ -63,12 +63,9 @@ curl -X PUT "$PUBLIC_URL/admin/api/repos/1/access" -H "$H" -H 'content-type: app
         <li><b>Caching.</b> Pages are cached per entitlement set. Anonymous visitors share their own cache
           entries, apart from readers', and staff have theirs. The account controls, edit links and
           feedback form are added to each response after the cache.</li>
-        <li><b>Why the union only on the same line.</b> The public set opens one release line: the line
-          labelled <codeph>latest</codeph>, or without that label the line of the public set's version. A
-          reader on another line keeps their own entitlements, so the public set never opens gated content
-          of a line it was not meant for.</li>
-        <li><b>Older and newer lines</b> can be public too, under <filepath>/v/<varname>line</varname>/</filepath>,
-          with a version menu in the header. See <xref href="release-lines.dita"/>.</li>
+        <li><b>Why the union only on the same line.</b> The public set opens one release line. A reader on
+          another line keeps their own entitlements, so the public set never opens gated content of a
+          line it was not meant for.</li>
         <li><b>Feedback</b> needs sign-in. Anonymous page views and searches are counted without an
           organization. The embedded help panel is unchanged: it always uses the reader from the host app's
           signed token.</li>

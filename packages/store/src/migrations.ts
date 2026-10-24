@@ -418,31 +418,24 @@ create table if not exists admin_handoffs (
 `,
   },
   {
-    id: '011_release_lines',
+    id: '011_version_picker',
+    sql: `
+-- The version picker of the docs site: what readers may switch between. off (no
+-- picker: each reader gets their own version), reader (their own version, shown),
+-- fixed ({"mode":"fixed","version":"2.1"}: everyone gets that version) or list
+-- ({"mode":"list","versions":[...]}: readers choose one). Operator-controlled
+-- through the admin API, like access, never read from the docs repository.
+alter table repos add column if not exists version_picker jsonb not null
+  default '{"mode":"off"}';
+`,
+  },
+  {
+    id: '012_release_lines',
     sql: `
 -- How releases group into lines, each with one live release: 'major' (line 2
 -- holds 2.x) or 'minor' (line 0.23 holds 0.23.x). Existing repos keep 'major'.
 alter table repos add column if not exists release_lines text not null default 'major'
   check (release_lines in ('major', 'minor'));
-
--- Labels such as latest and stable, each on at most one line of a repo. A label
--- may name a line before its first build goes live; only live lines are shown.
-create table if not exists release_line_labels (
-  repo_id bigint not null references repos (id) on delete cascade,
-  label text not null,
-  release_line text not null,
-  updated_at timestamptz not null default now(),
-  primary key (repo_id, label)
-);
-
--- Lines of a public site that anonymous visitors may read under /v/<line>/,
--- besides the line the public entitlements name (always public).
-create table if not exists public_release_lines (
-  repo_id bigint not null references repos (id) on delete cascade,
-  release_line text not null,
-  created_at timestamptz not null default now(),
-  primary key (repo_id, release_line)
-);
 `,
   },
 ];

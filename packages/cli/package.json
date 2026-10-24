@@ -1,6 +1,6 @@
 {
   "name": "@opend/cli",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "OpenD command line: build, validate and local preview",
   "license": "MIT",
   "type": "module",

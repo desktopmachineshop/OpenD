@@ -1,10 +1,33 @@
 import { DEFAULT_CSS, escapeHtml } from '@opend/render-html';
-import type { Diagnostic } from '@opend/model';
-import type { ApiKey, ApiScope, BuildJob, EditorUser, Org, Reader, Repo } from '@opend/store';
+import {
+  COLOR_SCHEMES,
+  MAX_CUSTOM_CSS,
+  PAGE_SIZES,
+  PDF_COVERS,
+  PDF_FONT_SIZES,
+  PDF_MARGINS,
+  PDF_TEMPLATES,
+  THEME_FONTS,
+  THEME_PRESETS,
+  THEME_RADII,
+  THEME_WIDTHS,
+  type Diagnostic,
+  type PdfTemplate,
+  type SiteTheme,
+} from '@opend/model';
+import type {
+  ApiKey,
+  ApiScope,
+  BuildJob,
+  EditorUser,
+  LiveRelease,
+  Org,
+  Reader,
+  Repo,
+} from '@opend/store';
 import { ADMIN_CSS } from './admin-style.js';
 import type { PickableRepo } from './github-connect.js';
 import { GITHUB_ICON, KEY_ICON } from './pages.js';
-import type { ReleaseLinesInfo } from './release-lines.js';
 import type { SettingSource } from './settings.js';
 
 // ---- a small escaping template tag ------------------------------------------
@@ -61,6 +84,9 @@ const ICONS = {
   ),
   editor: icon('<path d="M4 20h4L19 9l-4-4L4 16v4z"/><path d="M14 6l4 4"/>'),
   key: icon('<circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3M14 9l2 2"/>'),
+  appearance: icon(
+    '<path d="M12 3a9 9 0 100 18c1.1 0 1.7-.8 1.7-1.7 0-.5-.2-.9-.5-1.2-.3-.3-.5-.7-.5-1.2 0-.9.8-1.7 1.7-1.7h2A4.6 4.6 0 0021 10.6C21 6.4 17 3 12 3z"/><circle cx="7.5" cy="11" r="1.2"/><circle cx="10.5" cy="7.2" r="1.2"/><circle cx="15" cy="7.5" r="1.2"/>',
+  ),
   shield: icon(
     '<path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6l8-3z"/><path d="M9 12l2 2 4-4"/>',
   ),
@@ -72,7 +98,15 @@ const MENU_ICON = raw(
 // ---- shell -----------------------------------------------------------------
 
 export type AdminSection =
-  'overview' | 'site' | 'source' | 'people' | 'sign-in' | 'github' | 'editor' | 'api';
+  | 'overview'
+  | 'site'
+  | 'source'
+  | 'people'
+  | 'appearance'
+  | 'sign-in'
+  | 'github'
+  | 'editor'
+  | 'api';
 
 const NAV: { group: string; items: [AdminSection, string, string, Html][] }[] = [
   {
@@ -82,6 +116,7 @@ const NAV: { group: string; items: [AdminSection, string, string, Html][] }[] = 
       ['site', '/admin/site', 'Site & access', ICONS.site],
       ['source', '/admin/source', 'Docs source', ICONS.source],
       ['people', '/admin/people', 'People', ICONS.people],
+      ['appearance', '/admin/appearance', 'Appearance', ICONS.appearance],
     ],
   },
   {
@@ -332,8 +367,7 @@ function choices(o: {
 export interface OverviewData {
   repo: Repo | null;
   repoCount: number;
-  /** The site repo's release lines, live or with settings; null without a repo. */
-  lines: ReleaseLinesInfo | null;
+  live: LiveRelease[];
   jobs: (BuildJob & { repoName: string })[];
   readers: number;
   staff: number;
@@ -423,9 +457,7 @@ export function overviewPage(d: OverviewData): Html {
         <p><a href="/admin/github">GitHub</a></p>
       </li>`,
     );
-  const live = d.lines?.lines.filter((l) => l.live) ?? [];
-  const isPublic = d.repo?.access === 'public';
-  const lines = live.length
+  const lines = d.live.length
     ? html`<div class="admin-table-wrap">
         <table class="admin-table">
           <thead>
@@ -433,27 +465,15 @@ export function overviewPage(d: OverviewData): Html {
               <th scope="col">Release line</th>
               <th scope="col">Release</th>
               <th scope="col">Commit</th>
-              <th scope="col">Labels</th>
-              ${isPublic ? html`<th scope="col">Public</th>` : ''}
             </tr>
           </thead>
           <tbody>
-            ${live.map(
+            ${d.live.map(
               (l) =>
                 html`<tr>
-                  <td>${l.line}.x</td>
-                  <td>${badge(l.release ?? '', 'ok')}</td>
-                  <td><code>${(l.sha ?? '').slice(0, 7)}</code></td>
-                  <td>
-                    ${l.labels.length ? l.labels.join(', ') : html`<span class="admin-muted">None</span>`}
-                  </td>
-                  ${
-                    isPublic
-                      ? html`<td>
-                          ${l.default ? 'Yes, at /' : l.public ? html`Yes, at <code>/v/${l.line}/</code>` : 'No'}
-                        </td>`
-                      : ''
-                  }
+                  <td>${l.releaseLine}.x</td>
+                  <td>${badge(l.release, 'ok')}</td>
+                  <td><code>${l.sha.slice(0, 7)}</code></td>
                 </tr>`,
             )}
           </tbody>
@@ -462,10 +482,6 @@ export function overviewPage(d: OverviewData): Html {
     : html`<p class="admin-empty">
         Nothing is published yet. A build goes live when it passes validation.
       </p>`;
-  const granularity =
-    d.lines?.releaseLines === 'minor'
-      ? 'One live release per minor version (0.23.x, 0.24.x).'
-      : 'One live release per major version (1.x, 2.x).';
   return html`${head('Admin', 'Overview', 'What readers see right now, the latest builds, and recent changes.')}
     ${
       setup.length
@@ -501,7 +517,18 @@ export function overviewPage(d: OverviewData): Html {
         <h2 id="live-h">Live releases</h2>
         <a class="admin-button is-secondary is-small" href="/">Open the site</a>
       </div>
-      ${d.repo ? html`<p class="admin-muted">${granularity}</p>` : ''} ${lines}
+      ${
+        d.repo
+          ? html`<p class="admin-muted">
+              ${
+                d.repo.releaseLines === 'minor'
+                  ? 'One live release per minor version (0.23.x, 0.24.x).'
+                  : 'One live release per major version (1.x, 2.x).'
+              }
+            </p>`
+          : ''
+      }
+      ${lines}
     </section>
     <section class="admin-card" aria-labelledby="builds-h">
       <div class="admin-card-head">
@@ -548,7 +575,69 @@ export interface SitePageData {
   siteTitle: string;
   attributes: { product: string[]; feature: string[] };
   release: string | null;
+  /** The live release of each line, newest first, e.g. `['2.1', '1.4']`. */
+  published: string[];
   csrf: string;
+}
+
+const VERSION_MODES = [
+  ['off', 'Off', 'No picker. Each reader gets the version their organization is entitled to.'],
+  [
+    'reader',
+    'Reader’s version',
+    'Show each signed-in reader the version they get, from their organization’s entitlements.',
+  ],
+  ['fixed', 'Fixed version', 'Everyone gets the one version below, whatever their own.'],
+  [
+    'list',
+    'Choose from a list',
+    'Readers pick from the versions below. Their own version is always offered too, and is where they start.',
+  ],
+] as const;
+
+function versionPickerForm(repo: Repo, published: string[], csrf: string): Html {
+  const picker = repo.versionPicker;
+  const fixed = picker.mode === 'fixed' ? picker.version : (published[0] ?? '');
+  const list = picker.mode === 'list' ? picker.versions.join(', ') : published.join(', ');
+  const hint = published.length
+    ? `Published release lines: ${published.join(', ')}. Any version such as 2.0 or 1.4 works.`
+    : 'A version such as 2.1.';
+  return html`<form
+    class="admin-card admin-form"
+    method="post"
+    action="/admin/site/versions"
+    aria-labelledby="versions-h"
+  >
+    ${csrfField(csrf)}
+    <h2 id="versions-h">Version picker</h2>
+    <p class="admin-hint">
+      What readers see next to the site title, and which version of the docs they are served.
+      Products and features still come from each reader’s entitlements. On a public site, anonymous
+      visitors get the same choice.
+    </p>
+    <fieldset class="admin-fieldset">
+      <legend class="admin-legend">What readers can choose</legend>
+      <div class="admin-options">
+        ${VERSION_MODES.map(
+          ([mode, title, text]) =>
+            html`<label class="admin-option"
+              ><input
+                type="radio"
+                name="mode"
+                value="${mode}"
+                ${raw(picker.mode === mode ? ' checked' : '')}
+              /><span><strong>${title}</strong><span>${text}</span></span></label
+            >`,
+        )}
+      </div>
+    </fieldset>
+    <div class="admin-form-row">
+      ${field({ name: 'fixedVersion', label: 'Fixed version', value: fixed, hint: 'For “Fixed version”.' })}${field({ name: 'versions', label: 'Versions in the list', value: list, hint: `For “Choose from a list”, comma-separated. ${hint}` })}
+    </div>
+    <div class="admin-buttons">
+      <button class="admin-button" type="submit">Save version picker</button>
+    </div>
+  </form>`;
 }
 
 export function sitePage(d: SitePageData): Html {
@@ -641,7 +730,8 @@ export function sitePage(d: SitePageData): Html {
       <div class="admin-buttons">
         <button class="admin-button" type="submit">Save access</button>
       </div>
-    </form>`;
+    </form>
+    ${versionPickerForm(d.repo, d.published, d.csrf)}`;
 }
 
 // ---- docs source -----------------------------------------------------------
@@ -1390,6 +1480,305 @@ export function editorPage(d: EditorPageData): Html {
           </form>
         </div>
       </details>
+    </section>`;
+}
+
+// ---- appearance ------------------------------------------------------------
+
+export interface AppearancePageData {
+  /** The theme the form shows: the stored one, or the defaults. */
+  theme: SiteTheme;
+  themeStored: boolean;
+  /** Whether the published release has its own theme stylesheet. */
+  repoTheme: boolean;
+  /** The PDF template in force: the stored one, or the repository's. */
+  pdf: PdfTemplate;
+  pdfStored: boolean;
+  /** Whether the published release sets `pdf` in opend.config.yaml. */
+  repoPdf: boolean;
+  /** PDFs to check the result with, as this staff reader sees them. */
+  publications: { title: string; href: string }[];
+  csrf: string;
+}
+
+const checkedIf = (on: boolean) => raw(on ? ' checked' : '');
+
+function select(o: {
+  name: string;
+  label: string;
+  value: string;
+  options: [string, string][];
+  hint?: string;
+}): Html {
+  const id = `f-${o.name}`;
+  return html`<div class="admin-field">
+    <label for="${id}">${o.label}</label
+    ><select id="${id}" name="${o.name}" ${o.hint ? html` aria-describedby="${id}-hint"` : ''}>
+      ${o.options.map(
+        ([v, label]) =>
+          html`<option value="${v}" ${raw(v === o.value ? ' selected' : '')}>${label}</option>`,
+      )}
+    </select>
+    ${o.hint ? html`<p class="admin-hint" id="${id}-hint">${o.hint}</p>` : ''}
+  </div>`;
+}
+
+/** Radio buttons as pills. */
+function pills(o: {
+  legend: string;
+  name: string;
+  value: string;
+  options: [string, string][];
+}): Html {
+  return html`<fieldset class="admin-fieldset">
+    <legend class="admin-legend">${o.legend}</legend>
+    <div class="admin-choices">
+      ${o.options.map(
+        ([v, label]) =>
+          html`<label class="admin-choice"
+            ><input
+              type="radio"
+              name="${o.name}"
+              value="${v}"
+              ${checkedIf(v === o.value)}
+            />${label}</label
+          >`,
+      )}
+    </div>
+  </fieldset>`;
+}
+
+function textarea(o: { name: string; label: string; value: string; hint: string | Html }): Html {
+  const id = `f-${o.name}`;
+  return html`<div class="admin-field">
+    <label for="${id}">${o.label}</label
+    ><textarea
+      id="${id}"
+      name="${o.name}"
+      maxlength="${MAX_CUSTOM_CSS}"
+      spellcheck="false"
+      aria-describedby="${id}-hint"
+    >
+${o.value}</textarea>
+    <p class="admin-hint" id="${id}-hint">${o.hint}</p>
+  </div>`;
+}
+
+const labels = <T extends Record<string, { label: string }>>(record: T): [string, string][] =>
+  Object.entries(record).map(([k, v]) => [k, v.label]);
+
+export function appearancePage(d: AppearancePageData): Html {
+  const t = d.theme;
+  const p = d.pdf;
+  const themeSource = d.themeStored
+    ? badge('Set here', 'ok')
+    : d.repoTheme
+      ? badge('Repository theme', 'info')
+      : badge('Default', 'muted');
+  const pdfSource = d.pdfStored
+    ? badge('Set here', 'ok')
+    : d.repoPdf
+      ? badge('opend.config.yaml', 'info')
+      : badge('Default', 'muted');
+  const previews = d.publications.length
+    ? html`<ul class="admin-preview-links">
+        ${d.publications.map((pub) => html`<li><a href="${pub.href}">${pub.title} (PDF)</a></li>`)}
+      </ul>`
+    : html`<p class="admin-hint">The published release has no publications to print.</p>`;
+  return html`${head('Site', 'Appearance', 'Choose how the docs site, the help panel and PDFs look. Changes apply to every page at once, with no rebuild.')}
+    <form
+      class="admin-card admin-form"
+      method="post"
+      action="/admin/appearance/theme"
+      aria-labelledby="theme-h"
+    >
+      ${csrfField(d.csrf)}
+      <div class="admin-card-head">
+        <h2 id="theme-h">Site theme</h2>
+        ${themeSource}
+      </div>
+      <p class="admin-hint">
+        The theme loads after the built-in styles and after the repository’s own theme, so what you
+        choose here
+        wins.${d.repoTheme ? ' Keep the preset on Default to use the repository’s colours.' : ''}
+      </p>
+      <fieldset class="admin-fieldset">
+        <legend class="admin-legend">Colour preset</legend>
+        <div class="admin-options admin-presets">
+          ${Object.entries(THEME_PRESETS).map(
+            ([id, preset]) =>
+              html`<label class="admin-option"
+                ><input
+                  type="radio"
+                  name="preset"
+                  value="${id}"
+                  ${checkedIf(t.preset === id)}
+                /><span class="admin-swatch admin-swatch-${id}" aria-hidden="true"
+                  ><i></i><i></i></span
+                ><span
+                  ><strong>${preset.label}</strong><span>${preset.description}</span></span
+                ></label
+              >`,
+          )}
+        </div>
+      </fieldset>
+      <div class="admin-form-row">
+        <div class="admin-field">
+          <label class="admin-choice"
+            ><input type="checkbox" name="customAccent" value="1" ${checkedIf(Boolean(t.accent))} />
+            Custom accent colour</label
+          >
+          <label for="f-accent">Accent, light scheme</label>
+          <input id="f-accent" name="accent" type="color" value="${t.accent ?? '#187f65'}" />
+        </div>
+        <div class="admin-field">
+          <label class="admin-choice"
+            ><input
+              type="checkbox"
+              name="customAccentDark"
+              value="1"
+              ${checkedIf(Boolean(t.accentDark))}
+            />
+            Custom dark-scheme accent</label
+          >
+          <label for="f-accentDark">Accent, dark scheme</label>
+          <input
+            id="f-accentDark"
+            name="accentDark"
+            type="color"
+            value="${t.accentDark ?? '#3fbf98'}"
+          />
+          <p class="admin-hint">Left unticked, a lighter tint of the light accent is used.</p>
+        </div>
+      </div>
+      <p class="admin-hint">
+        Links, buttons and highlights use the accent. It needs at least 3:1 contrast against the
+        page background of its scheme (4.5:1 reads best); the console refuses colours that are too
+        faint.
+      </p>
+      <div class="admin-form-row">
+        ${select({ name: 'font', label: 'Body font', value: t.font, options: labels(THEME_FONTS), hint: 'Fonts installed on the reader’s device; no web fonts are loaded.' })}
+        ${select({ name: 'headingFont', label: 'Heading font', value: t.headingFont, options: labels(THEME_FONTS) })}
+      </div>
+      ${pills({ legend: 'Corners', name: 'radius', value: t.radius, options: labels(THEME_RADII) })}
+      ${pills({ legend: 'Reading width', name: 'width', value: t.width, options: labels(THEME_WIDTHS) })}
+      ${pills({ legend: 'Colour scheme', name: 'colorScheme', value: t.colorScheme, options: Object.entries(COLOR_SCHEMES) })}
+      ${textarea({ name: 'customCss', label: 'Custom CSS', value: t.customCss, hint: html`Loaded last on every page and in the help panel (and in PDFs). Override <code>--opend-*</code> properties or style classes such as <code>.site-header</code>.` })}
+      <div class="admin-buttons">
+        <button class="admin-button" type="submit">Save theme</button>
+      </div>
+    </form>
+    ${d.themeStored ? html`<div class="admin-buttons admin-reset">${confirmButton({ action: '/admin/appearance/theme/reset', csrf: d.csrf, label: 'Reset the theme', question: 'Go back to the repository’s look (or OpenD’s default)?' })}</div>` : ''}
+
+    <section class="admin-card" aria-labelledby="pdf-h">
+      <div class="admin-card-head">
+        <h2 id="pdf-h">PDF template</h2>
+        ${pdfSource}
+      </div>
+      <p class="admin-hint">
+        Every publication prints with this template, for every reader. Saved here, it replaces the
+        <code>pdf</code> settings in opend.config.yaml. PDFs also follow the site theme, always in
+        the light scheme.
+      </p>
+      <form class="admin-form" method="post" action="/admin/appearance/pdf/template">
+        ${csrfField(d.csrf)}
+        <fieldset class="admin-fieldset">
+          <legend class="admin-legend">Start from a template</legend>
+          <div class="admin-options admin-presets">
+            ${Object.entries(PDF_TEMPLATES).map(
+              ([id, tpl]) =>
+                html`<label class="admin-option"
+                  ><input
+                    type="radio"
+                    name="template"
+                    value="${id}"
+                    ${checkedIf(p.template === id)}
+                  /><span><strong>${tpl.label}</strong><span>${tpl.description}</span></span></label
+                >`,
+            )}
+          </div>
+        </fieldset>
+        <div class="admin-buttons">
+          <button class="admin-button is-secondary" type="submit">Apply template</button>
+          <span class="admin-hint"
+            >Replaces the settings below with the template’s; custom CSS is kept.</span
+          >
+        </div>
+      </form>
+    </section>
+    <form
+      class="admin-card admin-form"
+      method="post"
+      action="/admin/appearance/pdf"
+      aria-labelledby="pdfs-h"
+    >
+      ${csrfField(d.csrf)}
+      <input type="hidden" name="template" value="${p.template}" />
+      <h2 id="pdfs-h">PDF settings</h2>
+      <div class="admin-form-row">
+        ${select({ name: 'pageSize', label: 'Page size', value: p.pageSize, options: labels(PAGE_SIZES) })}
+        ${select({ name: 'font', label: 'Font', value: p.font, options: labels(THEME_FONTS), hint: 'Default follows the site theme. Use fonts installed on the server.' })}
+      </div>
+      ${pills({
+        legend: 'Orientation',
+        name: 'orientation',
+        value: p.orientation,
+        options: [
+          ['portrait', 'Portrait'],
+          ['landscape', 'Landscape'],
+        ],
+      })}
+      ${pills({ legend: 'Margins', name: 'margins', value: p.margins, options: labels(PDF_MARGINS) })}
+      ${pills({ legend: 'Text size', name: 'fontSize', value: p.fontSize, options: labels(PDF_FONT_SIZES) })}
+      <fieldset class="admin-fieldset">
+        <legend class="admin-legend">Cover</legend>
+        <div class="admin-options">
+          ${Object.entries(PDF_COVERS).map(([id, text]) => {
+            const [name, rest = ''] = text.split(': ');
+            return html`<label class="admin-option"
+              ><input type="radio" name="cover" value="${id}" ${checkedIf(p.cover === id)} /><span
+                ><strong>${name}</strong
+                ><span>${rest.charAt(0).toUpperCase() + rest.slice(1)}.</span></span
+              ></label
+            >`;
+          })}
+        </div>
+      </fieldset>
+      <div class="admin-form-row">
+        ${field({ name: 'coverNote', label: 'Cover note', value: p.coverNote, placeholder: 'Confidential', hint: 'An extra line on the cover. Optional.' })}
+      </div>
+      <div class="admin-choices">
+        <label class="admin-choice"
+          ><input type="checkbox" name="toc" value="1" ${checkedIf(p.toc)} /> Contents</label
+        >
+        <label class="admin-choice"
+          ><input type="checkbox" name="chapterBreaks" value="1" ${checkedIf(p.chapterBreaks)} />
+          Each chapter on a new page</label
+        >
+        <label class="admin-choice"
+          ><input type="checkbox" name="pageNumbers" value="1" ${checkedIf(p.pageNumbers)} /> Page
+          numbers</label
+        >
+      </div>
+      <div class="admin-form-row">
+        ${field({ name: 'header', label: 'Running header', value: p.header, hint: html`Top of every page. <code>{title}</code>, <code>{site}</code>, <code>{release}</code> and <code>{date}</code> are filled in. Empty for none.` })}
+        ${field({ name: 'footer', label: 'Running footer', value: p.footer, hint: 'Foot of every page, before the page number.' })}
+      </div>
+      ${textarea({ name: 'pdfCss', label: 'Print CSS', value: p.customCss, hint: html`Loaded last in every PDF. The body has the class <code>publication</code>; hooks include <code>.pub-cover</code>, <code>.pub-toc</code> and <code>.pub-chapter</code>.` })}
+      <div class="admin-buttons">
+        <button class="admin-button" type="submit">Save PDF settings</button>
+      </div>
+    </form>
+    ${d.pdfStored ? html`<div class="admin-buttons admin-reset">${confirmButton({ action: '/admin/appearance/pdf/reset', csrf: d.csrf, label: 'Reset the PDF template', question: 'Go back to the repository’s pdf settings (or the Standard template)?' })}</div>` : ''}
+    <section class="admin-card" aria-labelledby="see-h">
+      <h2 id="see-h">Check the result</h2>
+      <p class="admin-hint">
+        Open the site or a PDF as you see it. PDFs are printed again after every change.
+      </p>
+      <ul class="admin-preview-links">
+        <li><a href="/">The docs site</a></li>
+      </ul>
+      ${previews}
     </section>`;
 }
 

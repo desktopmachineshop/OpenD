@@ -1,6 +1,6 @@
 {
   "name": "@opend/worker",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Build worker: fetches a commit, builds and validates it, and publishes or reports the failure",
   "license": "MIT",
   "type": "module",

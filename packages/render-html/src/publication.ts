@@ -1,9 +1,18 @@
 import { posix } from 'node:path';
-import { ASSET_ATTR, publicationSlug, walk, type NavEntry, type Publication } from '@opend/model';
+import {
+  ASSET_ATTR,
+  publicationSlug,
+  resolvePdfTemplate,
+  walk,
+  type NavEntry,
+  type PdfTemplate,
+  type Publication,
+} from '@opend/model';
 import type { PublicationView, ReleaseView } from '@opend/filter';
 import { escapeHtml } from './escape.js';
 import { pageHref, renderTopic, type RenderOptions, type TopicLink } from './render.js';
 import { DEFAULT_CSS } from './style.js';
+import { pdfPrintLayout, pdfTemplateCss, styleText, type PrintLayout } from './theme.js';
 
 /** Layout for paged output. Loads after the site styles and before the brand theme. */
 export const PRINT_CSS = `
@@ -25,6 +34,16 @@ a[href^="http"] { text-decoration: underline; text-decoration-thickness: 0.5pt; 
 .pub-cover h1 { font-size: 30pt; margin: 0 0 12pt; color: var(--opend-accent); }
 .pub-cover .pub-site { font-size: 15pt; margin: 0 0 4pt; }
 .pub-cover .pub-meta { color: var(--opend-muted); margin: 2pt 0; }
+.pub-cover .pub-note { margin-top: 18pt; font-weight: 600; color: var(--opend-heading); }
+.pub-cover-banner { justify-content: flex-start; }
+.pub-cover-banner .pub-banner { margin: 0 0 18pt; padding: 36pt 24pt 28pt; border-radius: var(--opend-radius); background: var(--opend-accent); color: var(--opend-on-accent); }
+.pub-cover-banner .pub-banner h1 { color: inherit; margin: 0 0 6pt; }
+.pub-cover-banner .pub-banner .pub-site { margin: 0; }
+.pub-cover-minimal { justify-content: flex-start; padding-top: 30mm; }
+.pub-cover-minimal h1 { color: var(--opend-heading); border-bottom: 1.5pt solid var(--opend-accent); padding-bottom: 8pt; }
+.pub-titleblock { margin: 0 0 18pt; padding-bottom: 10pt; border-bottom: 1.5pt solid var(--opend-accent); }
+.pub-titleblock h1 { margin: 0 0 4pt; color: var(--opend-accent); }
+.pub-titleblock p { margin: 0; color: var(--opend-muted); }
 .pub-toc { break-after: page; page-break-after: always; }
 .pub-toc ol { list-style: none; padding-left: 0; margin: 0; }
 .pub-toc ol ol { padding-left: 14pt; }
@@ -39,6 +58,13 @@ a[href^="http"] { text-decoration: underline; text-decoration-thickness: 0.5pt; 
 export interface PublicationRenderOptions {
   /** CSS text of the project theme. It is inlined after the print styles, so brand rules win. */
   themeCss?: string;
+  /**
+   * CSS of the site theme set in the admin console (`siteThemeCss(theme, { print: true })`).
+   * It loads after the project theme, as it does on the site.
+   */
+  siteThemeCss?: string;
+  /** Page set-up, cover, contents and running text. Default the `standard` template. */
+  template?: PdfTemplate;
   /**
    * Loads a file the visible content references, by docs-root-relative path.
    * Images are inlined as data URIs: the PDF renderer has no reader session to
@@ -92,9 +118,29 @@ export function publicationImages(view: ReleaseView): string[] {
   return [...images].sort();
 }
 
-/** Keeps author CSS inside its `<style>` element. */
-function styleText(css: string): string {
-  return css.replace(/<\/(style)/gi, '<\\/$1');
+/** The values the running header and footer placeholders are filled with. */
+function placeholderValues(view: PublicationView, now: Date | undefined) {
+  return {
+    title: view.publication.title || view.release.title,
+    site: view.release.title,
+    release: view.release.release,
+    date: (now ?? new Date()).toISOString().slice(0, 10),
+  };
+}
+
+/**
+ * The printer's page set-up for a publication: page size, margins, running
+ * header and footer. Pass it to the PDF renderer with `renderPublication`'s
+ * document, with the same template.
+ */
+export function publicationLayout(
+  view: PublicationView,
+  options: Pick<PublicationRenderOptions, 'template' | 'now'> = {},
+): PrintLayout {
+  return pdfPrintLayout(
+    options.template ?? resolvePdfTemplate(null),
+    placeholderValues(view, options.now),
+  );
 }
 
 /**
@@ -109,6 +155,7 @@ export async function renderPublication(
 ): Promise<string> {
   const release = view.release;
   const title = view.publication.title || release.title;
+  const template = options.template ?? resolvePdfTemplate(null);
 
   // Inline every image the visible topics use.
   const dataUris = new Map<string, string>();
@@ -197,20 +244,42 @@ export async function renderPublication(
   };
   const { body, toc } = walkNav(view.nav, 0);
 
-  const generated = (options.now ?? new Date()).toISOString().slice(0, 10);
+  const generated = placeholderValues(view, options.now).date;
   const org = options.orgName
     ? `<p class="pub-meta">Prepared for ${escapeHtml(options.orgName)}</p>`
     : '';
-  const cover = `<section class="pub-cover">
+  const note = template.coverNote.trim()
+    ? `<p class="pub-note">${escapeHtml(template.coverNote.trim())}</p>`
+    : '';
+  const meta = `<p class="pub-meta">Release ${escapeHtml(release.release)}</p>
+<p class="pub-meta">Generated ${escapeHtml(generated)}</p>
+${org}`;
+  let cover: string;
+  if (template.cover === 'none') {
+    cover = `<header class="pub-titleblock">
+<h1>${escapeHtml(title)}</h1>
+<p>${escapeHtml(release.title)} · Release ${escapeHtml(release.release)} · Generated ${escapeHtml(generated)}</p>
+${note}
+</header>`;
+  } else if (template.cover === 'banner') {
+    cover = `<section class="pub-cover pub-cover-banner">
+<div class="pub-banner">
 <h1>${escapeHtml(title)}</h1>
 <p class="pub-site">${escapeHtml(release.title)}</p>
-<p class="pub-meta">Release ${escapeHtml(release.release)}</p>
-<p class="pub-meta">Generated ${escapeHtml(generated)}</p>
-${org}
+</div>
+${meta}${note}
 </section>`;
-  const contents = toc
-    ? `<nav class="pub-toc" aria-label="Contents"><h1>Contents</h1><ol>${toc}</ol></nav>`
-    : '';
+  } else {
+    cover = `<section class="pub-cover pub-cover-${template.cover}">
+<h1>${escapeHtml(title)}</h1>
+<p class="pub-site">${escapeHtml(release.title)}</p>
+${meta}${note}
+</section>`;
+  }
+  const contents =
+    toc && template.toc
+      ? `<nav class="pub-toc" aria-label="Contents"><h1>Contents</h1><ol>${toc}</ol></nav>`
+      : '';
   const main =
     body || '<p class="pub-empty">No content in this publication is available to you.</p>';
 
@@ -221,7 +290,10 @@ ${org}
 <title>${escapeHtml(title)}</title>
 <style>${DEFAULT_CSS}</style>
 <style>${PRINT_CSS}</style>
+<style>${pdfTemplateCss(template)}</style>
 ${options.themeCss ? `<style>${styleText(options.themeCss)}</style>` : ''}
+${options.siteThemeCss ? `<style>${styleText(options.siteThemeCss)}</style>` : ''}
+${template.customCss.trim() ? `<style>${styleText(template.customCss)}</style>` : ''}
 </head>
 <body class="publication">
 ${cover}

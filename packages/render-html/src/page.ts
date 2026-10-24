@@ -6,6 +6,8 @@ import { escapeHtml } from './escape.js';
 export interface PageOptions extends RenderOptions {
   /** URL of the theme stylesheet, if the project has one. */
   themeHref?: string;
+  /** URL of the site theme set in the admin console. It loads after `themeHref`, so it wins. */
+  siteThemeHref?: string;
   /** URL of the project logo, shown before the site title in the header. */
   logoHref?: string;
   /** Trusted HTML inserted at the top of the page body, e.g. the previewer banner. */
@@ -29,48 +31,46 @@ export interface PageOptions extends RenderOptions {
    */
   account?: { header: string; menu: string };
   /**
-   * Trusted HTML after the release in the header: the version menu
-   * (`renderVersionMenu`), or a marker the hosted server fills per request.
+   * Trusted HTML for the version control (see `renderVersionControl`): `header`
+   * in place of the "Release" label after the site title, `menu` near the top
+   * of the narrow-screen menu panel. Markers too on the hosted server.
    */
-  versions?: string;
-  /** Trusted HTML at the end of `<head>`, e.g. a `<link rel="canonical">`. */
-  head?: string;
+  version?: { header: string; menu: string };
 }
 
-/** One line in the version menu. */
-export interface VersionMenuItem {
-  /** The line, e.g. `0.23` or `2`. */
-  line: string;
-  /** Its labels, e.g. `latest` and `stable`. */
-  labels: readonly string[];
-  /** The same page in that line, or that line's home when it has no such page. */
-  href: string;
-}
-
-function lineName(line: string, labels: readonly string[]): string {
-  return labels.length
-    ? `${escapeHtml(line)} <span class="site-versions-label">(${labels.map(escapeHtml).join(', ')})</span>`
-    : escapeHtml(line);
+/** What `renderVersionControl` shows: the version served and what the reader may switch to. */
+export interface VersionControl {
+  current: string;
+  /** Newest first. With more than one, the reader may switch; otherwise it is a label. */
+  options: string[];
 }
 
 /**
- * The version menu of a public site: a `<details>` whose panel lists the
- * lines, each linking to the same page in that line. No script: Enter or
- * Space on the summary opens and closes it, and Tab reaches the links.
- * `current` is the line the page is from; it is marked when it is listed.
+ * The version control: a label with the version served, or, when there is
+ * more than one option, a `<details>` list of links (`href(version)`) to
+ * switch, so it works without scripts. `header` goes in the wide-screen
+ * header, `menu` in the narrow-screen menu panel.
  */
-export function renderVersionMenu(
-  current: { line: string; labels: readonly string[] },
-  items: readonly VersionMenuItem[],
-): string {
-  if (!items.length) return '';
-  const links = items
+export function renderVersionControl(
+  control: VersionControl,
+  href: (version: string) => string,
+): { header: string; menu: string } {
+  const current = escapeHtml(control.current);
+  if (control.options.length < 2)
+    return {
+      header: `<span class="site-release">Version ${current}</span>`,
+      menu: `<div class="site-menu-versions"><p class="site-menu-heading">Version</p><p class="site-menu-version">${current}</p></div>`,
+    };
+  const links = control.options
     .map(
-      (i) =>
-        `<li><a href="${escapeHtml(i.href)}"${i.line === current.line ? ' aria-current="page"' : ''}>${lineName(i.line, i.labels)}</a></li>`,
+      (v) =>
+        `<li><a href="${escapeHtml(href(v))}"${v === control.current ? ' aria-current="true"' : ''}>${escapeHtml(v)}</a></li>`,
     )
     .join('');
-  return `<details class="site-versions"><summary><span class="site-versions-prefix">Version </span><span class="opend-visually-hidden">of the documentation: </span>${lineName(current.line, current.labels)}</summary><nav class="site-versions-panel" aria-label="Documentation versions"><ul>${links}</ul></nav></details>`;
+  return {
+    header: `<details class="site-version"><summary>Version ${current}</summary><ul class="site-version-list" aria-label="Versions">${links}</ul></details>`,
+    menu: `<nav class="site-menu-versions" aria-label="Version"><p class="site-menu-heading">Version</p><ul>${links}</ul></nav>`,
+  };
 }
 
 /** Longest search query the site accepts; longer ones are cut, as analytics does. */
@@ -160,14 +160,15 @@ function menu(nav: string, options: PageOptions): string {
   const account = options.account?.menu
     ? `<div class="site-menu-account">${options.account.menu}</div>`
     : '';
-  if (!nav && !search && !pdfs && !account) return '';
+  const versions = options.version?.menu ?? '';
+  if (!nav && !search && !pdfs && !account && !versions) return '';
   const contents = nav
     ? `<nav class="opend-nav site-menu-nav" aria-label="Contents">${nav}</nav>`
     : '';
   const publications = pdfs
     ? `<nav class="site-menu-pdfs" aria-label="Download PDF"><p class="site-menu-heading">Publications</p><ul>${pdfs}</ul></nav>`
     : '';
-  return `<details class="site-menu"><summary aria-controls="opend-menu-panel"><span class="site-menu-button">${MENU_ICON}<span>Menu</span></span></summary><div class="site-menu-panel" id="opend-menu-panel">${search}${contents}${publications}${account}</div></details>`;
+  return `<details class="site-menu"><summary aria-controls="opend-menu-panel"><span class="site-menu-button">${MENU_ICON}<span>Menu</span></span></summary><div class="site-menu-panel" id="opend-menu-panel">${search}${versions}${contents}${publications}${account}</div></details>`;
 }
 
 /** Three bars, and a cross shown instead while the menu is open. */
@@ -191,6 +192,9 @@ function shell(
   const theme = options.themeHref
     ? `<link rel="stylesheet" href="${escapeHtml(options.themeHref)}">`
     : '';
+  const siteTheme = options.siteThemeHref
+    ? `<link rel="stylesheet" href="${escapeHtml(options.siteThemeHref)}">`
+    : '';
   const logo = options.logoHref
     ? `<img class="site-logo" src="${escapeHtml(options.logoHref)}" alt="">`
     : '';
@@ -202,13 +206,12 @@ function shell(
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escapeHtml(title ? `${title} · ${release.title}` : release.title)}</title>
 <style>${DEFAULT_CSS}</style>
-${theme}
-${options.head ?? ''}
+${theme}${siteTheme}
 </head>
 <body class="opend-site">
 <a class="opend-skip" href="#opend-main">Skip to content</a>
 ${options.banner ?? ''}
-<header class="site-header">${menu(nav, options)}<a class="site-title" href="${escapeHtml(base)}">${logo}<span>${escapeHtml(release.title)}</span></a><span class="site-release">Release ${escapeHtml(release.release)}</span>${options.versions ?? ''}${publicationLinks(options)}${searchBox(options)}${options.account?.header ?? ''}</header>
+<header class="site-header">${menu(nav, options)}<a class="site-title" href="${escapeHtml(base)}">${logo}<span>${escapeHtml(release.title)}</span></a>${options.version?.header ?? `<span class="site-release">Release ${escapeHtml(release.release)}</span>`}${publicationLinks(options)}${searchBox(options)}${options.account?.header ?? ''}</header>
 <div class="layout">
 <nav class="toc opend-nav" id="opend-toc" aria-label="Contents">${nav}</nav>
 <main id="opend-main">${main}</main>

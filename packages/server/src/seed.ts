@@ -4,6 +4,7 @@ import {
   audit,
   setEntitlements,
   setRepoAccess,
+  setRepoVersionPicker,
   upsertOrg,
   upsertReader,
   upsertRepo,
@@ -11,7 +12,7 @@ import {
   type Pool,
 } from '@opend/store';
 import { RELEASE_LINES } from '@opend/model';
-import { changeReleaseLines, entitlementsSchema } from './admin.js';
+import { changeReleaseLines, entitlementsSchema, versionPickerSchema } from './admin.js';
 
 const seedSchema = z.object({
   repos: z
@@ -25,6 +26,8 @@ const seedSchema = z.object({
         /** Omitted: keep the repo's current access (new repos: private). */
         access: z.enum(['private', 'public']).optional(),
         publicEntitlements: entitlementsSchema.nullable().optional(),
+        /** Omitted: keep the repo's current version picker (new repos: off). */
+        versionPicker: versionPickerSchema.optional(),
         /** Omitted: keep the repo's release lines (new repos: major). */
         releaseLines: z.enum(RELEASE_LINES).optional(),
       }),
@@ -69,7 +72,13 @@ export async function applySeed(
   const seed = parsed.data;
   let readers = 0;
   await withTransaction(pool, async (db) => {
-    for (const { access, publicEntitlements, releaseLines, ...input } of seed.repos) {
+    for (const {
+      access,
+      publicEntitlements,
+      versionPicker,
+      releaseLines,
+      ...input
+    } of seed.repos) {
       const repo = await upsertRepo(db, input);
       if (releaseLines) await changeReleaseLines(db, repo.id, releaseLines, 'seed');
       if (access)
@@ -79,6 +88,7 @@ export async function applySeed(
           access,
           publicEntitlements === undefined ? repo.publicEntitlements : publicEntitlements,
         );
+      if (versionPicker) await setRepoVersionPicker(db, repo.id, versionPicker);
     }
     for (const org of seed.orgs) {
       await upsertOrg(db, org);

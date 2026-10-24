@@ -18,7 +18,7 @@ import {
   renderPage,
   renderSearch,
   renderTopic,
-  renderVersionMenu,
+  renderVersionControl,
   siteSearchQuery,
 } from '../src/index.js';
 
@@ -246,6 +246,33 @@ describe('renderNav and renderPage', () => {
   });
 });
 
+describe('renderVersionControl', () => {
+  const href = (v: string) => `/_version?v=${v}&x=<`;
+
+  it('is a label when there is nothing to switch to', () => {
+    const c = renderVersionControl({ current: '2.1', options: ['2.1'] }, href);
+    expect(c.header).toBe('<span class="site-release">Version 2.1</span>');
+    expect(c.menu).toContain('<p class="site-menu-version">2.1</p>');
+    expect(c.header + c.menu).not.toContain('<a ');
+  });
+
+  it('lists the versions as escaped links, the current one marked', () => {
+    const c = renderVersionControl({ current: '1.4', options: ['2.1', '1.4'] }, href);
+    expect(c.header).toContain('<details class="site-version"><summary>Version 1.4</summary>');
+    expect(c.header).toContain('<a href="/_version?v=2.1&amp;x=&lt;">2.1</a>');
+    expect(c.header).toContain('<a href="/_version?v=1.4&amp;x=&lt;" aria-current="true">1.4</a>');
+    expect(c.menu).toContain('<nav class="site-menu-versions" aria-label="Version">');
+  });
+
+  it('replaces the release label in the page header, and joins the menu', () => {
+    const view = viewRelease(release([topic('a', '<topic id="a"><title>A</title></topic>')]), []);
+    const page = renderPage(view, 'a', { version: { header: '<!--v-->', menu: '<!--m-->' } })!;
+    expect(page).toContain('</a><!--v-->');
+    expect(page).not.toContain('<span class="site-release">Release');
+    expect(page).toContain('id="opend-menu-panel"><!--m-->');
+  });
+});
+
 describe('collapsible navigation', () => {
   const a = topic('a', '<topic id="a"><title>Alpha</title></topic>');
   const b = topic('b', '<topic id="b"><title>Beta</title></topic>');
@@ -435,38 +462,5 @@ describe('site search', () => {
     expect(siteSearchQuery('x'.repeat(500))).toHaveLength(MAX_SEARCH_QUERY);
     // Cut by character, never through a surrogate pair.
     expect(siteSearchQuery('😀'.repeat(300))).toBe('😀'.repeat(MAX_SEARCH_QUERY));
-  });
-});
-
-describe('version menu', () => {
-  const items = [
-    { line: '0.23', labels: ['latest'], href: '/v/0.23/a.html' },
-    { line: '0.21', labels: ['stable'], href: '/v/0.21/' },
-    { line: '0.20', labels: [], href: '/v/0.20/<x>' },
-  ];
-
-  it('lists the lines as plain links in a <details>, marking the current one', () => {
-    const menu = renderVersionMenu({ line: '0.23', labels: ['latest'] }, items);
-    expect(menu).toMatch(/^<details class="site-versions"><summary>/);
-    expect(menu).toContain(
-      '<a href="/v/0.23/a.html" aria-current="page">0.23 <span class="site-versions-label">(latest)</span></a>',
-    );
-    expect(menu).toContain(
-      '<a href="/v/0.21/">0.21 <span class="site-versions-label">(stable)</span></a>',
-    );
-    expect(menu).toContain('<a href="/v/0.20/&lt;x&gt;">0.20</a>');
-    expect(menu).not.toMatch(/<script|style=|onclick/);
-    expect(menu.match(/aria-current/g)).toHaveLength(1);
-  });
-
-  it('renders nothing without lines, and sits after the release in the header', () => {
-    expect(renderVersionMenu({ line: '1', labels: [] }, [])).toBe('');
-    const view = viewRelease(release([topic('a', '<topic id="a"><title>A</title></topic>')]), []);
-    const page = renderPage(view, 'a', {
-      versions: '<!--v-->',
-      head: '<link rel="canonical" href="/a.html">',
-    })!;
-    expect(page).toContain('<span class="site-release">Release 2.1</span><!--v-->');
-    expect(page).toMatch(/<link rel="canonical" href="\/a.html">\n<\/head>/);
   });
 });

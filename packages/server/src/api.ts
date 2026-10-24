@@ -10,11 +10,11 @@ import {
   type ApiScope,
   type Repo,
 } from '@opend/store';
-import { readerAudience, type Audience } from './access.js';
+import { publicAudience, readerAudience, type Audience } from './access.js';
 import { OPENAPI } from './api-spec.js';
 import { registerApiWrites } from './api-writes.js';
 import type { AppContext } from './context.js';
-import { audienceRelease, sitePublicAudience, siteRepo, type ReaderRelease } from './delivery.js';
+import { audienceRelease, siteRepo, type ReaderRelease } from './delivery.js';
 import { searchRelease } from './search.js';
 
 /**
@@ -276,7 +276,7 @@ export async function releaseFor(
     );
   } else {
     if (repo.access !== 'public') throw new ApiError(403, 'the site is private');
-    audience = await sitePublicAudience(ctx, repo);
+    audience = publicAudience(repo);
   }
   if (
     requested &&

@@ -2,6 +2,18 @@ import { timingSafeEqual } from 'node:crypto';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import {
+  RELEASE_LINES,
+  pdfTemplateSchema,
+  resolvePdfTemplate,
+  siteThemeSchema,
+  type ReleaseLines,
+} from '@opend/model';
+import { releaseLine } from '@opend/filter';
+import {
+  setRepoReleaseLines,
+  SETTING,
+  deleteSetting,
+  putSetting,
   API_SCOPES,
   analyticsSummary,
   audit,
@@ -24,29 +36,34 @@ import {
   listJobs,
   listLiveReleases,
   retireReleaseLine,
-  removeReleaseLineLabel,
-  setReleaseLineLabel,
-  setReleaseLinePublic,
-  setRepoReleaseLines,
   listOrgs,
   listReaders,
   listRepos,
   setEntitlements,
   setReaderStaff,
   setRepoAccess,
+  setRepoVersionPicker,
   upsertOrg,
   upsertReader,
   upsertRepo,
   withTransaction,
   type Pool,
 } from '@opend/store';
-import { isReleaseLine, releaseLine } from '@opend/filter';
-import { RELEASE_LINES, type ReleaseLines } from '@opend/model';
+import { accentProblem, appearance } from './appearance.js';
 import type { AppContext } from './context.js';
-import { describeReleaseLines } from './release-lines.js';
 import { settingSources } from './settings.js';
 
 const ACTOR = 'admin-token';
+
+/**
+ * `PUT /admin/api/appearance`: each of `theme` and `pdf` is left as it is
+ * when absent, reset with `null`, or replaced. `pdf` may be partial: the
+ * named built-in template fills in the rest.
+ */
+const appearanceSchema = z.object({
+  theme: siteThemeSchema.nullable().optional(),
+  pdf: pdfTemplateSchema.partial().nullable().optional(),
+});
 export const slug = z
   .string()
   .regex(/^[a-z0-9][a-z0-9-]{0,62}$/, 'lowercase letters, digits and dashes');
@@ -57,6 +74,30 @@ export const entitlementsSchema = z.object({
   features: z.array(token).default([]),
   version: z.string().regex(/^v?\d+(\.\d+)*$/, 'a version such as 1.4'),
 });
+
+const pickerVersion = z
+  .string()
+  .max(32)
+  .regex(/^v?\d+(\.\d+)*$/, 'a version such as 2.1');
+
+/**
+ * The site's version picker: `off` (no picker), `reader` (show each reader
+ * their own version), `fixed` (every reader gets `version`) or `list`
+ * (readers choose among `versions`, and their own).
+ */
+export const versionPickerSchema = z.discriminatedUnion('mode', [
+  z.object({ mode: z.literal('off') }),
+  z.object({ mode: z.literal('reader') }),
+  z.object({ mode: z.literal('fixed'), version: pickerVersion }),
+  z.object({
+    mode: z.literal('list'),
+    versions: z
+      .array(pickerVersion)
+      .min(1)
+      .max(50)
+      .transform((vs) => [...new Set(vs)]),
+  }),
+]);
 
 const orgSchema = z.object({
   slug,
@@ -111,16 +152,11 @@ export function sourceUrlSchema(production: boolean) {
 
 /** How a repo groups releases into lines: `major` (the default) or `minor`. */
 export const releaseLinesSchema = z.object({ releaseLines: z.enum(RELEASE_LINES) });
-/** A line label, such as `latest` or `stable`. */
-export const lineLabel = z
-  .string()
-  .regex(/^[a-z][a-z0-9-]{0,31}$/, 'lowercase letters, digits and dashes, starting with a letter');
-const labelSchema = z.object({ label: lineLabel });
-const linePublicSchema = z.object({ public: z.boolean() });
 
 /**
  * Switches a repo's release-line granularity and moves its live releases to
  * their new lines, in the caller's transaction (see `setRepoReleaseLines`).
+ * Null when the repo does not exist.
  */
 export async function changeReleaseLines(
   db: Parameters<typeof setRepoReleaseLines>[0],
@@ -150,7 +186,7 @@ export const repoSchema = (production: boolean) =>
         'a path inside the repository',
       )
       .optional(),
-    /** Omitted: keep the repo's granularity (new repos: major). */
+    /** Omitted: keep the repo's release lines (new repos: major). */
     releaseLines: z.enum(RELEASE_LINES).optional(),
   });
 const analyticsQuery = z.object({
@@ -301,98 +337,36 @@ export function registerAdmin(app: FastifyInstance, ctx: AppContext): void {
         ctx.caches.releaseChanged();
         return repo ? reply.send(repo) : reply.code(404).send({ error: 'no such repo' });
       });
-      // Release lines: granularity, labels such as latest and stable, and public lines.
-      const repoParam = async (request: FastifyRequest) => {
+      scope.put('/repos/:id/versions', async (request, reply) => {
         const id = Number((request.params as { id: string }).id);
-        return Number.isSafeInteger(id) ? getRepo(ctx.pool, id) : null;
-      };
+        const picker = parse(versionPickerSchema, request.body, reply);
+        if (!picker) return reply;
+        const repo = await withTransaction(ctx.pool, async (db) => {
+          const current = Number.isInteger(id) ? await getRepo(db, id) : null;
+          if (!current) return null;
+          const r = await setRepoVersionPicker(db, id, picker);
+          await audit(db, ACTOR, 'repo.versions', {
+            repo: current.fullName,
+            versionPicker: picker,
+          });
+          return r;
+        });
+        // Pages show the picker, and readers may now be on another version: drop every cache.
+        ctx.caches.releaseChanged();
+        return repo ? reply.send(repo) : reply.code(404).send({ error: 'no such repo' });
+      });
       scope.put('/repos/:id/release-lines', async (request, reply) => {
+        const id = Number((request.params as { id: string }).id);
         const input = parse(releaseLinesSchema, request.body, reply);
         if (!input) return reply;
-        const id = Number((request.params as { id: string }).id);
         const repo = Number.isSafeInteger(id)
           ? await withTransaction(ctx.pool, (db) =>
               changeReleaseLines(db, id, input.releaseLines, ACTOR),
             )
           : null;
+        // Live releases may have moved to other lines: drop every cache.
         ctx.caches.releaseChanged();
-        if (!repo) return reply.code(404).send({ error: 'no such repo' });
-        return reply.send(await describeReleaseLines(ctx.pool, repo));
-      });
-      scope.get('/repos/:id/lines', async (request, reply) => {
-        const repo = await repoParam(request);
-        if (!repo) return reply.code(404).send({ error: 'no such repo' });
-        return reply.send(await describeReleaseLines(ctx.pool, repo));
-      });
-      /** The repo and a line name valid for its granularity, or null after answering. */
-      const lineParams = async (request: FastifyRequest, reply: FastifyReply) => {
-        const repo = await repoParam(request);
-        if (!repo) {
-          await reply.code(404).send({ error: 'no such repo' });
-          return null;
-        }
-        const line = (request.params as { line: string }).line;
-        if (!isReleaseLine(line, repo.releaseLines)) {
-          await reply.code(400).send({
-            error: 'invalid request',
-            issues: [
-              `line: this repo has release lines by ${repo.releaseLines} version, such as ${repo.releaseLines === 'minor' ? '0.23' : '2'}`,
-            ],
-          });
-          return null;
-        }
-        return { repo, line };
-      };
-      scope.put('/repos/:id/lines/:line/label', async (request, reply) => {
-        const found = await lineParams(request, reply);
-        if (!found) return reply;
-        const input = parse(labelSchema, request.body, reply);
-        if (!input) return reply;
-        await withTransaction(ctx.pool, async (db) => {
-          await setReleaseLineLabel(db, found.repo.id, found.line, input.label);
-          await audit(db, ACTOR, 'release-line.label', {
-            repo: found.repo.fullName,
-            line: found.line,
-            label: input.label,
-          });
-        });
-        ctx.caches.releaseChanged();
-        return reply.send(await describeReleaseLines(ctx.pool, found.repo));
-      });
-      scope.delete('/repos/:id/lines/:line/labels/:label', async (request, reply) => {
-        const found = await lineParams(request, reply);
-        if (!found) return reply;
-        const label = (request.params as { label: string }).label;
-        const removed = await withTransaction(ctx.pool, async (db) => {
-          const ok = await removeReleaseLineLabel(db, found.repo.id, found.line, label);
-          if (ok)
-            await audit(db, ACTOR, 'release-line.unlabel', {
-              repo: found.repo.fullName,
-              line: found.line,
-              label,
-            });
-          return ok;
-        });
-        ctx.caches.releaseChanged();
-        return removed
-          ? reply.code(204).send()
-          : reply.code(404).send({ error: 'the line does not have that label' });
-      });
-      scope.put('/repos/:id/lines/:line/public', async (request, reply) => {
-        const found = await lineParams(request, reply);
-        if (!found) return reply;
-        const input = parse(linePublicSchema, request.body, reply);
-        if (!input) return reply;
-        await withTransaction(ctx.pool, async (db) => {
-          await setReleaseLinePublic(db, found.repo.id, found.line, input.public);
-          await audit(db, ACTOR, 'release-line.public', {
-            repo: found.repo.fullName,
-            line: found.line,
-            public: input.public,
-          });
-        });
-        ctx.caches.releaseChanged();
-        return reply.send(await describeReleaseLines(ctx.pool, found.repo));
+        return repo ? reply.send(repo) : reply.code(404).send({ error: 'no such repo' });
       });
       scope.get('/repos/:id/releases', async (request) =>
         listLiveReleases(ctx.pool, Number((request.params as { id: string }).id)),
@@ -543,6 +517,32 @@ export function registerAdmin(app: FastifyInstance, ctx: AppContext): void {
         return link
           ? reply.code(201).send(link)
           : reply.code(409).send({ error: 'a staff reader exists; sign in as staff instead' });
+      });
+
+      // Site theme and PDF template, as on the console's Appearance page.
+      const appearanceState = () => {
+        const a = appearance(ctx);
+        return { theme: a.theme, pdf: a.pdf, version: a.version };
+      };
+      scope.get('/appearance', async () => appearanceState());
+      scope.put('/appearance', async (request, reply) => {
+        const input = parse(appearanceSchema, request.body ?? {}, reply);
+        if (!input) return reply;
+        const problem = input.theme ? accentProblem(input.theme) : null;
+        if (problem) return reply.code(400).send({ error: 'invalid request', issues: [problem] });
+        const changes: [string, unknown][] = [];
+        if (input.theme !== undefined) changes.push([SETTING.siteTheme, input.theme]);
+        if (input.pdf !== undefined)
+          changes.push([SETTING.pdfTemplate, input.pdf && resolvePdfTemplate(input.pdf)]);
+        await withTransaction(ctx.pool, async (db) => {
+          for (const [key, value] of changes) {
+            if (value === null) await deleteSetting(db, key);
+            else await putSetting(db, key, value, ACTOR);
+            await audit(db, ACTOR, `settings.${key}`, value === null ? { reset: true } : value);
+          }
+        });
+        await ctx.reloadSettings();
+        return appearanceState();
       });
 
       // Public API keys (/api/v1). The token is in the creation response only.

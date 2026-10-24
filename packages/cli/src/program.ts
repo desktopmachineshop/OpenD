@@ -57,7 +57,7 @@ export function createProgram(
 ): Command {
   const program = new Command('opend')
     .description('Build, validate and preview DITA docs where release and entitlement are one rule')
-    .version('0.1.0')
+    .version('0.2.0')
     // Program options only before the subcommand, so `preview --version 1.4` reaches preview.
     .enablePositionalOptions()
     .configureOutput({

@@ -4,11 +4,11 @@ import { join } from 'node:path';
 import { chromium } from 'playwright-core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { entitlementKey } from '@opend/model';
-import type { PdfRenderer } from '@opend/pdf';
+import type { PdfRenderer, PrintLayout } from '@opend/pdf';
 import { FsBlobStore, enqueueJob, testDatabaseUrl, upsertRepo } from '@opend/store';
 import { createDocsRepo, processNext, type DocsRepo } from '@opend/worker';
 import { applySeed, pdfKey } from '../src/index.js';
-import { STARTER, devLogin, startHarness, type Harness } from './helpers.js';
+import { STARTER, admin, devLogin, startHarness, type Harness } from './helpers.js';
 
 const url = testDatabaseUrl();
 const hasBrowser = existsSync(process.env.OPEND_CHROMIUM_PATH || chromium.executablePath());
@@ -62,10 +62,12 @@ describe.skipIf(!url)('PDF publications (hosted)', () => {
   let h: Harness;
   let docs: DocsRepo;
   const printed: string[] = [];
+  const layouts: (PrintLayout | undefined)[] = [];
   let release: (() => void) | null = null;
   const pdf: PdfRenderer = {
-    render: async (html) => {
+    render: async (html, layout) => {
       printed.push(html);
+      layouts.push(layout);
       // Held open while a test checks that concurrent requests share one render.
       if (release) await new Promise<void>((resolve) => (release = resolve));
       return Buffer.from(`%PDF-1.7 render ${printed.length}`);
@@ -167,6 +169,44 @@ describe.skipIf(!url)('PDF publications (hosted)', () => {
     expect(missing.statusCode).toBe(404);
     expect(none.body).toBe(missing.body);
     expect((await get('/pdf/admin-guide.html', cookies['ann@acme.example'])).statusCode).toBe(404);
+  });
+
+  it('prints with the standard template and the repository theme by default', () => {
+    expect(printed[0]).toContain('@page { size: A4 portrait;');
+    expect(layouts[0]).toMatchObject({
+      format: 'A4',
+      headerText: 'Widget Platform Administrator Guide',
+    });
+  });
+
+  it('prints again with the admin console’s template and theme, and back', async () => {
+    const before = printed.length;
+    const set = await admin(h.app, 'PUT', '/appearance', {
+      theme: { preset: 'rose' },
+      pdf: { template: 'report', coverNote: 'Draft' },
+    });
+    expect(set.statusCode).toBe(200);
+    let res = await get('/pdf/admin-guide.pdf', cookies['ann@acme.example']);
+    expect(res.statusCode).toBe(200);
+    expect(printed).toHaveLength(before + 1);
+    const html = printed.at(-1)!;
+    expect(html).toContain('@page { size: Letter portrait;');
+    expect(html).toContain('pub-cover-banner');
+    expect(html).toContain('<p class="pub-note">Draft</p>');
+    expect(html).toContain('--opend-accent: #be123c;');
+    // The site theme loads after the repository's.
+    expect(html).toContain('--opend-accent: #2f6fde');
+    expect(html.indexOf('#be123c')).toBeGreaterThan(html.indexOf('--opend-accent: #2f6fde'));
+    expect(layouts.at(-1)).toMatchObject({
+      format: 'Letter',
+      headerText: 'Widget Platform Docs',
+      footerText: 'Widget Platform Administrator Guide · Release 1.4',
+    });
+    // Back to the repository's look: the first render, still in the blob store, is served.
+    await admin(h.app, 'PUT', '/appearance', { theme: null, pdf: null });
+    res = await get('/pdf/admin-guide.pdf', cookies['ann@acme.example']);
+    expect(res.body).toBe('%PDF-1.7 render 1');
+    expect(printed).toHaveLength(before + 1);
   });
 
   it('links each visible publication from the docs site', async () => {
