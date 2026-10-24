@@ -3,8 +3,8 @@
 <task id="admin-console" product="core hosted" audience="admin">
   <title>Run your site from the admin console</title>
   <shortdesc>Staff readers run the docs site in the browser at <filepath>/admin</filepath>: who can read it,
-    which repository it is built from, readers and organizations, sign-in, the GitHub connection and the web
-    editor. No server access or environment variables needed.</shortdesc>
+    which repository it is built from, readers and organizations, the site's look, sign-in, the GitHub
+    connection and the web editor. No server access or environment variables needed.</shortdesc>
   <taskbody>
     <context>
       <p>Only signed-in staff readers can open the console. Anyone else gets a <codeph>404</codeph>; visitors
@@ -64,6 +64,12 @@ curl -X POST "$PUBLIC_URL/admin/api/setup-links" -H "authorization: Bearer $OPEN
         <info><p>An organization's products, features and release decide what its readers see. Readers sign
           in with an account whose verified email is the one you give. Make teammates staff here; you cannot
           remove your own staff role, yourself or your own organization.</p></info>
+      </step>
+      <step>
+        <cmd>Optional: set the site theme and PDF template on the <uicontrol>Appearance</uicontrol> page.</cmd>
+        <info><p>A colour preset or your brand colour, fonts, corners, reading width, colour scheme and custom
+          CSS for the site, the help panel and PDFs, and the template every PDF prints with. See
+          <xref href="appearance.dita"/>.</p></info>
       </step>
       <step>
         <cmd>Choose how readers sign in on the <uicontrol>Sign-in</uicontrol> page.</cmd>

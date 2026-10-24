@@ -2,8 +2,9 @@ import { createHash } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import { findPublication } from '@opend/model';
 import type { PublicationView } from '@opend/filter';
-import { publicationHasContent, renderPublication } from '@opend/render-html';
+import { publicationHasContent, publicationLayout, renderPublication } from '@opend/render-html';
 import { assetKey } from '@opend/store';
+import { appearance, effectivePdfTemplate, type Appearance } from './appearance.js';
 import type { AppContext } from './context.js';
 import { PAGE_HEADERS, publicationView, resolveViewer, type ReaderRelease } from './delivery.js';
 import { messagePage } from './pages.js';
@@ -12,10 +13,19 @@ import { messagePage } from './pages.js';
  * Blob key of a generated PDF, by audience key (see `Audience`): readers with
  * the same entitlement set share one render, anonymous visitors and staff
  * each have their own, and a new release gets new keys, so nothing needs
- * invalidating. A change of public entitlements changes the anonymous key.
+ * invalidating. A change of public entitlements changes the anonymous key,
+ * and a change of the admin console's theme or PDF template (`appearance`,
+ * its version) changes every key.
  */
-export function pdfKey(releaseId: number, entitlements: string, slug: string): string {
-  const hash = createHash('sha256').update(entitlements).digest('hex');
+export function pdfKey(
+  releaseId: number,
+  entitlements: string,
+  slug: string,
+  appearance = '',
+): string {
+  const hash = createHash('sha256')
+    .update(appearance ? `${entitlements}|${appearance}` : entitlements)
+    .digest('hex');
   return `pdf/${releaseId}/${hash}/${encodeURIComponent(slug)}.pdf`;
 }
 
@@ -24,7 +34,12 @@ export function registerPdf(app: FastifyInstance, ctx: AppContext): void {
   /** Renders in progress in this process, by blob key. */
   const inflight = new Map<string, Promise<Buffer>>();
 
-  const generate = async (release: ReaderRelease, view: PublicationView, key: string) => {
+  const generate = async (
+    release: ReaderRelease,
+    view: PublicationView,
+    key: string,
+    look: Appearance,
+  ) => {
     const { stored } = release;
     const blob = async (path: string) => {
       try {
@@ -37,6 +52,7 @@ export function registerPdf(app: FastifyInstance, ctx: AppContext): void {
       assets: blob,
       site: release.view,
       siteBase: `${ctx.config.publicUrl}/`,
+      template: effectivePdfTemplate(look, stored.snapshot.pdf),
       // No organization on the cover: the render is shared by every reader with
       // the same entitlements, whichever organization they belong to.
     };
@@ -44,8 +60,12 @@ export function registerPdf(app: FastifyInstance, ctx: AppContext): void {
       const theme = await blob(stored.snapshot.theme);
       if (theme) options.themeCss = theme.toString('utf8');
     }
+    if (look.printCss) options.siteThemeCss = look.printCss;
     const started = Date.now();
-    const pdf = await ctx.pdf.render(await renderPublication(view, options));
+    const pdf = await ctx.pdf.render(
+      await renderPublication(view, options),
+      publicationLayout(view, options),
+    );
     await ctx.blobs.put(key, pdf);
     ctx.log({
       level: 'info',
@@ -75,13 +95,15 @@ export function registerPdf(app: FastifyInstance, ctx: AppContext): void {
     // Missing publications and ones with nothing visible look the same.
     if (!view || !publicationHasContent(view)) return notFound();
 
-    const key = pdfKey(r.release.stored.id, r.release.audience.key, slug);
+    const look = appearance(ctx);
+    const key = pdfKey(r.release.stored.id, r.release.audience.key, slug, look.version);
     // Registered before the first await, so concurrent requests share one lookup and render.
     let pending = inflight.get(key);
     if (!pending) {
       const release = r.release;
-      pending = (async () => (await ctx.blobs.get(key)) ?? generate(release, view, key))().finally(
-        () => inflight.delete(key),
+      pending = (async () =>
+        (await ctx.blobs.get(key)) ?? generate(release, view, key, look))().finally(() =>
+        inflight.delete(key),
       );
       inflight.set(key, pending);
     }

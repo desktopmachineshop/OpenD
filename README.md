@@ -52,7 +52,11 @@ A project restyles its site, help panel and PDFs with two optional fields in `op
 - `theme`: a stylesheet loaded after the built-in styles. It overrides the `--opend-*` custom properties: `--opend-accent`, `--opend-text`, `--opend-muted`, `--opend-surface`, `--opend-surface-alt`, `--opend-border`, `--opend-warn`, `--opend-danger`, `--opend-info`, `--opend-cond`, `--opend-font` and `--opend-mono`. Link, hover, focus and highlight colours are derived from `--opend-accent`, so setting it alone rebrands the site.
 - `logo`: an `.svg`, `.png`, `.jpg`, `.gif` or `.webp` image shown before the site title in the header.
 
-See [Theme the site, the panel and PDFs](site/topics/pdf/pdf-theming.dita) for the full list.
+- `pdf`: how publications print. A built-in template (`standard`, `report`, `compact` or `handbook`) and any of its settings to change: page size and orientation, margins, text size, font, cover (`classic`, `banner`, `minimal`, `none`) and cover note, contents, chapter breaks, running header and footer (with `{title}`, `{site}`, `{release}` and `{date}` filled in) and page numbers.
+
+See [Theme the site, the panel and PDFs](site/topics/pdf/pdf-theming.dita) for the full list, and [Choose a PDF template](site/topics/pdf/pdf-templates.dita).
+
+Staff of a hosted site can change the look without touching the repository, on the admin console's **Appearance** page: a colour preset (Default, Ocean, Indigo, Violet, Teal, Rose, Amber, Graphite) or their own accent colours, body and heading fonts, corners, reading width, a forced light or dark scheme and custom CSS, served as `/_site-theme.css` after the repository's theme so it wins; and a PDF template with every setting above plus print CSS, which replaces the repository's `pdf` settings until reset. Changes reach every page and PDF at once, with no rebuild. See [Change the site's look from the admin console](site/topics/hosting/appearance.dita).
 
 ## How applicability works
 
@@ -119,6 +123,7 @@ To try it without an identity provider, set `NODE_ENV=development` and `OPEND_DE
 | Admin console (staff readers)                                                         |                                                                                                         |
 | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
 | `/admin`, `/admin/site`, `/admin/source`, `/admin/people`                             | Overview; access; docs repository and builds; orgs and readers                                          |
+| `/admin/appearance`                                                                   | Site theme (presets, accent, fonts, corners, width, scheme, custom CSS) and the PDF template            |
 | `/admin/sign-in`, `/admin/github` (also `/admin/integrations`), `/admin/editor`       | Sign-in providers; GitHub connection; editor links and authors                                          |
 | `/admin/api-keys`                                                                     | Public API keys (create, revoke) and the AI assistant address                                           |
 | `/admin/github/connect`, `/admin/github/manifest-callback`, `/admin/github/installed` | Connect GitHub: manifest form, code exchange, installation                                              |
@@ -147,6 +152,7 @@ To try it without an identity provider, set `NODE_ENV=development` and `OPEND_DE
 | `PUT /admin/api/readers/:id/staff`                                                                   | Grant or revoke the unfiltered staff view                             |
 | `GET /admin/api/audit`                                                                               | Audit log                                                             |
 | `GET /admin/api/settings`, `POST /admin/api/setup-links`                                             | Console settings (never secrets); first-staff setup link              |
+| `GET/PUT /admin/api/appearance`                                                                      | Site theme and PDF template (`null` resets either)                    |
 | `GET /admin/api/analytics/summary`, `GET /admin/api/analytics/feedback[.csv]`                        | Docs analytics and reader feedback                                    |
 
 See [ADR 0004](docs/adr/0004-hosted-architecture.md) for how it fits together.

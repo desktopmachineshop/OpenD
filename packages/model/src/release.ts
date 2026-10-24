@@ -1,3 +1,4 @@
+import type { PdfConfig } from './appearance.js';
 import type { ElementNode } from './nodes.js';
 
 /**
@@ -125,4 +126,6 @@ export interface CompiledRelease {
   theme?: string;
   /** Docs-root-relative path of the header logo, from the project config. */
   logo?: string;
+  /** The project's PDF template settings, from the project config. */
+  pdf?: PdfConfig;
 }

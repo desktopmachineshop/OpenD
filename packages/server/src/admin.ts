@@ -1,7 +1,11 @@
 import { timingSafeEqual } from 'node:crypto';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
+import { pdfTemplateSchema, resolvePdfTemplate, siteThemeSchema } from '@opend/model';
 import {
+  SETTING,
+  deleteSetting,
+  putSetting,
   API_SCOPES,
   analyticsSummary,
   audit,
@@ -37,10 +41,21 @@ import {
   withTransaction,
   type Pool,
 } from '@opend/store';
+import { accentProblem, appearance } from './appearance.js';
 import type { AppContext } from './context.js';
 import { settingSources } from './settings.js';
 
 const ACTOR = 'admin-token';
+
+/**
+ * `PUT /admin/api/appearance`: each of `theme` and `pdf` is left as it is
+ * when absent, reset with `null`, or replaced. `pdf` may be partial: the
+ * named built-in template fills in the rest.
+ */
+const appearanceSchema = z.object({
+  theme: siteThemeSchema.nullable().optional(),
+  pdf: pdfTemplateSchema.partial().nullable().optional(),
+});
 export const slug = z
   .string()
   .regex(/^[a-z0-9][a-z0-9-]{0,62}$/, 'lowercase letters, digits and dashes');
@@ -455,6 +470,32 @@ export function registerAdmin(app: FastifyInstance, ctx: AppContext): void {
         return link
           ? reply.code(201).send(link)
           : reply.code(409).send({ error: 'a staff reader exists; sign in as staff instead' });
+      });
+
+      // Site theme and PDF template, as on the console's Appearance page.
+      const appearanceState = () => {
+        const a = appearance(ctx);
+        return { theme: a.theme, pdf: a.pdf, version: a.version };
+      };
+      scope.get('/appearance', async () => appearanceState());
+      scope.put('/appearance', async (request, reply) => {
+        const input = parse(appearanceSchema, request.body ?? {}, reply);
+        if (!input) return reply;
+        const problem = input.theme ? accentProblem(input.theme) : null;
+        if (problem) return reply.code(400).send({ error: 'invalid request', issues: [problem] });
+        const changes: [string, unknown][] = [];
+        if (input.theme !== undefined) changes.push([SETTING.siteTheme, input.theme]);
+        if (input.pdf !== undefined)
+          changes.push([SETTING.pdfTemplate, input.pdf && resolvePdfTemplate(input.pdf)]);
+        await withTransaction(ctx.pool, async (db) => {
+          for (const [key, value] of changes) {
+            if (value === null) await deleteSetting(db, key);
+            else await putSetting(db, key, value, ACTOR);
+            await audit(db, ACTOR, `settings.${key}`, value === null ? { reset: true } : value);
+          }
+        });
+        await ctx.reloadSettings();
+        return appearanceState();
       });
 
       // Public API keys (/api/v1). The token is in the creation response only.

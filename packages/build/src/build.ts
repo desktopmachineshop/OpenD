@@ -249,6 +249,7 @@ export function buildRelease(tree: SourceTree, options: BuildOptions = {}): Buil
   if (tree.ref) release.sourceRef = tree.ref;
   if (config.theme) release.theme = config.theme;
   if (config.logo) release.logo = config.logo;
+  if (config.pdf) release.pdf = config.pdf;
 
   diagnostics.push(...workspace.diagnostics);
   const referencedTopicFiles = new Set(

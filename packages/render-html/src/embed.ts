@@ -41,6 +41,8 @@ export interface EmbedOptions extends RenderOptions {
   /** Host app name, carried through links so contexts and search keep working. */
   app?: string;
   themeHref?: string;
+  /** URL of the site theme set in the admin console, loaded after `themeHref`. */
+  siteThemeHref?: string;
   /** Trusted HTML after the article on topic panels only, e.g. the feedback form. */
   topicEnd?: string;
 }
@@ -78,7 +80,9 @@ function shell(
   frameData: Record<string, string | undefined>,
   query = '',
 ): string {
-  const theme = o.themeHref ? `<link rel="stylesheet" href="${escapeHtml(o.themeHref)}">` : '';
+  const theme =
+    (o.themeHref ? `<link rel="stylesheet" href="${escapeHtml(o.themeHref)}">` : '') +
+    (o.siteThemeHref ? `<link rel="stylesheet" href="${escapeHtml(o.siteThemeHref)}">` : '');
   const search = `<form method="get" action="${escapeHtml(embedBase(o))}/search" role="search">
 ${o.hostOrigin ? `<input type="hidden" name="host" value="${escapeHtml(o.hostOrigin)}">` : ''}${o.app ? `<input type="hidden" name="app" value="${escapeHtml(o.app)}">` : ''}
 <input type="search" name="q" value="${escapeHtml(query)}" placeholder="Search help" aria-label="Search help"></form>`;

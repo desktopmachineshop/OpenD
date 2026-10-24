@@ -1,6 +1,7 @@
 import type { LightMyRequestResponse } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { FakeGitHub } from '@opend/editor';
+import { PDF_TEMPLATES } from '@opend/model';
 import { FsBlobStore, SETTING, listAudit, testDatabaseUrl } from '@opend/store';
 import { createDocsRepo, processNext, type DocsRepo } from '@opend/worker';
 import {
@@ -46,12 +47,18 @@ const POSTS = [
   '/admin/editor',
   '/admin/editor/users',
   '/admin/editor/users/disable',
+  '/admin/appearance/theme',
+  '/admin/appearance/theme/reset',
+  '/admin/appearance/pdf/template',
+  '/admin/appearance/pdf',
+  '/admin/appearance/pdf/reset',
 ];
 const PAGES = [
   '/admin',
   '/admin/site',
   '/admin/source',
   '/admin/people',
+  '/admin/appearance',
   '/admin/sign-in',
   '/admin/github',
   '/admin/integrations',
@@ -540,6 +547,176 @@ describe.skipIf(!url)('the admin console', () => {
       const page = await get('/admin/editor', owner);
       expect(page.body).toContain('writer@acme.example');
       expect(page.body).toContain('@wren');
+    });
+  });
+
+  describe('appearance', () => {
+    const THEME = {
+      preset: 'ocean',
+      font: 'serif',
+      headingFont: 'default',
+      radius: 'round',
+      width: 'wide',
+      colorScheme: 'auto',
+      customCss: '.brand { color: red; }\r\n',
+      customAccent: '1',
+      accent: '#123456',
+      accentDark: '#ffffff',
+    };
+    const topicPage = async () =>
+      (await get(String((await get('/', owner)).headers.location), owner)).body;
+
+    it('offers the presets and the PDF templates', async () => {
+      const res = await get('/admin/appearance', owner);
+      expect(res.statusCode).toBe(200);
+      expect(res.body).toMatch(/href="\/admin\/appearance"\s+aria-current="page"/);
+      for (const preset of ['Ocean', 'Graphite', 'Rose'])
+        expect(res.body).toContain(`<strong>${preset}</strong>`);
+      expect(res.body).toContain('.admin-swatch-ocean { --swatch-light: #0b6bcb;');
+      for (const t of Object.values(PDF_TEMPLATES))
+        expect(res.body).toContain(`<strong>${t.label}</strong>`);
+      expect(res.body).toContain('href="/pdf/admin-guide.pdf"');
+      // Nothing stored: no reset buttons, and the site links no theme.
+      expect(res.body).not.toContain('Reset the theme');
+      expect(await topicPage()).not.toContain('/_site-theme.css');
+    });
+
+    it('saves a theme that every page links at once, and resets it', async () => {
+      let res = await submit('/admin/appearance', '/admin/appearance/theme', THEME);
+      expect(res.statusCode).toBe(303);
+      expect(res.headers.location).toBe('/admin/appearance?done=theme');
+      // The dark accent box was left unticked, so its value is ignored.
+      expect(h.ctx.settings.current.values[SETTING.siteTheme]).toMatchObject({
+        preset: 'ocean',
+        accent: '#123456',
+        customCss: '.brand { color: red; }\n',
+      });
+      expect(h.ctx.settings.current.values[SETTING.siteTheme]).not.toHaveProperty('accentDark');
+      const href = /href="(\/_site-theme\.css\?v=[0-9a-f]{12})"/.exec(await topicPage())?.[1];
+      expect(href).toBeDefined();
+      const css = await get(href!);
+      expect(css.headers['content-type']).toBe('text/css; charset=utf-8');
+      expect(css.headers['cache-control']).toBe('public, max-age=31536000, immutable');
+      expect(css.body).toContain('--opend-accent: #123456;');
+      expect(css.body).toContain('--opend-font: Charter');
+      expect(css.body).toContain('.brand { color: red; }');
+      // Anyone may fetch it (the sign-in page of a private site too); an old version is revalidated.
+      expect((await get('/_site-theme.css?v=old')).headers['cache-control']).toBe('no-cache');
+      expect((await get('/admin/appearance', owner)).body).toContain('Reset the theme');
+      expect((await listAudit(h.db.pool, 20)).map((a) => a.action)).toContain(
+        'settings.appearance.theme',
+      );
+
+      res = await submit('/admin/appearance', '/admin/appearance/theme/reset', {});
+      expect(res.headers.location).toBe('/admin/appearance?done=theme-reset');
+      expect(h.ctx.settings.current.values[SETTING.siteTheme]).toBeUndefined();
+      expect((await get('/_site-theme.css')).body).toBe('');
+      expect(await topicPage()).not.toContain('/_site-theme.css');
+    });
+
+    it('refuses accents too faint to read and unknown options', async () => {
+      let res = await submit('/admin/appearance', '/admin/appearance/theme', {
+        ...THEME,
+        accent: '#fafafa',
+      });
+      expect(res.statusCode).toBe(400);
+      expect(res.body).toContain('too pale to read on white');
+      res = await submit('/admin/appearance', '/admin/appearance/theme', {
+        ...THEME,
+        customAccentDark: '1',
+        accentDark: '#101010',
+      });
+      expect(res.statusCode).toBe(400);
+      expect(res.body).toContain('too dark to read');
+      res = await submit('/admin/appearance', '/admin/appearance/theme', { ...THEME, preset: 'x' });
+      expect(res.statusCode).toBe(400);
+      expect(res.body).toContain('Check the theme');
+      expect(h.ctx.settings.current.values[SETTING.siteTheme]).toBeUndefined();
+    });
+
+    it('applies a PDF template, adjusts it and resets it', async () => {
+      let res = await submit('/admin/appearance', '/admin/appearance/pdf/template', {
+        template: 'report',
+      });
+      expect(res.headers.location).toBe('/admin/appearance?done=pdf-template');
+      expect(h.ctx.settings.current.values[SETTING.pdfTemplate]).toEqual(
+        PDF_TEMPLATES.report.settings,
+      );
+      let page = await get('/admin/appearance', owner);
+      expect(page.body).toMatch(/<option value="Letter"\s+selected/);
+
+      res = await submit('/admin/appearance', '/admin/appearance/pdf', {
+        template: 'report',
+        pageSize: 'A5',
+        orientation: 'landscape',
+        margins: 'narrow',
+        fontSize: 'large',
+        cover: 'banner',
+        coverNote: ' Confidential ',
+        toc: '1',
+        header: '{site}',
+        footer: '',
+        font: 'default',
+        pdfCss: '.pub-cover h1 { color: red; }',
+      });
+      expect(res.headers.location).toBe('/admin/appearance?done=pdf');
+      expect(h.ctx.settings.current.values[SETTING.pdfTemplate]).toEqual({
+        template: 'report',
+        pageSize: 'A5',
+        orientation: 'landscape',
+        margins: 'narrow',
+        fontSize: 'large',
+        cover: 'banner',
+        coverNote: 'Confidential',
+        toc: true,
+        chapterBreaks: false,
+        header: '{site}',
+        footer: '',
+        pageNumbers: false,
+        font: 'default',
+        customCss: '.pub-cover h1 { color: red; }',
+      });
+      // Applying another template keeps the print CSS.
+      await submit('/admin/appearance', '/admin/appearance/pdf/template', { template: 'compact' });
+      expect(h.ctx.settings.current.values[SETTING.pdfTemplate]).toMatchObject({
+        template: 'compact',
+        customCss: '.pub-cover h1 { color: red; }',
+      });
+      res = await submit('/admin/appearance', '/admin/appearance/pdf', { pageSize: 'B9' });
+      expect(res.statusCode).toBe(400);
+      expect(res.body).toContain('Check the PDF settings');
+
+      res = await submit('/admin/appearance', '/admin/appearance/pdf/reset', {});
+      expect(res.headers.location).toBe('/admin/appearance?done=pdf-reset');
+      expect(h.ctx.settings.current.values[SETTING.pdfTemplate]).toBeUndefined();
+      page = await get('/admin/appearance', owner);
+      expect(page.body).not.toContain('Reset the PDF template');
+    });
+
+    it('sets both through the admin API', async () => {
+      let res = await admin(h.app, 'PUT', '/appearance', {
+        theme: { preset: 'graphite' },
+        pdf: { template: 'handbook', toc: false },
+      });
+      expect(res.statusCode).toBe(200);
+      const body = res.json() as {
+        theme: { preset: string };
+        pdf: { pageSize: string; toc: boolean };
+        version: string;
+      };
+      expect(body.theme.preset).toBe('graphite');
+      expect(body.pdf).toMatchObject({ pageSize: 'A5', toc: false });
+      expect(body.version).toMatch(/^[0-9a-f]{12}$/);
+      expect((await admin(h.app, 'GET', '/appearance')).json()).toEqual(body);
+      res = await admin(h.app, 'PUT', '/appearance', { theme: { accent: '#fefefe' } });
+      expect(res.statusCode).toBe(400);
+      res = await admin(h.app, 'PUT', '/appearance', { pdf: { cover: 'gold' } });
+      expect(res.statusCode).toBe(400);
+      // `theme` absent leaves it as it is; null resets.
+      res = await admin(h.app, 'PUT', '/appearance', { pdf: null });
+      expect(res.json()).toMatchObject({ theme: { preset: 'graphite' }, pdf: null });
+      res = await admin(h.app, 'PUT', '/appearance', { theme: null });
+      expect(res.json()).toEqual({ theme: null, pdf: null, version: '' });
     });
   });
 

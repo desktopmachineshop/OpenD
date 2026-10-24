@@ -30,7 +30,10 @@
 
   <chapter href="../topics/hosting/managed-site.dita" product="hosted"/>
 
-  <chapter href="../topics/hosting/admin-console.dita" product="core hosted"/>
+  <chapter href="../topics/hosting/admin-console.dita" product="core hosted">
+    <topicref href="../topics/hosting/appearance.dita"/>
+    <topicref href="../topics/pdf/pdf-templates.dita"/>
+  </chapter>
 
   <chapter navtitle="Readers and administration" product="core">
     <topicref href="../topics/hosting/readers-orgs.dita"/>

@@ -46,6 +46,16 @@ describe('projectConfigSchema', () => {
     ).toBe(false);
   });
 
+  it('takes a built-in PDF template and settings to change in it', () => {
+    const parse = (pdf: unknown) =>
+      projectConfigSchema.safeParse({ release: '1', map: 'm', pdf }).success;
+    expect(parse({ template: 'handbook', pageSize: 'Letter', header: '{title}' })).toBe(true);
+    expect(parse({ template: 'poster' })).toBe(false);
+    expect(parse({ pageSize: 'A3' })).toBe(false);
+    // Print CSS belongs in the project theme.
+    expect(parse({ customCss: 'x' })).toBe(false);
+  });
+
   it('takes an image inside the docs root as the logo, and serves it by extension', () => {
     const parse = (logo: string) =>
       projectConfigSchema.safeParse({ release: '1', map: 'm', logo }).success;

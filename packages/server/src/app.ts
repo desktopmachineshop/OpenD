@@ -13,6 +13,7 @@ import {
   type Pool,
 } from '@opend/store';
 import { GitHubConnection, jsonLog, type Log } from '@opend/worker';
+import { registerAppearance } from './appearance.js';
 import { registerAdminConsole } from './admin-console.js';
 import { registerAdmin } from './admin.js';
 import { Analytics } from './analytics.js';
@@ -178,6 +179,7 @@ export async function createApp(config: ServerConfig, deps: AppDeps): Promise<Op
   registerApi(app, ctx);
   registerPdf(app, ctx);
   registerFeedback(app, ctx);
+  registerAppearance(app, ctx);
   registerDelivery(app, ctx);
   app.addHook('onClose', async () => ctx.analytics.flush());
   // The default renderer is ours to close; an injected one belongs to the caller.
