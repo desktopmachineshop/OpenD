@@ -125,7 +125,7 @@ button, input, textarea, select { font: inherit; color: inherit; }
 .site-versions > summary:hover { border-color: var(--opend-accent); }
 .site-versions > summary:focus-visible { border-radius: 999px; }
 .site-versions-label { font-weight: 500; color: var(--opend-muted); }
-.site-versions > summary .site-versions-label { color: inherit; opacity: 0.85; }
+.site-versions > summary .site-versions-label { color: inherit; }
 .site-versions-panel { position: absolute; z-index: 30; top: calc(100% + 6px); left: 0; min-width: 12rem; max-height: 60vh; overflow-y: auto; padding: 6px; border: 1px solid var(--opend-border-strong); border-radius: var(--opend-radius); background: var(--opend-surface); box-shadow: var(--opend-shadow); }
 .site-versions-panel ul { list-style: none; margin: 0; padding: 0; }
 .site-versions-panel a { display: block; padding: 8px 10px; border-radius: var(--opend-radius-sm); color: var(--opend-text); font-size: 14px; font-weight: 600; text-decoration: none; white-space: nowrap; }
