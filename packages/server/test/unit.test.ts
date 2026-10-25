@@ -399,6 +399,27 @@ describe('versionChoice', () => {
     expect(chosenVersion(versionChoice(list, '1.9', '1.4'))).toBe('1.4');
   });
 
+  it('offers the live release lines, matching requests and readers by line', () => {
+    const live = { ...repo({ mode: 'live' }), releaseLines: 'minor' as const };
+    const lines = ['0.23', '0.22', '0.21'];
+    expect(versionChoice(live, null, undefined, lines)).toEqual({
+      mode: 'live',
+      current: '0.23',
+      options: lines,
+    });
+    expect(versionChoice(live, null, '0.21.4', lines)?.current).toBe('0.21');
+    expect(versionChoice(live, null, '0.24', lines)?.current).toBe('0.23');
+    // A reader starts on their own line and is served their own version there.
+    const own = versionChoice(live, '0.22.3', undefined, lines);
+    expect(own).toEqual({ mode: 'live', current: '0.22', options: lines, serve: '0.22.3' });
+    expect(chosenVersion(own)).toBe('0.22.3');
+    expect(chosenVersion(versionChoice(live, '0.22.3', '0.21', lines))).toBe('0.21');
+    // Their line is not live: the newest instead.
+    expect(chosenVersion(versionChoice(live, '0.25.0', undefined, lines))).toBe('0.23');
+    // Nothing live: no picker.
+    expect(versionChoice(live, '0.22.3', undefined, [])).toBeNull();
+  });
+
   it('ignores a requested version the list does not offer', () => {
     expect(versionChoice(list, '1.9', '3.0')?.current).toBe('1.9');
     expect(versionChoice(list, '1.9', '9')?.current).toBe('1.9');

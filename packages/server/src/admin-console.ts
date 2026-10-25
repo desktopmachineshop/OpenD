@@ -15,9 +15,7 @@ import {
   deleteReader,
   deleteSecret,
   deleteSetting,
-  enqueueJob,
   findReaderByEmail,
-  findRepoByName,
   getReaderAccess,
   getRelease,
   listAudit,
@@ -42,7 +40,6 @@ import {
   upsertEditorUser,
   upsertOrg,
   upsertReader,
-  upsertRepo,
   useHandoff,
   updateRepo,
   withTransaction,
@@ -52,7 +49,6 @@ import {
   type Repo,
   type StoredRelease,
 } from '@opend/store';
-import { listRemoteRefs, releaseRefsToPoll } from '@opend/worker';
 import { compareReleaseLines } from '@opend/filter';
 import {
   pdfTemplateSchema,
@@ -63,7 +59,10 @@ import {
 } from '@opend/model';
 import { publicationHref } from '@opend/render-html';
 import {
+  changeReleaseLines,
+  declaredFields,
   entitlementsSchema,
+  publicEntitlementsSchema,
   repoSchema,
   slug as slugSchema,
   versionPickerSchema,
@@ -87,6 +86,7 @@ import {
   type Html,
 } from './admin-pages.js';
 import { HANDOFF_PATH, verifyHandoff } from './admin-handoff.js';
+import { autoConnect, forgetAutoConnect, queueReleaseBuilds, saveSource } from './auto-connect.js';
 import { accentProblem, appearance, effectivePdfTemplate } from './appearance.js';
 import { ADMIN_CSS } from './admin-style.js';
 import { loginPath, safeReturnTo, setSession, siteSession } from './auth.js';
@@ -133,6 +133,9 @@ const DONE: Record<string, string> = {
     'Welcome. You are a staff reader: connect GitHub and choose the docs repository to get going.',
   access: 'Access saved. Every page follows it from now on.',
   versions: 'Version picker saved. Every page follows it from now on.',
+  'release-lines':
+    'Release lines saved. Live releases moved to their new lines; older versions come back with their next build.',
+  'release-lines-same': 'Release lines unchanged.',
   repo: 'Docs repository saved.',
   'repo-build': 'Docs repository saved and a build queued. It goes live when it passes validation.',
   build: 'Build queued. It goes live when it passes validation.',
@@ -146,6 +149,8 @@ const DONE: Record<string, string> = {
   signin: 'Sign-in options saved.',
   connected: 'GitHub App created. Install it on your docs repository next.',
   installed: 'GitHub App installed. Choose the docs repository below.',
+  'auto-connected':
+    'GitHub connected, and the docs repository with it: its opend.config.yaml says where the docs are and how the site is set up. Its builds are queued and go live when they pass validation.',
   disconnected: 'GitHub disconnected.',
   editor: 'Editor settings saved.',
   author: 'Author saved.',
@@ -223,15 +228,24 @@ function checked(body: Record<string, string>, prefix: string): string[] {
 }
 
 /** Entitlements from a form: `null` when no version is given. */
-function entitlementsFrom(body: Record<string, string>): Entitlements | null {
+/**
+ * Entitlements from a form: none without a version. The public set's version
+ * (`publicSet`) may also be `latest`, the newest live release line.
+ */
+function entitlementsFrom(body: Record<string, string>, publicSet = false): Entitlements | null {
   const version = (body.version ?? '').trim();
   if (!version) return null;
-  const parsed = entitlementsSchema.safeParse({
+  const parsed = (publicSet ? publicEntitlementsSchema : entitlementsSchema).safeParse({
     products: checked(body, 'product'),
     features: checked(body, 'feature'),
     version,
   });
-  if (!parsed.success) throw new InputError('Give the release version as a number such as 2.1.');
+  if (!parsed.success)
+    throw new InputError(
+      publicSet
+        ? 'Give the release version as a number such as 2.1, or latest.'
+        : 'Give the release version as a number such as 2.1.',
+    );
   return parsed.data;
 }
 
@@ -317,6 +331,8 @@ export function registerAdminConsole(app: FastifyInstance, ctx: AppContext): voi
     (s: Staff, created?: { name: string; token: string }) => Promise<Page>
   > = {
     overview: async () => {
+      // Zero-touch setup: connects the docs repository when GitHub exposes exactly one.
+      const auto = await autoConnect(ctx);
       const repos = await listRepos(ctx.pool);
       const repo = await siteRepo(ctx);
       const names = new Map(repos.map((r) => [r.id, r.fullName]));
@@ -337,6 +353,7 @@ export function registerAdminConsole(app: FastifyInstance, ctx: AppContext): voi
           audit: await listAudit(ctx.pool, 10),
           github: settingSources(ctx.env, ctx.settings.current).github,
           publicUrl: ctx.env.publicUrl,
+          autoConnect: auto,
         }),
       };
     },
@@ -361,6 +378,7 @@ export function registerAdminConsole(app: FastifyInstance, ctx: AppContext): voi
       };
     },
     source: async (s) => {
+      await autoConnect(ctx);
       const repos = await listRepos(ctx.pool);
       const names = new Map(repos.map((r) => [r.id, r.fullName]));
       let picker = null;
@@ -611,6 +629,12 @@ export function registerAdminConsole(app: FastifyInstance, ctx: AppContext): voi
     const s = await staffOnly(request, reply);
     if (!s) return reply;
     const connected = (request.query as { github?: unknown }).github === 'connected';
+    if (connected) {
+      // The hosting provider linked an installation: with exactly one repository, connect it now.
+      forgetAutoConnect(ctx.pool);
+      const auto = await autoConnect(ctx);
+      if (auto.status === 'connected') return reply.redirect('/admin?done=auto-connected', 303);
+    }
     return show(
       reply,
       s,
@@ -663,12 +687,16 @@ export function registerAdminConsole(app: FastifyInstance, ctx: AppContext): voi
   // ---- site & access -------------------------------------------------------
 
   action('/admin/site/access', 'site', async (s, body) => {
-    const access = body.access;
-    if (access !== 'private' && access !== 'public')
-      throw new InputError('Choose private or public.');
-    const pub = entitlementsFrom(body);
     const repo = await siteRepo(ctx);
     if (!repo) throw new InputError('Register the docs repository first.');
+    // Fields the repository's opend.config.yaml declares keep its values (their inputs are disabled).
+    const owned = declaredFields(repo, ['access', 'publicEntitlements']);
+    const access = owned.includes('access') ? repo.access : body.access;
+    if (access !== 'private' && access !== 'public')
+      throw new InputError('Choose private or public.');
+    const pub = owned.includes('publicEntitlements')
+      ? repo.publicEntitlements
+      : entitlementsFrom(body, true);
     await withTransaction(ctx.pool, async (db) => {
       await setRepoAccess(db, repo.id, access, pub);
       await audit(db, s.actor, 'repo.access', {
@@ -683,6 +711,11 @@ export function registerAdminConsole(app: FastifyInstance, ctx: AppContext): voi
   });
 
   action('/admin/site/versions', 'site', async (s, body) => {
+    const declared = await siteRepo(ctx);
+    if (declared && declaredFields(declared, ['versionPicker']).length)
+      throw new InputError(
+        'The version picker is set by opend.config.yaml (site.versionPicker): change it in the docs repository.',
+      );
     const versions = (body.versions ?? '')
       .split(',')
       .map((v) => v.trim())
@@ -711,6 +744,24 @@ export function registerAdminConsole(app: FastifyInstance, ctx: AppContext): voi
     });
     ctx.caches.releaseChanged();
     return 'versions';
+  });
+
+  action('/admin/site/release-lines', 'site', async (s, body) => {
+    const lines = body.releaseLines;
+    if (lines !== 'major' && lines !== 'minor')
+      throw new InputError('Choose release lines by major or by minor version.');
+    const repo = await siteRepo(ctx);
+    if (!repo) throw new InputError('Register the docs repository first.');
+    if (declaredFields(repo, ['releaseLines']).length)
+      throw new InputError(
+        'Release lines are set by opend.config.yaml (site.releaseLines): change them in the docs repository.',
+      );
+    if (repo.releaseLines === lines) return 'release-lines-same';
+    // The same change, and audit entry, as PUT /admin/api/repos/:id/release-lines.
+    await withTransaction(ctx.pool, (db) => changeReleaseLines(db, repo.id, lines, s.actor));
+    // Live releases may have moved to other lines: drop every cache.
+    ctx.caches.releaseChanged();
+    return 'release-lines';
   });
 
   // ---- appearance ----------------------------------------------------------
@@ -799,25 +850,13 @@ export function registerAdminConsole(app: FastifyInstance, ctx: AppContext): voi
   // ---- docs source ---------------------------------------------------------
 
   const queueBuilds = async (s: Staff, repo: Repo): Promise<number> => {
-    let refs;
     try {
-      const tokenValue = await ctx.github.repoToken(repo, 'read');
-      refs = releaseRefsToPoll(
-        await listRemoteRefs(repo.sourceUrl, tokenValue, ctx.github.gitHosts),
-        repo.releaseRefs,
-      );
+      return await queueReleaseBuilds(ctx, repo, s.actor);
     } catch (err) {
       throw new InputError(
         `Could not read the repository’s branches: ${err instanceof Error ? err.message : String(err)}`,
       );
     }
-    await withTransaction(ctx.pool, async (db) => {
-      for (const { ref, sha } of refs) {
-        const job = await enqueueJob(db, { repoId: repo.id, ref, sha });
-        await audit(db, s.actor, 'build.request', { repo: repo.fullName, ref, sha, job: job.id });
-      }
-    });
-    return refs.length;
   };
 
   action('/admin/source', 'source', async (s, body) => {
@@ -855,10 +894,17 @@ export function registerAdminConsole(app: FastifyInstance, ctx: AppContext): voi
         installationId: ctx.github.mode() === 'env' && id ? Number(id) : null,
       };
     }
+    const docsPath = (body.docsPath ?? '.').trim() || '.';
+    // The same repository and folder keep the release refs their opend.config.yaml declares
+    // (the form's field is disabled for them, so it sends none).
+    const same = (await listRepos(ctx.pool)).find(
+      (r) => r.fullName.toLowerCase() === input.fullName.toLowerCase() && r.docsPath === docsPath,
+    );
     const parsed = repoSchema(ctx.env.production).safeParse({
       ...input,
-      releaseRefs,
-      docsPath: (body.docsPath ?? '.').trim() || '.',
+      releaseRefs:
+        same && declaredFields(same, ['releaseRefs']).length ? same.releaseRefs : releaseRefs,
+      docsPath,
     });
     if (!parsed.success)
       throw new InputError(
@@ -866,16 +912,10 @@ export function registerAdminConsole(app: FastifyInstance, ctx: AppContext): voi
       );
     const value = { ...parsed.data, installationId: parsed.data.installationId ?? null };
     const current = await siteRepo(ctx);
-    const repo = await withTransaction(ctx.pool, async (db) => {
-      const existing = await findRepoByName(db, value.fullName);
-      // Changing the site's repository keeps its row: access settings and history stay.
-      const r =
-        !existing && current && !ctx.env.siteRepo
-          ? await updateRepo(db, current.id, value)
-          : await upsertRepo(db, value);
-      await audit(db, s.actor, 'repo.upsert', value);
-      return r!;
-    });
+    // Changing the site's repository keeps its row: access settings and history stay.
+    const repo = await withTransaction(ctx.pool, (db) =>
+      saveSource(db, value, { current, pinned: Boolean(ctx.env.siteRepo), actor: s.actor }),
+    );
     ctx.caches.releaseChanged();
     if (body.build !== '1') return 'repo';
     return (await queueBuilds(s, repo)) > 0 ? 'repo-build' : 'build-none';
@@ -1181,6 +1221,10 @@ export function registerAdminConsole(app: FastifyInstance, ctx: AppContext): voi
       });
     });
     await changed();
+    // Zero-touch setup: with exactly one repository in the installation, connect it now.
+    forgetAutoConnect(ctx.pool);
+    const auto = await autoConnect(ctx);
+    if (auto.status === 'connected') return reply.redirect('/admin?done=auto-connected', 303);
     return reply.redirect('/admin/source?done=installed', 303);
   });
 

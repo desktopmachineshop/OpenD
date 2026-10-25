@@ -6,8 +6,13 @@
     filtered for a set of public entitlements you choose.</shortdesc>
   <taskbody>
     <context>
-      <p>The access mode belongs to the registered repository and is kept in the database, never in the docs
-        repository, so only an operator can change it. New repositories are private.</p>
+      <p>The access mode belongs to the registered repository and is kept in the database. Staff change it
+        in the admin console or the admin API, unless the docs repository declares it in the
+        <parmname>site</parmname> block of its <filepath>opend.config.yaml</filepath>
+        (<parmname>access</parmname> and <parmname>publicEntitlements</parmname>): then the build that goes
+        live on the newest release line applies it, and the console shows it read-only
+        (<xref href="site-settings.dita"/>). Either way, switching to public opens exactly the public set,
+        and every cached page is dropped at once. New repositories are private.</p>
       <simpletable relcolwidth="2* 3* 3*">
         <sthead><stentry>Who</stentry><stentry>Private site</stentry><stentry>Public site</stentry></sthead>
         <strow><stentry>Anonymous visitor</stentry><stentry>Sent to the sign-in page</stentry><stentry>The public entitlements</stentry></strow>
@@ -23,6 +28,13 @@
         <info>
           <p>Without a public set, a public site is fail-closed: anonymous visitors see only content with no
             product, feature or release condition, on the newest release line.</p>
+          <p>The version may be the keyword <codeph>latest</codeph>: the newest live release line at the time
+            of each request, such as <codeph>0.23</codeph> with release lines by minor version. When 0.24 goes
+            live it becomes the default at once, with no admin call, and when the newest line is retired the
+            next one takes over. The line's name is used as the version, so content conditioned on
+            <codeph>release</codeph> is filtered for 0.23 (that is, 0.23.0). With nothing live yet,
+            <codeph>latest</codeph> serves nothing. Only the public set takes <codeph>latest</codeph>;
+            organizations name a real version.</p>
         </info>
       </step>
       <step>
@@ -31,7 +43,8 @@
           <codeblock>H="authorization: Bearer $OPEND_ADMIN_TOKEN"
 curl "$PUBLIC_URL/admin/api/repos" -H "$H"          # find the repository's id
 curl -X PUT "$PUBLIC_URL/admin/api/repos/1/access" -H "$H" -H 'content-type: application/json' \
-  -d '{"access":"public","publicEntitlements":{"products":["core"],"features":[],"version":"0.1"}}'</codeblock>
+  -d '{"access":"public","publicEntitlements":{"products":["core"],"features":[],"version":"0.1"}}'
+# or "version":"latest" to follow the newest live release line</codeblock>
         </stepxmp>
         <stepresult>
           <p>Every replica drops its cached pages at once. The next anonymous request gets the public view
@@ -54,6 +67,12 @@ curl -X PUT "$PUBLIC_URL/admin/api/repos/1/access" -H "$H" -H 'content-type: app
         </stepxmp>
         <info><p>A seed without <parmname>access</parmname> leaves the mode as it is.</p></info>
       </step>
+      <step importance="optional">
+        <cmd>Or set both in the admin console, under <uicontrol>Access</uicontrol> on the
+          <uicontrol>Site &amp; access</uicontrol> page.</cmd>
+        <info><p>Type <userinput>latest</userinput> in <uicontrol>Release version</uicontrol> to follow the
+          newest live line. See <xref href="admin-console.dita"/>.</p></info>
+      </step>
     </steps>
     <result>
       <ul>
@@ -69,6 +88,9 @@ curl -X PUT "$PUBLIC_URL/admin/api/repos/1/access" -H "$H" -H 'content-type: app
         <li><b>Feedback</b> needs sign-in. Anonymous page views and searches are counted without an
           organization. The embedded help panel is unchanged: it always uses the reader from the host app's
           signed token.</li>
+        <li><b>The help JSON API</b> answers anonymous requests on a public site with exactly this public
+          view, with no token and no embedding set up. See
+          <xref href="../help/json-api.dita#json-api/auth"/>.</li>
         <li>Anonymous visitors see <uicontrol>Sign in</uicontrol> in the header (and in the menu on narrow
           screens), which returns them to the same page. See <xref href="oidc.dita"/> and
           <xref href="github-sign-in.dita"/>.</li>

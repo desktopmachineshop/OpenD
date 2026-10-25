@@ -15,6 +15,7 @@ import {
 import { GitHubConnection, jsonLog, startPoller, startWorker } from '@opend/worker';
 import { mintSetupLink } from './admin.js';
 import { startAnalyticsPurge } from './analytics-purge.js';
+import { autoConnect } from './auto-connect.js';
 import { createApp } from './app.js';
 import { loadFleetConfig } from './fleet/config.js';
 import { migrateFleet, startFleet } from './fleet/serve.js';
@@ -106,8 +107,17 @@ program
     });
     // Polling mode, for installs that GitHub's webhooks cannot reach.
     const pollSeconds = config.selfHosting?.pollIntervalSeconds ?? 0;
+    // Each tick also connects the docs source when GitHub exposes exactly one repository.
     const poller =
-      pollSeconds > 0 ? startPoller({ pool, github, intervalMs: pollSeconds * 1000 }) : null;
+      pollSeconds > 0
+        ? startPoller({
+            pool,
+            github,
+            intervalMs: pollSeconds * 1000,
+            beforePoll: () =>
+              autoConnect({ pool, github, settings, log: jsonLog, config, env: config }),
+          })
+        : null;
     // Retention applies even with analytics off, so old rows still go.
     const retentionDays = (config.analytics ?? DEFAULT_ANALYTICS).retentionDays;
     const purge = startAnalyticsPurge({ pool, retentionDays, log: jsonLog });

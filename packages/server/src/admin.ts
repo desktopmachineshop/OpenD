@@ -3,14 +3,17 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import {
   RELEASE_LINES,
+  entitlementsSchema,
+  publicEntitlementsSchema,
+  releaseRefsSchema,
+  versionPickerSchema,
   pdfTemplateSchema,
   resolvePdfTemplate,
   siteThemeSchema,
-  type ReleaseLines,
+  type SiteSettingField,
 } from '@opend/model';
-import { releaseLine } from '@opend/filter';
+import { changeReleaseLines } from '@opend/worker';
 import {
-  setRepoReleaseLines,
   SETTING,
   deleteSetting,
   putSetting,
@@ -26,6 +29,7 @@ import {
   deleteReader,
   enqueueJob,
   exportSite,
+  findRepoByName,
   importSite,
   ImportRefused,
   type SiteExport,
@@ -67,37 +71,7 @@ const appearanceSchema = z.object({
 export const slug = z
   .string()
   .regex(/^[a-z0-9][a-z0-9-]{0,62}$/, 'lowercase letters, digits and dashes');
-const token = z.string().regex(/^[A-Za-z0-9_.:-]+$/);
-
-export const entitlementsSchema = z.object({
-  products: z.array(token).default([]),
-  features: z.array(token).default([]),
-  version: z.string().regex(/^v?\d+(\.\d+)*$/, 'a version such as 1.4'),
-});
-
-const pickerVersion = z
-  .string()
-  .max(32)
-  .regex(/^v?\d+(\.\d+)*$/, 'a version such as 2.1');
-
-/**
- * The site's version picker: `off` (no picker), `reader` (show each reader
- * their own version), `fixed` (every reader gets `version`) or `list`
- * (readers choose among `versions`, and their own).
- */
-export const versionPickerSchema = z.discriminatedUnion('mode', [
-  z.object({ mode: z.literal('off') }),
-  z.object({ mode: z.literal('reader') }),
-  z.object({ mode: z.literal('fixed'), version: pickerVersion }),
-  z.object({
-    mode: z.literal('list'),
-    versions: z
-      .array(pickerVersion)
-      .min(1)
-      .max(50)
-      .transform((vs) => [...new Set(vs)]),
-  }),
-]);
+export { entitlementsSchema, publicEntitlementsSchema, versionPickerSchema };
 
 const orgSchema = z.object({
   slug,
@@ -120,7 +94,7 @@ const staffSchema = z.object({ staff: z.boolean() });
  */
 export const accessSchema = z.object({
   access: z.enum(['private', 'public']),
-  publicEntitlements: entitlementsSchema.nullable().optional(),
+  publicEntitlements: publicEntitlementsSchema.nullable().optional(),
 });
 function urlWithProtocol(value: string, protocol: string): boolean {
   try {
@@ -153,24 +127,26 @@ export function sourceUrlSchema(production: boolean) {
 /** How a repo groups releases into lines: `major` (the default) or `minor`. */
 export const releaseLinesSchema = z.object({ releaseLines: z.enum(RELEASE_LINES) });
 
+export { changeReleaseLines };
+
 /**
- * Switches a repo's release-line granularity and moves its live releases to
- * their new lines, in the caller's transaction (see `setRepoReleaseLines`).
- * Null when the repo does not exist.
+ * The fields of `fields` that the repo's `opend.config.yaml` declares in its
+ * `site:` block: those are the repository's, and the admin API and console
+ * refuse to change them (the next build would put them back).
  */
-export async function changeReleaseLines(
-  db: Parameters<typeof setRepoReleaseLines>[0],
-  repoId: number,
-  lines: ReleaseLines,
-  actor: string,
-) {
-  const result = await setRepoReleaseLines(db, repoId, lines, (v) => releaseLine(v, lines));
-  if (result?.changed)
-    await audit(db, actor, 'repo.release-lines', {
-      repo: result.repo.fullName,
-      releaseLines: lines,
-    });
-  return result?.repo ?? null;
+export function declaredFields(
+  repo: { declared: { settings: Partial<Record<SiteSettingField, unknown>> } | null },
+  fields: readonly SiteSettingField[],
+): SiteSettingField[] {
+  const settings = repo.declared?.settings ?? {};
+  return fields.filter((f) => settings[f] !== undefined);
+}
+
+/** The 409 the admin API answers for a change to a repository-declared setting. */
+export function declaredConflict(reply: FastifyReply, fields: string[]) {
+  return reply.code(409).send({
+    error: `set by opend.config.yaml (site: ${fields.join(', ')}); change it in the docs repository`,
+  });
 }
 
 export const repoSchema = (production: boolean) =>
@@ -178,7 +154,7 @@ export const repoSchema = (production: boolean) =>
     fullName: z.string().regex(/^[\w.-]+\/[\w.-]+$/, 'owner/name'),
     sourceUrl: sourceUrlSchema(production),
     installationId: z.number().int().positive().nullable().optional(),
-    releaseRefs: z.array(z.string().min(1)).min(1).optional(),
+    releaseRefs: releaseRefsSchema.optional(),
     docsPath: z
       .string()
       .refine(
@@ -293,6 +269,20 @@ export function registerAdmin(app: FastifyInstance, ctx: AppContext): void {
       scope.post('/repos', async (request, reply) => {
         const input = parse(repoSchema(ctx.config.production), request.body, reply);
         if (!input) return reply;
+        // Re-registering the same repository and folder keeps what its opend.config.yaml declares.
+        const existing = await findRepoByName(ctx.pool, input.fullName);
+        const kept = existing && existing.docsPath === (input.docsPath ?? '.') ? existing : null;
+        const owned = kept
+          ? declaredFields(kept, ['releaseRefs', 'releaseLines']).filter((f) =>
+              f === 'releaseRefs'
+                ? input.releaseRefs !== undefined &&
+                  JSON.stringify(input.releaseRefs) !== JSON.stringify(kept.releaseRefs)
+                : input.releaseLines !== undefined && input.releaseLines !== kept.releaseLines,
+            )
+          : [];
+        if (owned.length) return declaredConflict(reply, owned);
+        if (kept && declaredFields(kept, ['releaseRefs']).length)
+          input.releaseRefs = kept.releaseRefs;
         const repo = await withTransaction(ctx.pool, async (db) => {
           const { releaseLines, ...fields } = input;
           const r = await upsertRepo(db, fields);
@@ -318,6 +308,21 @@ export function registerAdmin(app: FastifyInstance, ctx: AppContext): void {
         const id = Number((request.params as { id: string }).id);
         const input = parse(accessSchema, request.body, reply);
         if (!input) return reply;
+        const found = Number.isSafeInteger(id) ? await getRepo(ctx.pool, id) : null;
+        const owned = found
+          ? declaredFields(
+              found,
+              input.publicEntitlements === undefined
+                ? ['access']
+                : ['access', 'publicEntitlements'],
+            ).filter((f) =>
+              f === 'access'
+                ? input.access !== found.access
+                : JSON.stringify(input.publicEntitlements) !==
+                  JSON.stringify(found.publicEntitlements),
+            )
+          : [];
+        if (owned.length) return declaredConflict(reply, owned);
         const repo = await withTransaction(ctx.pool, async (db) => {
           const current = Number.isInteger(id) ? await getRepo(db, id) : null;
           if (!current) return null;
@@ -341,6 +346,13 @@ export function registerAdmin(app: FastifyInstance, ctx: AppContext): void {
         const id = Number((request.params as { id: string }).id);
         const picker = parse(versionPickerSchema, request.body, reply);
         if (!picker) return reply;
+        const found = Number.isSafeInteger(id) ? await getRepo(ctx.pool, id) : null;
+        if (
+          found &&
+          declaredFields(found, ['versionPicker']).length &&
+          JSON.stringify(picker) !== JSON.stringify(found.versionPicker)
+        )
+          return declaredConflict(reply, ['versionPicker']);
         const repo = await withTransaction(ctx.pool, async (db) => {
           const current = Number.isInteger(id) ? await getRepo(db, id) : null;
           if (!current) return null;
@@ -359,6 +371,13 @@ export function registerAdmin(app: FastifyInstance, ctx: AppContext): void {
         const id = Number((request.params as { id: string }).id);
         const input = parse(releaseLinesSchema, request.body, reply);
         if (!input) return reply;
+        const found = Number.isSafeInteger(id) ? await getRepo(ctx.pool, id) : null;
+        if (
+          found &&
+          declaredFields(found, ['releaseLines']).length &&
+          input.releaseLines !== found.releaseLines
+        )
+          return declaredConflict(reply, ['releaseLines']);
         const repo = Number.isSafeInteger(id)
           ? await withTransaction(ctx.pool, (db) =>
               changeReleaseLines(db, id, input.releaseLines, ACTOR),

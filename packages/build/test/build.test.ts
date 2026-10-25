@@ -118,6 +118,38 @@ describe('buildRelease diagnostics', () => {
     );
     expect(bad.diagnostics.map((d) => d.code)).toEqual(['invalid-config']);
   });
+
+  it('accepts a site: block, and reports a bad one as invalid-config', () => {
+    const files = {
+      'main.ditamap': '<map><topicref href="a.dita"/></map>',
+      'a.dita': '<topic id="a"><title>A</title></topic>',
+    };
+    const config = [
+      'release: "0.23"',
+      'map: main.ditamap',
+      'attributes: { product: [free, business] }',
+      'site:',
+      '  releaseRefs: [docs/*]',
+      '  releaseLines: minor',
+      '  access: public',
+      '  publicEntitlements: { products: [free], version: latest }',
+      '  versionPicker: { mode: live }',
+      '',
+    ].join('\n');
+    const ok = buildRelease(tree({ ...files, 'opend.config.yaml': config }));
+    expect(ok.diagnostics).toEqual([]);
+    expect(ok.config?.site).toMatchObject({ access: 'public', versionPicker: { mode: 'live' } });
+    const bad = buildRelease(
+      tree({ ...files, 'opend.config.yaml': config.replace('access: public', 'access: open') }),
+    );
+    expect(bad.diagnostics).toEqual([
+      expect.objectContaining({
+        severity: 'error',
+        code: 'invalid-config',
+        message: expect.stringMatching(/^site\.access: /),
+      }),
+    ]);
+  });
 });
 
 describe('readGitRef', () => {

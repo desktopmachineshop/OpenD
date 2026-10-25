@@ -14,7 +14,7 @@ import { publicAudience, readerAudience, type Audience } from './access.js';
 import { OPENAPI } from './api-spec.js';
 import { registerApiWrites } from './api-writes.js';
 import type { AppContext } from './context.js';
-import { audienceRelease, siteRepo, type ReaderRelease } from './delivery.js';
+import { audienceRelease, servedRepo, siteRepo, type ReaderRelease } from './delivery.js';
 import { searchRelease } from './search.js';
 
 /**
@@ -261,7 +261,7 @@ export async function releaseFor(
   key: ApiKey,
   requested: string | undefined,
 ): Promise<ReaderRelease> {
-  const repo = await requireRepo(ctx);
+  const repo = await servedRepo(ctx, await requireRepo(ctx));
   let audience: Audience;
   if (key.audience === 'staff') {
     const line = requested ? releaseLine(requested, repo.releaseLines) : null;

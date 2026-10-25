@@ -33,6 +33,7 @@ const csrfOf = (res: LightMyRequestResponse) =>
 const POSTS = [
   '/admin/site/access',
   '/admin/site/versions',
+  '/admin/site/release-lines',
   '/admin/source',
   '/admin/source/rebuild',
   '/admin/people/orgs',
@@ -381,6 +382,78 @@ describe.skipIf(!url)('the admin console', () => {
       expect(res.statusCode).toBe(303);
       repos = (await admin(h.app, 'GET', '/repos')).json() as object[];
       expect(repos[0]).toMatchObject({ versionPicker: { mode: 'off' } });
+    });
+
+    it('sets the picker to follow the live lines, and the public version to latest', async () => {
+      const page = await get('/admin/site', owner);
+      expect(page.body).toMatch(/name="mode"\s+value="live"/);
+      expect(page.body).toContain('Every live version');
+      let res = await submit('/admin/site', '/admin/site/versions', {
+        mode: 'live',
+        fixedVersion: '',
+        versions: '',
+      });
+      expect(res.statusCode).toBe(303);
+      res = await submit('/admin/site', '/admin/site/access', {
+        access: 'public',
+        version: 'latest',
+      });
+      expect(res.statusCode).toBe(303);
+      expect(((await admin(h.app, 'GET', '/repos')).json() as object[])[0]).toMatchObject({
+        versionPicker: { mode: 'live' },
+        publicEntitlements: { version: 'latest' },
+      });
+      const after = await get('/admin/site', owner);
+      expect(after.body).toMatch(/name="mode"\s+value="live"\s+checked/);
+      expect(after.body).toMatch(/name="version"[^>]*value="latest"/);
+      res = await submit('/admin/site', '/admin/site/access', {
+        access: 'public',
+        version: 'newest',
+      });
+      expect(res.statusCode).toBe(400);
+      expect(res.body).toContain('a number such as 2.1, or latest');
+      // Organizations name a real version.
+      res = await submit('/admin/people', '/admin/people/orgs', {
+        slug: 'later',
+        name: 'Later',
+        version: 'latest',
+      });
+      expect(res.statusCode).toBe(400);
+      await submit('/admin/site', '/admin/site/access', { access: 'private', version: '' });
+      await submit('/admin/site', '/admin/site/versions', { mode: 'off' });
+    });
+
+    it('switches release lines, as the admin API does', async () => {
+      const page = await get('/admin/site', owner);
+      expect(page.body).toContain('action="/admin/site/release-lines"');
+      expect(page.body).toMatch(/name="releaseLines"\s+value="major"\s+checked/);
+      expect(page.body).toContain('older minor versions come back when their');
+      expect((await get('/admin', owner)).body).toContain('href="/admin/site#lines-h"');
+      let res = await submit('/admin/site', '/admin/site/release-lines', { releaseLines: 'patch' });
+      expect(res.statusCode).toBe(400);
+      expect(res.body).toContain('Choose release lines by major or by minor version.');
+      res = await submit('/admin/site', '/admin/site/release-lines', { releaseLines: 'minor' });
+      expect(res.statusCode).toBe(303);
+      expect(res.headers.location).toBe('/admin/site?done=release-lines');
+      expect(((await admin(h.app, 'GET', '/repos')).json() as object[])[0]).toMatchObject({
+        releaseLines: 'minor',
+      });
+      const entries = (await listAudit(h.db.pool, 50)).filter(
+        (a) => a.action === 'repo.release-lines',
+      );
+      expect(entries).toHaveLength(1);
+      expect(entries[0]!.actor).toBe('staff:owner@docs.example');
+      const flash = await get('/admin/site?done=release-lines', owner);
+      expect(flash.body).toContain('Live releases moved to their new lines');
+      expect(flash.body).toMatch(/name="releaseLines"\s+value="minor"\s+checked/);
+      // Saving the same grouping changes and audits nothing.
+      res = await submit('/admin/site', '/admin/site/release-lines', { releaseLines: 'minor' });
+      expect(res.headers.location).toBe('/admin/site?done=release-lines-same');
+      res = await submit('/admin/site', '/admin/site/release-lines', { releaseLines: 'major' });
+      expect(res.statusCode).toBe(303);
+      expect(
+        (await listAudit(h.db.pool, 50)).filter((a) => a.action === 'repo.release-lines'),
+      ).toHaveLength(2);
     });
   });
 

@@ -2,6 +2,7 @@ import { parse as parseYaml } from 'yaml';
 import { z } from 'zod';
 import {
   audit,
+  findRepoByName,
   setEntitlements,
   setRepoAccess,
   setRepoVersionPicker,
@@ -12,7 +13,13 @@ import {
   type Pool,
 } from '@opend/store';
 import { RELEASE_LINES } from '@opend/model';
-import { changeReleaseLines, entitlementsSchema, versionPickerSchema } from './admin.js';
+import {
+  changeReleaseLines,
+  declaredFields,
+  entitlementsSchema,
+  publicEntitlementsSchema,
+  versionPickerSchema,
+} from './admin.js';
 
 const seedSchema = z.object({
   repos: z
@@ -25,7 +32,7 @@ const seedSchema = z.object({
         docsPath: z.string().optional(),
         /** Omitted: keep the repo's current access (new repos: private). */
         access: z.enum(['private', 'public']).optional(),
-        publicEntitlements: entitlementsSchema.nullable().optional(),
+        publicEntitlements: publicEntitlementsSchema.nullable().optional(),
         /** Omitted: keep the repo's current version picker (new repos: off). */
         versionPicker: versionPickerSchema.optional(),
         /** Omitted: keep the repo's release lines (new repos: major). */
@@ -79,16 +86,30 @@ export async function applySeed(
       releaseLines,
       ...input
     } of seed.repos) {
+      // What the repository's opend.config.yaml declares (site:) is its own: the seed leaves it.
+      const existing = await findRepoByName(db, input.fullName);
+      if (
+        existing?.docsPath === (input.docsPath ?? '.') &&
+        declaredFields(existing, ['releaseRefs']).length
+      )
+        input.releaseRefs = existing.releaseRefs;
       const repo = await upsertRepo(db, input);
-      if (releaseLines) await changeReleaseLines(db, repo.id, releaseLines, 'seed');
+      const owned = new Set(
+        declaredFields(repo, ['releaseLines', 'access', 'publicEntitlements', 'versionPicker']),
+      );
+      if (releaseLines && !owned.has('releaseLines'))
+        await changeReleaseLines(db, repo.id, releaseLines, 'seed');
       if (access)
         await setRepoAccess(
           db,
           repo.id,
-          access,
-          publicEntitlements === undefined ? repo.publicEntitlements : publicEntitlements,
+          owned.has('access') ? repo.access : access,
+          publicEntitlements === undefined || owned.has('publicEntitlements')
+            ? repo.publicEntitlements
+            : publicEntitlements,
         );
-      if (versionPicker) await setRepoVersionPicker(db, repo.id, versionPicker);
+      if (versionPicker && !owned.has('versionPicker'))
+        await setRepoVersionPicker(db, repo.id, versionPicker);
     }
     for (const org of seed.orgs) {
       await upsertOrg(db, org);

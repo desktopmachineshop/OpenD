@@ -116,11 +116,19 @@ export function audienceFor(
 
 /** What the header shows a request about versions: nothing when the picker is off. */
 export interface VersionChoice {
-  mode: 'reader' | 'fixed' | 'list';
-  /** The version served. */
+  mode: 'reader' | 'fixed' | 'list' | 'live';
+  /** The version shown as current: one of `options`. */
   current: string;
-  /** What the reader may switch to, newest first: only `current` unless the mode is `list`. */
+  /**
+   * What the reader may switch to, newest first: only `current` unless the
+   * mode is `list` or `live` (where they are the live release lines).
+   */
   options: string[];
+  /**
+   * The version served, when it is not `current`: under `live`, a reader on
+   * their own line keeps their own version (0.22.3 rather than 0.22).
+   */
+  serve?: string;
 }
 
 /**
@@ -129,11 +137,17 @@ export interface VersionChoice {
  * without a public set) and the version they asked for (the version cookie).
  * A requested version that is not offered is ignored, so a reader can only
  * ever switch to what the operator listed or to their own version.
+ *
+ * Under `live`, the options are `live` (the repo's live release lines, newest
+ * first) and a request is matched by its line, so `0.22.1` asks for `0.22`.
+ * Without a live request, the reader starts on their own version's line when
+ * it is live, else on the newest.
  */
 export function versionChoice(
   repo: Repo,
   own: string | null,
   requested: string | undefined,
+  live: readonly string[] = [],
 ): VersionChoice | null {
   const picker = repo.versionPicker;
   const ownVersion = own && parseVersion(own) ? own : null;
@@ -150,6 +164,23 @@ export function versionChoice(
       const current =
         requested && options.includes(requested) ? requested : (ownVersion ?? options[0]!);
       return { mode: 'list', current, options };
+    }
+    case 'live': {
+      if (!live.length) return null;
+      const options = [...live];
+      const lineOf = (v: string | null | undefined) =>
+        v ? releaseLine(v, repo.releaseLines) : null;
+      const asked = lineOf(requested);
+      const ownLine = lineOf(ownVersion);
+      const current =
+        asked && options.includes(asked)
+          ? asked
+          : ownLine && options.includes(ownLine)
+            ? ownLine
+            : options[0]!;
+      return ownVersion && current === ownLine && ownVersion !== current
+        ? { mode: 'live', current, options, serve: ownVersion }
+        : { mode: 'live', current, options };
     }
     default:
       return null;
@@ -168,11 +199,11 @@ export function ownVersion(repo: Repo, access: ReaderAccess | null): string | nu
 }
 
 /**
- * The version `audienceFor` serves for a choice: only `fixed` and `list`
- * change it, as `reader` shows the version each reader already gets.
+ * The version `audienceFor` serves for a choice: only `fixed`, `list` and
+ * `live` change it, as `reader` shows the version each reader already gets.
  */
 export function chosenVersion(choice: VersionChoice | null): string | null {
-  return choice && choice.mode !== 'reader' ? choice.current : null;
+  return choice && choice.mode !== 'reader' ? (choice.serve ?? choice.current) : null;
 }
 
 /** The filter policies and options for an audience: none for the staff view. */

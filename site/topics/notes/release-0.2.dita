@@ -55,6 +55,13 @@
           <xref href="../hosting/release-lines.dita"/>.</li>
         <li audience="admin developer">The version picker offers only listed versions that have a live
           release.</li>
+        <li audience="admin author">Zero-touch site setup: a <parmname>site</parmname> block in
+          <filepath>opend.config.yaml</filepath> declares release refs, release lines, access, public
+          entitlements and the version picker, applied by the build live on the newest release line and
+          read-only in the console; and a site with no docs source connects the one repository its GitHub App
+          can access by itself. Migration <codeph>013_declared_site_settings</codeph>, the
+          <codeph>repo.release-refs</codeph> audit action, and 409 from the admin API for declared settings.
+          See <xref href="../hosting/site-settings.dita"/>.</li>
         <li audience="developer" product="embed"><codeph>GET /api/v1/help/nav</codeph>: the token reader's
           navigation, for apps that draw a help sidebar. See <xref href="../help/json-api.dita"/>.</li>
         <li audience="developer" product="embed">Context links for public sites,

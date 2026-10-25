@@ -205,6 +205,34 @@ describe.skipIf(!url)('pollOnce', () => {
     expect((await listJobs(db.pool)).length).toBe(before + 1);
   });
 
+  it('runs beforePoll first, so a repository it registers is polled at once', async () => {
+    const order: string[] = [];
+    const summary = await pollOnce({
+      pool: db.pool,
+      ...quiet,
+      beforePoll: async () => {
+        order.push('before');
+        await upsertRepo(db.pool, { fullName: 'acme/auto', sourceUrl: bare });
+      },
+      listRefs: async (source) => {
+        order.push(source === bare ? 'poll' : 'other');
+        return source === bare ? [{ ref: 'main', sha: 'd'.repeat(40), kind: 'branch' }] : [];
+      },
+    });
+    expect(order[0]).toBe('before');
+    expect(summary.queued.map((j) => j.sha)).toContain('d'.repeat(40));
+    // A failing hook is logged and polling goes on.
+    const failing = await pollOnce({
+      pool: db.pool,
+      ...quiet,
+      beforePoll: async () => {
+        throw new Error('broker down');
+      },
+      listRefs: async () => [],
+    });
+    expect(failing.repos).toBeGreaterThan(0);
+  });
+
   it('polls on an interval until stopped', async () => {
     let calls = 0;
     const poller = startPoller({

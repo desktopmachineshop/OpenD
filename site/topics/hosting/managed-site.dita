@@ -12,8 +12,11 @@
         <li><uicontrol>GitHub</uicontrol> says <uicontrol>Managed by your hosting provider</uicontrol>. Its
           <uicontrol>Connect GitHub</uicontrol> button installs the provider's GitHub App on the repositories
           you choose; there is no app to create and no key to handle.</li>
-        <li><uicontrol>Docs source</uicontrol> lists the repositories you installed it on: pick yours and the
-          first build starts. Pushes reach the site through the provider, already verified.</li>
+        <li>Installed on one repository, that is all: the site finds <filepath>opend.config.yaml</filepath>,
+          connects the repository and builds it, and the <parmname>site</parmname> block of the file sets up
+          access, the version picker and release lines (<xref href="site-settings.dita"/>). With several,
+          <uicontrol>Docs source</uicontrol> lists them: pick yours and the first build starts. Pushes reach
+          the site through the provider, already verified.</li>
         <li>Readers and staff sign in with <uicontrol>Sign in with GitHub</uicontrol>, which goes through the
           provider's sign-in service; the web editor signs authors in the same way.</li>
       </ul>

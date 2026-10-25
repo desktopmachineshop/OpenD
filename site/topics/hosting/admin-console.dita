@@ -49,15 +49,26 @@ curl -X POST "$PUBLIC_URL/admin/api/setup-links" -H "authorization: Bearer $OPEN
             <uicontrol>Build now</uicontrol> queues a build of every matching branch and tag;
             <uicontrol>Rebuild now</uicontrol> does it again later. Choosing another repository keeps the site's
             access settings and readers.</p>
+          <p>When the GitHub App can access only one repository, the site does this step itself as soon as
+            the app is installed, and the <uicontrol>Overview</uicontrol> says so; when it cannot (several
+            repositories or docs folders), the <uicontrol>Overview</uicontrol> says why. See
+            <xref href="site-settings.dita"/>.</p>
         </info>
       </step>
       <step>
         <cmd>Decide who can read the site on the <uicontrol>Site &amp; access</uicontrol> page.</cmd>
-        <info><p><uicontrol>Private</uicontrol> or <uicontrol>Public</uicontrol>, and for a public site the
+        <info><p>Settings the docs repository declares in the <parmname>site</parmname> block of its
+          <filepath>opend.config.yaml</filepath> show <uicontrol>Set by opend.config.yaml</uicontrol> and are
+          read-only; change them in the repository.</p><p><uicontrol>Private</uicontrol> or <uicontrol>Public</uicontrol>, and for a public site the
           products, features and release anonymous visitors see, chosen from those the published release
           declares in <filepath>opend.config.yaml</filepath>. See <xref href="access.dita"/>. The site title
-          comes from the repository and is shown read-only. <uicontrol>Version picker</uicontrol> sets what
-          readers can choose beside the site title; see <xref href="version-picker.dita"/>.</p></info>
+          comes from the repository and is shown read-only. The release version may be
+          <userinput>latest</userinput>, the newest live release line. <uicontrol>Release lines</uicontrol>
+          groups releases by major or by minor version; switching moves the live releases to their new
+          lines at once, and older minor versions come back only with their next build (see
+          <xref href="release-lines.dita"/>). The overview's <uicontrol>Live releases</uicontrol> card links
+          to it. <uicontrol>Version picker</uicontrol> sets what readers can choose beside the site title,
+          including <uicontrol>Every live version</uicontrol>; see <xref href="version-picker.dita"/>.</p></info>
       </step>
       <step>
         <cmd>Add organizations and readers on the <uicontrol>People</uicontrol> page.</cmd>

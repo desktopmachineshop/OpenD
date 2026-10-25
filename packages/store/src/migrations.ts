@@ -438,4 +438,17 @@ alter table repos add column if not exists release_lines text not null default '
   check (release_lines in ('major', 'minor'));
 `,
   },
+  {
+    id: '013_declared_site_settings',
+    sql: `
+-- The site settings the docs repository declares in the site: block of its
+-- opend.config.yaml, as last applied by a build ({settings, ref, sha, release,
+-- appliedAt}), or null when it declares none. The settings themselves are
+-- applied to the columns above (access, version_picker, release_lines,
+-- release_refs); this records which of them the repository owns, so the admin
+-- console shows them read-only. Cleared when the site's repository or docs
+-- folder changes.
+alter table repos add column if not exists site_settings jsonb;
+`,
+  },
 ];

@@ -19,14 +19,20 @@
     </context>
     <steps>
       <step>
-        <cmd>Choose lines by minor version for the repository.</cmd>
+        <cmd>Choose lines by minor version for the repository: in the admin console, on the
+          <uicontrol>Site &amp; access</uicontrol> page under <uicontrol>Release lines</uicontrol>, select
+          <uicontrol>By minor version</uicontrol> and <uicontrol>Save release lines</uicontrol>; or through
+          the admin API.</cmd>
         <stepxmp>
           <codeblock>H="authorization: Bearer $OPEND_ADMIN_TOKEN"
 curl -X PUT "$PUBLIC_URL/admin/api/repos/1/release-lines" -H "$H" -H 'content-type: application/json' \
   -d '{"releaseLines":"minor"}'</codeblock>
           <p>Or give <parmname>releaseLines</parmname> when registering the repository with
             <codeph>POST /admin/api/repos</codeph>, or in a seed file next to the repository:
-            <codeph>releaseLines: minor</codeph>.</p>
+            <codeph>releaseLines: minor</codeph>. Or let the repository say so, in the
+            <parmname>site</parmname> block of its <filepath>opend.config.yaml</filepath>:
+            <codeph>site: { releaseLines: minor }</codeph>. The first build that goes live switches the
+            lines, and the console then shows the setting read-only (<xref href="site-settings.dita"/>).</p>
         </stepxmp>
         <info>
           <p>The change applies at once, in one transaction, to what is already live: each live release moves
@@ -36,7 +42,9 @@ curl -X PUT "$PUBLIC_URL/admin/api/repos/1/release-lines" -H "$H" -H 'content-ty
             minors go live again with their next build (request one with <codeph>POST
             /admin/api/repos/:id/builds</codeph>). Switching back merges lines, keeping the newest build of
             each. A build that finishes during the switch publishes to a line of the new setting. The change is
-            audited as <codeph>repo.release-lines</codeph>, and every replica drops its caches.</p>
+            audited as <codeph>repo.release-lines</codeph>, and every replica drops its caches. The console's
+            form does the same, audited under the staff reader's name; saving the grouping already in place
+            changes nothing. See <xref href="admin-console.dita"/>.</p>
         </info>
       </step>
       <step>
@@ -53,19 +61,24 @@ curl -X PUT "$PUBLIC_URL/admin/api/repos/1/release-lines" -H "$H" -H 'content-ty
         <p>A version served through the version picker maps to its line the same way: on a
           <codeph>minor</codeph> repository, a reader who chooses <codeph>0.21</codeph> is served the live
           0.21 build. A list offers only the versions whose line is live, so a line not yet built, or retired,
-          is left out of the menu, and a choice of it falls back to the reader's own version. See
+          is left out of the menu, and a choice of it falls back to the reader's own version. The
+          <codeph>live</codeph> mode offers every live line with no list at all. See
           <xref href="version-picker.dita"/>.</p>
       </section>
       <section id="newest-public">
         <title>A public site on the newest version, with older ones to choose</title>
         <p>For product docs published per minor, where anonymous visitors should land on the newest version
-          and may switch to older ones, run these after each release's build has gone live:</p>
+          and may switch to older ones, set this once:</p>
         <codeblock>curl -X PUT "$PUBLIC_URL/admin/api/repos/1/access" -H "$H" -H 'content-type: application/json' \
-  -d '{"access":"public","publicEntitlements":{"products":["core"],"features":[],"version":"0.23"}}'
+  -d '{"access":"public","publicEntitlements":{"products":["core"],"features":[],"version":"latest"}}'
 curl -X PUT "$PUBLIC_URL/admin/api/repos/1/versions" -H "$H" -H 'content-type: application/json' \
-  -d '{"mode":"list","versions":["0.23","0.22","0.21"]}'</codeblock>
-        <p>Anonymous visitors then get 0.23 at every address, with a menu of 0.23, 0.22 and 0.21. Signed-in
-          readers start on their own organization's version and can switch the same way.</p>
+  -d '{"mode":"live"}'</codeblock>
+        <p>With 0.21, 0.22 and 0.23 live, anonymous visitors get 0.23 at every address, with a menu of 0.23,
+          0.22 and 0.21. When the 0.24 build goes live it becomes the default and joins the menu, and a retired
+          line leaves it, with no admin call. Signed-in readers start on their own organization's line and can
+          switch the same way. To pin the versions instead, give a version such as <codeph>"0.23"</codeph>
+          and <codeph>{"mode":"list","versions":["0.23","0.22","0.21"]}</codeph>, and update both after each
+          release.</p>
       </section>
     </result>
   </taskbody>
