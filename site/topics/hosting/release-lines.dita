@@ -29,7 +29,10 @@ curl -X PUT "$PUBLIC_URL/admin/api/repos/1/release-lines" -H "$H" -H 'content-ty
   -d '{"releaseLines":"minor"}'</codeblock>
           <p>Or give <parmname>releaseLines</parmname> when registering the repository with
             <codeph>POST /admin/api/repos</codeph>, or in a seed file next to the repository:
-            <codeph>releaseLines: minor</codeph>.</p>
+            <codeph>releaseLines: minor</codeph>. Or let the repository say so, in the
+            <parmname>site</parmname> block of its <filepath>opend.config.yaml</filepath>:
+            <codeph>site: { releaseLines: minor }</codeph>. The first build that goes live switches the
+            lines, and the console then shows the setting read-only (<xref href="site-settings.dita"/>).</p>
         </stepxmp>
         <info>
           <p>The change applies at once, in one transaction, to what is already live: each live release moves

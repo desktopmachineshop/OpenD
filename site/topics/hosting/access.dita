@@ -6,8 +6,13 @@
     filtered for a set of public entitlements you choose.</shortdesc>
   <taskbody>
     <context>
-      <p>The access mode belongs to the registered repository and is kept in the database, never in the docs
-        repository, so only an operator can change it. New repositories are private.</p>
+      <p>The access mode belongs to the registered repository and is kept in the database. Staff change it
+        in the admin console or the admin API, unless the docs repository declares it in the
+        <parmname>site</parmname> block of its <filepath>opend.config.yaml</filepath>
+        (<parmname>access</parmname> and <parmname>publicEntitlements</parmname>): then the build that goes
+        live on the newest release line applies it, and the console shows it read-only
+        (<xref href="site-settings.dita"/>). Either way, switching to public opens exactly the public set,
+        and every cached page is dropped at once. New repositories are private.</p>
       <simpletable relcolwidth="2* 3* 3*">
         <sthead><stentry>Who</stentry><stentry>Private site</stentry><stentry>Public site</stentry></sthead>
         <strow><stentry>Anonymous visitor</stentry><stentry>Sent to the sign-in page</stentry><stentry>The public entitlements</stentry></strow>

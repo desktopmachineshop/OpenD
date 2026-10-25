@@ -29,7 +29,7 @@
     <refbody>
       <simpletable relcolwidth="3* 5*">
         <sthead><stentry>Route</stentry><stentry>What it does</stentry></sthead>
-        <strow><stentry><codeph>GET /admin/api/repos</codeph></stentry><stentry>Lists registered repositories: <codeph>id</codeph>, <codeph>fullName</codeph>, <codeph>sourceUrl</codeph>, <codeph>installationId</codeph>, <codeph>releaseRefs</codeph>, <codeph>docsPath</codeph>, <codeph>access</codeph>, <codeph>publicEntitlements</codeph>, <codeph>versionPicker</codeph> and <codeph>releaseLines</codeph>.</stentry></strow>
+        <strow><stentry><codeph>GET /admin/api/repos</codeph></stentry><stentry>Lists registered repositories: <codeph>id</codeph>, <codeph>fullName</codeph>, <codeph>sourceUrl</codeph>, <codeph>installationId</codeph>, <codeph>releaseRefs</codeph>, <codeph>docsPath</codeph>, <codeph>access</codeph>, <codeph>publicEntitlements</codeph>, <codeph>versionPicker</codeph>, <codeph>releaseLines</codeph> and <codeph>declared</codeph>: the <parmname>site</parmname> block of the repository's <filepath>opend.config.yaml</filepath> as last applied (<codeph>{settings, ref, sha, release, appliedAt}</codeph>), or <codeph>null</codeph>.</stentry></strow>
         <strow><stentry><codeph>POST /admin/api/repos</codeph></stentry><stentry>Registers a repository, or replaces the settings of the one with the same <codeph>fullName</codeph>. An optional <parmname>releaseLines</parmname> (<codeph>major</codeph> or <codeph>minor</codeph>) works as <codeph>PUT …/release-lines</codeph>; leaving it out keeps the current setting. 201 with the repository.</stentry></strow>
         <strow><stentry><codeph>PUT /admin/api/repos/:id/access</codeph></stentry><stentry>Makes the repository's site private or public. Body <codeph>{"access": "public", "publicEntitlements": {"products": [], "features": [], "version": "2.1"}}</codeph>. Leaving out <parmname>publicEntitlements</parmname> keeps the current set; <codeph>null</codeph> clears it. Every cached page is dropped at once, on every replica. 200 with the repository; 404 <codeph>{"error":"no such repo"}</codeph>. See <xref href="access.dita"/>.</stentry></strow>
         <strow><stentry><codeph>PUT /admin/api/repos/:id/release-lines</codeph></stentry><stentry>Groups the repository's releases into lines by <codeph>major</codeph> (the default) or <codeph>minor</codeph> version. Body <codeph>{"releaseLines": "minor"}</codeph>. Live releases move to their new lines at once; where several land on one line, the newest build stays live. 200 with the repository; 404 <codeph>{"error":"no such repo"}</codeph>. See <xref href="release-lines.dita"/>.</stentry></strow>
@@ -50,6 +50,12 @@
       <p>Omitted fields are reset to their defaults when a repository is registered again. The access mode and
         the version picker are not among them: only <codeph>PUT /admin/api/repos/:id/access</codeph> and
         <codeph>PUT /admin/api/repos/:id/versions</codeph> (or a seed file) change them.</p>
+      <p id="declared">Settings the repository declares in the <parmname>site</parmname> block of its
+        <filepath>opend.config.yaml</filepath> are its own (<xref href="site-settings.dita"/>): a request
+        that would change one gets 409 <codeph>{"error":"set by opend.config.yaml (site: access); change it
+        in the docs repository"}</codeph>, naming the fields. Sending the value already in place is not a
+        change. Registering the same repository and folder again keeps declared release refs, and a seed
+        file leaves declared fields as they are.</p>
     </refbody>
   </reference>
 

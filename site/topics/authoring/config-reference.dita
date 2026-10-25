@@ -68,6 +68,15 @@
           <parmname>footer</parmname>. See <xref href="../pdf/pdf-templates.dita"/>.</propdesc>
       </property>
       <property>
+        <proptype><parmname>site</parmname></proptype>
+        <propvalue>none</propvalue>
+        <propdesc>How the hosted site is set up, applied by the hosted build: <parmname>releaseRefs</parmname>,
+          <parmname>releaseLines</parmname>, <parmname>access</parmname>,
+          <parmname>publicEntitlements</parmname> and <parmname>versionPicker</parmname>, each optional and
+          with the admin API's values. The CLI only validates it. See
+          <xref href="../hosting/site-settings.dita"/>.</propdesc>
+      </property>
+      <property>
         <proptype><parmname>title</parmname></proptype>
         <propvalue><codeph>Documentation</codeph></propvalue>
         <propdesc>The site title in the page header and the PDF cover. Set it to an empty string to use the
@@ -91,7 +100,12 @@ theme: theme/site.css
 logo: theme/logo.svg
 pdf:
   template: standard
-  footer: OpenD {release}</codeblock>
+  footer: OpenD {release}
+site:
+  releaseRefs: [main, 'v*']
+  access: public
+  publicEntitlements: { products: [core], version: latest }
+  versionPicker: { mode: live }</codeblock>
       <p>Quote the release. Unquoted, YAML reads <codeph>0.1</codeph> as a number, and the config is
         rejected.</p>
       <p>Every path must stay inside the docs root: no leading <codeph>/</codeph> and no

@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE reference PUBLIC "-//OASIS//DTD DITA Reference//EN" "reference.dtd">
+<reference id="site-settings" product="core hosted" audience="admin author">
+  <title>Set the site up from opend.config.yaml</title>
+  <shortdesc>The <parmname>site</parmname> block of <filepath>opend.config.yaml</filepath> declares how the
+    hosted site is set up: who may read it, which versions readers can pick, how releases group into lines
+    and which branches publish. With it, installing the GitHub App is the only step a person takes.</shortdesc>
+  <refbody>
+    <section id="fields">
+      <title>Fields</title>
+      <p>Every field is optional and takes the same values as the admin API. A field the block sets belongs
+        to the repository; a field it leaves out stays yours to manage in the admin console.</p>
+      <properties relcolwidth="2* 3* 5*">
+        <prophead><proptypehd>Field</proptypehd><propvaluehd>Values</propvaluehd><propdeschd>Same as</propdeschd></prophead>
+        <property>
+          <proptype><parmname>releaseRefs</parmname></proptype>
+          <propvalue>branch and tag patterns, such as <codeph>[main, 'v*']</codeph> or
+            <codeph>['docs/*']</codeph></propvalue>
+          <propdesc>The release branches and tags on <uicontrol>Docs source</uicontrol>
+            (<codeph>releaseRefs</codeph> of <codeph>POST /admin/api/repos</codeph>). Quote patterns that
+            start with <codeph>*</codeph>. A branch it newly matches builds on its next push.</propdesc>
+        </property>
+        <property>
+          <proptype><parmname>releaseLines</parmname></proptype>
+          <propvalue><codeph>major</codeph> or <codeph>minor</codeph></propvalue>
+          <propdesc><xref href="release-lines.dita"/></propdesc>
+        </property>
+        <property>
+          <proptype><parmname>access</parmname></proptype>
+          <propvalue><codeph>private</codeph> or <codeph>public</codeph></propvalue>
+          <propdesc><xref href="access.dita"/></propdesc>
+        </property>
+        <property>
+          <proptype><parmname>publicEntitlements</parmname></proptype>
+          <propvalue><codeph>{products, features, version}</codeph>, or <codeph>null</codeph></propvalue>
+          <propdesc>What anonymous visitors of a public site see (<xref href="access.dita"/>). The
+            <parmname>version</parmname> may be <codeph>latest</codeph>. Products and features must be
+            declared under <parmname>attributes</parmname>.</propdesc>
+        </property>
+        <property>
+          <proptype><parmname>versionPicker</parmname></proptype>
+          <propvalue><codeph>{mode: off}</codeph>, <codeph>reader</codeph>, <codeph>fixed</codeph> with
+            <parmname>version</parmname>, <codeph>list</codeph> with <parmname>versions</parmname>, or
+            <codeph>live</codeph></propvalue>
+          <propdesc><xref href="version-picker.dita"/></propdesc>
+        </property>
+      </properties>
+      <p><cmdname>opend validate</cmdname> checks the block like the rest of the file: an unknown field, a
+        bad value or an undeclared product is an <codeph>invalid-config</codeph> error naming the field, such
+        as <systemoutput>site.access: Invalid option</systemoutput>.</p>
+    </section>
+    <example id="example">
+      <title>Example: a manual published per minor version</title>
+      <p>Docs in <filepath>manual/</filepath>, one <codeph>docs/0.23</codeph>-style branch per minor version,
+        public with the free plan's content, and a version menu of every live line:</p>
+      <codeblock>title: Product Manual
+release: '0.23'
+map: maps/manual.ditamap
+attributes:
+  product: [free, lite, business, enterprise, self-host]
+site:
+  releaseRefs: ['docs/*']
+  releaseLines: minor
+  access: public
+  publicEntitlements: { products: [free], version: latest }
+  versionPicker: { mode: live }</codeblock>
+    </example>
+    <section id="which-build">
+      <title>Which build's block applies</title>
+      <p>A build that goes live on the site's newest release line (the highest version, such as 0.23 next
+        to 0.22) applies its block, in the same transaction that makes it live: no reader is ever served the
+        new release under the old settings. Builds of older lines, such as a fix pushed to
+        <codeph>docs/0.22</codeph>, and builds a newer push already replaced change nothing, so the settings
+        never go back to an older branch's. Every change is in the audit log as
+        <codeph>repo:opend.config.yaml</codeph>, with the branch and commit it came from, and every replica
+        drops its cached pages at once.</p>
+      <p>Settings the block leaves out keep their values. Removing the block, or a field from it, hands
+        the setting back to the console with its last value.</p>
+    </section>
+    <section id="console">
+      <title>In the admin console</title>
+      <p>Settings the repository declares show <uicontrol>Set by opend.config.yaml</uicontrol> on
+        <uicontrol>Site &amp; access</uicontrol> and <uicontrol>Docs source</uicontrol>, with the branch and
+        commit, and are read-only. The admin API answers <codeph>409</codeph> to a change to one of them,
+        and a seed file leaves them as they are. To change one, change the repository.</p>
+      <p>A repository's settings are trusted like its content: anyone who can push to a release branch
+        can make the site public. Protect those branches on GitHub (required reviews) if that matters.</p>
+    </section>
+    <section id="auto-connect">
+      <title>Connecting the repository by itself</title>
+      <p>When the site has no docs source yet and the GitHub App can access exactly one repository, the site
+        connects it without anyone choosing it:</p>
+      <ul>
+        <li>the docs folder is where <filepath>opend.config.yaml</filepath> is on the default branch: the root,
+          else the only one up to three folders down (hidden folders and <filepath>node_modules</filepath>
+          aside), else the only one with a <parmname>site</parmname> block;</li>
+        <li>the release branches are its <parmname>site.releaseRefs</parmname>, or the default branch;</li>
+        <li>every release branch's head is queued to build, and the first build applies the rest of the
+          block.</li>
+      </ul>
+      <p>It happens when the installation completes (GitHub's return to the site, or the hosting provider's),
+        on the next visit to the admin console's <uicontrol>Overview</uicontrol> or
+        <uicontrol>Docs source</uicontrol>, on the first push from the repository, and on each poll of a
+        site that polls. With several repositories, several candidate folders, or an invalid
+        <parmname>site</parmname> block, nothing is connected: the <uicontrol>Overview</uicontrol> says why
+        and <uicontrol>Docs source</uicontrol> offers the picker as before.</p>
+    </section>
+  </refbody>
+</reference>

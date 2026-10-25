@@ -39,7 +39,12 @@
         <cmd>Install the app on your docs repository when GitHub asks, and choose
           <uicontrol>Install</uicontrol>.</cmd>
         <info><p>GitHub returns to the setup URL with the installation id. The site asks GitHub, as the app,
-          whether that installation is its own before it stores it.</p></info>
+          whether that installation is its own before it stores it.</p>
+          <p>Installed on exactly one repository, the app is all the site needs: it finds
+            <filepath>opend.config.yaml</filepath> on the default branch, registers the repository with that
+            folder and the branches its <parmname>site</parmname> block names, queues the builds, and
+            takes you to the <uicontrol>Overview</uicontrol>. The next step is then done for you
+            (<xref href="site-settings.dita"/>).</p></info>
       </step>
       <step>
         <cmd>On <uicontrol>Docs source</uicontrol>, pick the repository and choose <uicontrol>Use this

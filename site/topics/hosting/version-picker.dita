@@ -9,8 +9,10 @@
     <context>
       <p>Each reader normally gets the version their organization is entitled to, and anonymous visitors of a
         public site get the version of the public set. The version picker belongs to the registered repository
-        and is kept in the database, like the access mode, so only staff can change it. New repositories
-        have it off.</p>
+        and is kept in the database, like the access mode: staff change it, unless the docs repository
+        declares <parmname>versionPicker</parmname> in the <parmname>site</parmname> block of its
+        <filepath>opend.config.yaml</filepath> (<xref href="site-settings.dita"/>), which then sets it with
+        each build of the newest release line. New repositories have it off.</p>
       <simpletable relcolwidth="2* 4* 3*">
         <sthead><stentry>Mode</stentry><stentry>Version served</stentry><stentry>Beside the site title</stentry></sthead>
         <strow><stentry><codeph>off</codeph></stentry><stentry>The reader's own</stentry><stentry>The release label, as without a picker</stentry></strow>
