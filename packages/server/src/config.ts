@@ -55,6 +55,10 @@ const envSchema = z
       z.string().min(16, 'OPEND_GITHUB_BROKER_SECRET must be at least 16 characters'),
     ),
     OPEND_GITHUB_INSTALL_URL: optional(z.url()),
+    OPEND_HOSTING_URL: optional(z.url()),
+    OPEND_HOSTING_TOKEN: optional(
+      z.string().min(16, 'OPEND_HOSTING_TOKEN must be at least 16 characters'),
+    ),
     OPEND_GITHUB_COLLABORATOR_ORG: optional(
       z.string().regex(/^[a-z0-9][a-z0-9-]{0,62}$/, 'an org slug'),
     ),
@@ -140,6 +144,10 @@ const envSchema = z
     message: 'OPEND_GITHUB_BROKER_URL and OPEND_GITHUB_BROKER_SECRET must be set together',
     path: ['OPEND_GITHUB_BROKER_URL'],
   })
+  .refine((e) => !e.OPEND_HOSTING_URL === !e.OPEND_HOSTING_TOKEN, {
+    message: 'OPEND_HOSTING_URL and OPEND_HOSTING_TOKEN must be set together',
+    path: ['OPEND_HOSTING_URL'],
+  })
   .refine((e) => !(e.OPEND_GITHUB_BROKER_URL && e.GITHUB_APP_ID), {
     message: 'set either GITHUB_APP_ID (your own GitHub App) or OPEND_GITHUB_BROKER_URL, not both',
     path: ['OPEND_GITHUB_BROKER_URL'],
@@ -188,6 +196,12 @@ export interface ServerConfig {
    * and `installUrl` is the shared app's installation page.
    */
   broker?: BrokerConfig & { installUrl?: string };
+  /**
+   * Managed hosting: the host's site API and this site's credential (`OPEND_HOSTING_URL`,
+   * `OPEND_HOSTING_TOKEN`), for the console's Custom domain page. Without them, a broker
+   * at `…/broker/v1` implies `…/site/v1` with the broker secret (the same credential).
+   */
+  hosting?: { url: string; token: string };
   oidc?: {
     issuer: string;
     clientId: string;
@@ -286,6 +300,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     if (e.GITHUB_WEB_URL) config.broker.webUrl = e.GITHUB_WEB_URL;
     if (e.OPEND_GITHUB_INSTALL_URL) config.broker.installUrl = e.OPEND_GITHUB_INSTALL_URL;
   }
+  if (e.OPEND_HOSTING_URL && e.OPEND_HOSTING_TOKEN)
+    config.hosting = { url: e.OPEND_HOSTING_URL, token: e.OPEND_HOSTING_TOKEN };
+  else if (config.broker && /\/broker\/v1\/?$/.test(config.broker.url))
+    config.hosting = {
+      url: config.broker.url.replace(/\/broker\/v1\/?$/, '/site/v1'),
+      token: config.broker.secret,
+    };
   if (e.GITHUB_WEBHOOK_SECRET) config.webhookSecret = e.GITHUB_WEBHOOK_SECRET;
   if (e.GITHUB_APP_ID && e.GITHUB_APP_PRIVATE_KEY) {
     config.github = { appId: e.GITHUB_APP_ID, privateKey: e.GITHUB_APP_PRIVATE_KEY };

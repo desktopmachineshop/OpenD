@@ -80,6 +80,7 @@
     <topicref href="../topics/hosting/architecture.dita"/>
     <topicref href="../topics/hosting/managed-site.dita" product="hosted"/>
     <topicref href="../topics/hosting/admin-console.dita"/>
+    <topicref href="../topics/hosting/custom-domain.dita"/>
     <topicref href="../topics/hosting/appearance.dita"/>
     <topicref href="../topics/hosting/docker-compose.dita" product="core"/>
     <topicref href="../topics/hosting/railway.dita" product="core"/>

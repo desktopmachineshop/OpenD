@@ -72,6 +72,7 @@ import {
   apiPage,
   appearancePage,
   connectPage,
+  domainPage,
   editorPage,
   githubPage,
   html,
@@ -93,6 +94,7 @@ import { loginPath, safeReturnTo, setSession, siteSession } from './auth.js';
 import { API_KEY_EMAIL_DOMAIN } from './api-writes.js';
 import type { AppContext } from './context.js';
 import { siteRepo } from './delivery.js';
+import { HostingError, type HostingDomain } from './hosting.js';
 import {
   APP_NAME_MAX,
   buildManifest,
@@ -160,9 +162,14 @@ const DONE: Record<string, string> = {
   pdf: 'PDF settings saved. Publications are printed again with them.',
   'pdf-template': 'Template applied. Adjust the settings below, or keep them as they are.',
   'pdf-reset': 'PDF template reset: publications follow the repository’s pdf settings.',
+  domain:
+    'Custom domain saved. The DNS records to add appear below in a few minutes; the site keeps its own address until they are in place.',
+  'domain-removed': 'Custom domain removed. The site is back at its own address.',
 };
 
 const ORG_SLUG = /^[A-Za-z0-9][A-Za-z0-9-]{0,38}$/;
+/** A hostname such as docs.example.com; the hosting provider checks the rest. */
+const DOMAIN = /^(?=.{4,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
 const GITHUB_LOGIN = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/;
 const token = z.string().regex(/^[A-Za-z0-9_.:-]+$/);
 
@@ -373,6 +380,34 @@ export function registerAdminConsole(app: FastifyInstance, ctx: AppContext): voi
                 .sort((a, b) => compareReleaseLines(b.releaseLine, a.releaseLine))
                 .map((r) => r.release)
             : [],
+          publicUrl: ctx.env.publicUrl,
+          csrf: s.csrf,
+        }),
+      };
+    },
+    domain: async (s) => {
+      // Managed hosting attaches domains; the site's own credential asks for this site only.
+      const hosting = ctx.hosting;
+      let domain: HostingDomain | null = null;
+      let loadError: string | null = null;
+      if (hosting) {
+        try {
+          domain = await hosting.domain();
+        } catch (err) {
+          ctx.log({ level: 'warn', msg: 'custom domain status failed', error: String(err) });
+          loadError =
+            err instanceof HostingError && err.status === 403
+              ? 'Your hosting provider does not change this site right now (it may be suspended).'
+              : 'Could not reach your hosting provider.';
+        }
+      }
+      return {
+        title: 'Custom domain',
+        body: domainPage({
+          managed: hosting !== null,
+          publicUrl: ctx.env.publicUrl,
+          domain,
+          loadError,
           csrf: s.csrf,
         }),
       };
@@ -607,6 +642,7 @@ export function registerAdminConsole(app: FastifyInstance, ctx: AppContext): voi
   const ROUTES: [string, AdminSection][] = [
     ['/admin', 'overview'],
     ['/admin/site', 'site'],
+    ['/admin/domain', 'domain'],
     ['/admin/source', 'source'],
     ['/admin/people', 'people'],
     ['/admin/appearance', 'appearance'],
@@ -683,6 +719,42 @@ export function registerAdminConsole(app: FastifyInstance, ctx: AppContext): voi
   const changed = async () => {
     await ctx.reloadSettings();
   };
+
+  // ---- custom domain (managed hosting) ---------------------------------------
+
+  /** Asks the hosting provider to change the domain; its refusals become form errors. */
+  const changeDomain = async (s: Staff, domain: string | null): Promise<void> => {
+    const hosting = ctx.hosting;
+    if (!hosting)
+      throw new InputError(
+        'This site is self-hosted: its address is PUBLIC_URL, served by your reverse proxy.',
+      );
+    try {
+      await hosting.setDomain(domain, s.access.reader.email);
+    } catch (err) {
+      if (!(err instanceof HostingError)) throw err;
+      ctx.log({ level: 'warn', msg: 'custom domain change refused', error: err.message });
+      throw new InputError(
+        [400, 409, 429].includes(err.status)
+          ? err.message
+          : 'Your hosting provider could not change the domain right now. Try again in a minute.',
+      );
+    }
+    await audit(ctx.pool, s.actor, domain ? 'domain.set' : 'domain.remove', { domain });
+  };
+
+  action('/admin/domain', 'domain', async (s, body) => {
+    const domain = (body.domain ?? '').trim().toLowerCase().replace(/\.$/, '');
+    if (!DOMAIN.test(domain))
+      throw new InputError('Enter a domain name such as docs.example.com, without https://.');
+    await changeDomain(s, domain);
+    return 'domain';
+  });
+
+  action('/admin/domain/remove', 'domain', async (s) => {
+    await changeDomain(s, null);
+    return 'domain-removed';
+  });
 
   // ---- site & access -------------------------------------------------------
 

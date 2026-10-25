@@ -33,6 +33,7 @@
 
   <chapter href="../topics/hosting/admin-console.dita" product="core hosted">
     <topicref href="../topics/hosting/appearance.dita"/>
+    <topicref href="../topics/hosting/custom-domain.dita"/>
     <topicref href="../topics/pdf/pdf-templates.dita"/>
   </chapter>
 

@@ -25,6 +25,7 @@ export async function startHarness(
     config?: Partial<ServerConfig>;
     pdf?: PdfRenderer;
     githubFetch?: typeof fetch;
+    hostingFetch?: typeof fetch;
   } = {},
 ): Promise<Harness> {
   const db = await createTestDatabase(url);
@@ -50,6 +51,7 @@ export async function startHarness(
   if (options.oidc !== undefined) deps.oidc = options.oidc;
   if (options.pdf) deps.pdf = options.pdf;
   if (options.githubFetch) deps.githubFetch = options.githubFetch;
+  if (options.hostingFetch) deps.hostingFetch = options.hostingFetch;
   const opend = await createApp(config, deps);
   await opend.app.ready();
   return {

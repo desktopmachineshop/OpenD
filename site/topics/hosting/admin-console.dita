@@ -3,7 +3,7 @@
 <task id="admin-console" product="core hosted" audience="admin">
   <title>Run your site from the admin console</title>
   <shortdesc>Staff readers run the docs site in the browser at <filepath>/admin</filepath>: who can read it,
-    which repository it is built from, readers and organizations, the site's look, sign-in, the GitHub
+    its custom domain, which repository it is built from, readers and organizations, the site's look, sign-in, the GitHub
     connection and the web editor. No server access or environment variables needed.</shortdesc>
   <taskbody>
     <context>
@@ -69,6 +69,15 @@ curl -X POST "$PUBLIC_URL/admin/api/setup-links" -H "authorization: Bearer $OPEN
           <xref href="release-lines.dita"/>). The overview's <uicontrol>Live releases</uicontrol> card links
           to it. <uicontrol>Version picker</uicontrol> sets what readers can choose beside the site title,
           including <uicontrol>Every live version</uicontrol>; see <xref href="version-picker.dita"/>.</p></info>
+      </step>
+      <step>
+        <cmd>Optional: serve the site at your own domain on the <uicontrol>Custom domain</uicontrol> page.</cmd>
+        <info><p>On a managed site, enter a domain such as <codeph>docs.example.com</codeph> and add the DNS
+          records the page lists at your DNS provider; it shows whether each has propagated and when it was
+          last checked. The site keeps its own address until they are in place, then switches by itself, and
+          the old address keeps working. <uicontrol>Remove domain</uicontrol> goes back at once. A self-hosted
+          site's domain is its <codeph>PUBLIC_URL</codeph>, so the page only explains that. See
+          <xref href="custom-domain.dita"/>.</p></info>
       </step>
       <step>
         <cmd>Add organizations and readers on the <uicontrol>People</uicontrol> page.</cmd>

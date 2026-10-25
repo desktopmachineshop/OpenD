@@ -53,10 +53,13 @@ const POSTS = [
   '/admin/appearance/pdf/template',
   '/admin/appearance/pdf',
   '/admin/appearance/pdf/reset',
+  '/admin/domain',
+  '/admin/domain/remove',
 ];
 const PAGES = [
   '/admin',
   '/admin/site',
+  '/admin/domain',
   '/admin/source',
   '/admin/people',
   '/admin/appearance',
@@ -1192,6 +1195,25 @@ describe.skipIf(!url)('environment variables over console settings', () => {
     expect(res.statusCode).toBe(400);
     expect((await get('/auth/login')).body).toContain('Sign in with Env SSO');
   });
+
+  it('explains that a self-hosted site’s domain is PUBLIC_URL, with no form', async () => {
+    const page = await get('/admin/domain', owner);
+    expect(page.statusCode).toBe(200);
+    expect(page.body).toContain('Set by your server');
+    expect(page.body).toContain(`href="${h.ctx.env.publicUrl}"`);
+    expect(page.body).toContain('<code>PUBLIC_URL</code>');
+    expect(page.body).not.toContain('action="/admin/domain"');
+    expect(page.body).not.toContain('action="/admin/domain/remove"');
+    // Linked from the overview and Site & access.
+    expect((await get('/admin', owner)).body).toContain('href="/admin/domain"');
+    const res = await post(
+      '/admin/domain',
+      { _csrf: csrfOf(page), domain: 'docs.example.com' },
+      owner,
+    );
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toContain('This site is self-hosted');
+  });
 });
 
 describe.skipIf(!url)('managed hosting (token broker)', () => {
@@ -1347,6 +1369,183 @@ describe.skipIf(!url)('managed hosting (token broker)', () => {
   });
 });
 
+describe.skipIf(!url)('custom domain on a managed site (hosting link, no GitHub broker)', () => {
+  let h: Harness;
+  let owner = '';
+  /** The control plane's side of the site's custom domain (`/site/v1/domain`). */
+  const control = {
+    domain: null as string | null,
+    status: 'none',
+    live: false,
+    puts: [] as unknown[],
+    down: false,
+  };
+  const domainAnswer = () => ({
+    site: 'acme',
+    domain: control.domain,
+    status: control.status,
+    records: control.domain
+      ? [
+          {
+            type: 'CNAME',
+            name: 'docs',
+            value: 'acme-docs.up.railway.app',
+            propagated: control.live,
+          },
+          {
+            type: 'TXT',
+            name: `_railway-verify.${control.domain}`,
+            value: 'railway-verify=0123abcd',
+            propagated: control.live,
+          },
+        ]
+      : [],
+    checkedAt: control.domain ? '2026-10-25T09:30:00.000Z' : null,
+    defaultAddress: 'https://acme.opend.app',
+    publicUrl: control.live ? `https://${control.domain}` : 'https://acme.opend.app',
+    available: true,
+    unavailableReason: null,
+    error: null,
+  });
+  const hostingFetch = (async (input: string | URL | Request, init?: RequestInit) => {
+    const u = new URL(String(input));
+    if (new Headers(init?.headers).get('authorization') !== 'Bearer hosting-token-0123456789')
+      return new Response('{}', { status: 401 });
+    if (u.pathname === '/site/v1/domain') {
+      if (control.down) return new Response('{"error":"internal error"}', { status: 500 });
+      if (init?.method === 'PUT') {
+        const body = JSON.parse(String(init.body)) as { domain: string | null; actor?: string };
+        control.puts.push(body);
+        if (body.domain === 'docs.taken.example')
+          return Response.json(
+            { error: 'docs.taken.example is already another site’s domain' },
+            { status: 409 },
+          );
+        control.domain = body.domain;
+        control.status = body.domain ? 'awaiting-dns' : 'none';
+        control.live = false;
+      }
+      return Response.json(domainAnswer());
+    }
+    return new Response('{}', { status: 404 });
+  }) as typeof fetch;
+  const { get, post } = client({
+    get app() {
+      return h.app;
+    },
+  });
+
+  beforeAll(async () => {
+    h = await startHarness(url!, {
+      hostingFetch,
+      config: {
+        hosting: { url: 'https://control.test/site/v1', token: 'hosting-token-0123456789' },
+      },
+    });
+    owner = await setupStaff(h, 'owner@docs.example');
+  });
+  afterAll(async () => h?.close());
+
+  it('works whatever the GitHub connection is', () => {
+    expect(h.ctx.github.mode()).toBe('none');
+    expect(h.ctx.hosting).not.toBeNull();
+  });
+
+  it('shows that there is none yet, with the form', async () => {
+    const page = await get('/admin/domain', owner);
+    expect(page.statusCode).toBe(200);
+    expect(page.body).toContain('No custom domain');
+    expect(page.body).toContain('acme.opend.app');
+    expect(page.body).toContain('action="/admin/domain"');
+    expect(page.body).toContain('Add domain');
+    expect(page.body).not.toContain('action="/admin/domain/remove"');
+    expect(page.body).not.toMatch(/<script|\son[a-z]+=|\sstyle="/i);
+  });
+
+  it('sets the domain through the provider, naming the staff reader, and shows the records', async () => {
+    const page = await get('/admin/domain', owner);
+    const res = await post(
+      '/admin/domain',
+      { _csrf: csrfOf(page), domain: ' Docs.Acme.example. ' },
+      owner,
+    );
+    expect(res.statusCode).toBe(303);
+    expect(res.headers.location).toBe('/admin/domain?done=domain');
+    expect(control.puts.at(-1)).toEqual({
+      domain: 'docs.acme.example',
+      actor: 'owner@docs.example',
+    });
+    const after = await get('/admin/domain?done=domain', owner);
+    expect(after.body).toContain('Custom domain saved.');
+    expect(after.body).toContain('Waiting for DNS');
+    expect(after.body).toContain('class="admin-table admin-dns"');
+    expect(after.body).toContain('acme-docs.up.railway.app');
+    expect(after.body).toContain('_railway-verify.docs.acme.example');
+    expect(after.body).toContain('Pending');
+    expect(after.body).toContain('<time datetime="2026-10-25T09:30:00.000Z"');
+    expect(after.body).toContain('keeps its own address until they have propagated');
+    expect(after.body).toContain('action="/admin/domain/remove"');
+    const audit = await listAudit(h.db.pool, 5);
+    expect(audit[0]).toMatchObject({ actor: 'staff:owner@docs.example', action: 'domain.set' });
+  });
+
+  it('shows the domain live, with every record in place', async () => {
+    control.status = 'live';
+    control.live = true;
+    const page = await get('/admin/domain', owner);
+    expect(page.body).toContain('>Live<');
+    expect(page.body).toContain('✓ In place');
+    expect(page.body).not.toContain('Pending');
+    expect(page.body).toContain('acme.opend.app keeps working too');
+  });
+
+  it('shows the provider’s refusal on the form, and changes nothing', async () => {
+    const page = await get('/admin/domain', owner);
+    const res = await post(
+      '/admin/domain',
+      { _csrf: csrfOf(page), domain: 'docs.taken.example' },
+      owner,
+    );
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toContain('docs.taken.example is already another site’s domain');
+    expect(control.domain).toBe('docs.acme.example');
+    const bad = await post('/admin/domain', { _csrf: csrfOf(page), domain: 'https://x/' }, owner);
+    expect(bad.statusCode).toBe(400);
+    expect(bad.body).toContain('Enter a domain name such as docs.example.com');
+    expect(control.puts).toHaveLength(2);
+  });
+
+  it('refuses forms without the CSRF token, and readers who are not staff', async () => {
+    const before = control.puts.length;
+    expect((await post('/admin/domain', { domain: 'x.example.com' }, owner)).statusCode).toBe(403);
+    expect((await post('/admin/domain/remove', { _csrf: 'forged' }, owner)).statusCode).toBe(403);
+    await admin(h.app, 'POST', '/orgs', { slug: 'acme', name: 'Acme' });
+    await admin(h.app, 'POST', '/readers', { orgSlug: 'acme', email: 'ann@acme.example' });
+    const ann = await devLogin(h.app, 'ann@acme.example');
+    expect((await get('/admin/domain', ann)).statusCode).toBe(404);
+    expect((await post('/admin/domain/remove', { _csrf: 'x' }, ann)).statusCode).toBe(404);
+    expect(control.puts).toHaveLength(before);
+  });
+
+  it('removes the domain', async () => {
+    const page = await get('/admin/domain', owner);
+    const res = await post('/admin/domain/remove', { _csrf: csrfOf(page) }, owner);
+    expect(res.statusCode).toBe(303);
+    expect(res.headers.location).toBe('/admin/domain?done=domain-removed');
+    expect(control.puts.at(-1)).toEqual({ domain: null, actor: 'owner@docs.example' });
+    expect((await get('/admin/domain', owner)).body).toContain('No custom domain');
+  });
+
+  it('says so when the provider cannot be reached', async () => {
+    control.down = true;
+    const page = await get('/admin/domain', owner);
+    expect(page.statusCode).toBe(200);
+    expect(page.body).toContain('Could not reach your hosting provider.');
+    expect(page.body).not.toContain('action="/admin/domain"');
+    control.down = false;
+  });
+});
+
 describe('configuration', () => {
   const env = {
     DATABASE_URL: 'postgres://x/y',
@@ -1379,6 +1578,28 @@ describe('configuration', () => {
         OIDC_ICON: 'github',
       }).oidc?.icon,
     ).toBe('github');
+  });
+
+  it('reads the hosting link, or derives it from the broker', () => {
+    const own = loadConfig({
+      ...env,
+      OPEND_HOSTING_URL: 'https://control.example/site/v1',
+      OPEND_HOSTING_TOKEN: 'h'.repeat(32),
+    });
+    expect(own.hosting).toEqual({ url: 'https://control.example/site/v1', token: 'h'.repeat(32) });
+    const viaBroker = loadConfig({
+      ...env,
+      OPEND_GITHUB_BROKER_URL: 'https://control.example/broker/v1',
+      OPEND_GITHUB_BROKER_SECRET: 'b'.repeat(32),
+    });
+    expect(viaBroker.hosting).toEqual({
+      url: 'https://control.example/site/v1',
+      token: 'b'.repeat(32),
+    });
+    expect(loadConfig(env).hosting).toBeUndefined();
+    expect(() =>
+      loadConfig({ ...env, OPEND_HOSTING_URL: 'https://control.example/site/v1' }),
+    ).toThrow(/OPEND_HOSTING_URL and OPEND_HOSTING_TOKEN must be set together/);
   });
 
   it('refuses a broker without its secret, or alongside an own GitHub App', () => {

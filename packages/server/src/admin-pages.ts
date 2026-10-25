@@ -25,6 +25,7 @@ import type {
   Reader,
   Repo,
 } from '@opend/store';
+import type { HostingDomain, HostingDomainStatus } from './hosting.js';
 import { ADMIN_CSS } from './admin-style.js';
 import type { PickableRepo } from './github-connect.js';
 import { GITHUB_ICON, KEY_ICON } from './pages.js';
@@ -87,6 +88,9 @@ const ICONS = {
   appearance: icon(
     '<path d="M12 3a9 9 0 100 18c1.1 0 1.7-.8 1.7-1.7 0-.5-.2-.9-.5-1.2-.3-.3-.5-.7-.5-1.2 0-.9.8-1.7 1.7-1.7h2A4.6 4.6 0 0021 10.6C21 6.4 17 3 12 3z"/><circle cx="7.5" cy="11" r="1.2"/><circle cx="10.5" cy="7.2" r="1.2"/><circle cx="15" cy="7.5" r="1.2"/>',
   ),
+  domain: icon(
+    '<path d="M10 14a4.5 4.5 0 006.4 0l3-3a4.5 4.5 0 00-6.4-6.4l-1.2 1.2"/><path d="M14 10a4.5 4.5 0 00-6.4 0l-3 3a4.5 4.5 0 006.4 6.4l1.2-1.2"/>',
+  ),
   shield: icon(
     '<path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6l8-3z"/><path d="M9 12l2 2 4-4"/>',
   ),
@@ -100,6 +104,7 @@ const MENU_ICON = raw(
 export type AdminSection =
   | 'overview'
   | 'site'
+  | 'domain'
   | 'source'
   | 'people'
   | 'appearance'
@@ -114,6 +119,7 @@ const NAV: { group: string; items: [AdminSection, string, string, Html][] }[] = 
     items: [
       ['overview', '/admin', 'Overview', ICONS.overview],
       ['site', '/admin/site', 'Site & access', ICONS.site],
+      ['domain', '/admin/domain', 'Custom domain', ICONS.domain],
       ['source', '/admin/source', 'Docs source', ICONS.source],
       ['people', '/admin/people', 'People', ICONS.people],
       ['appearance', '/admin/appearance', 'Appearance', ICONS.appearance],
@@ -543,6 +549,11 @@ export function overviewPage(d: OverviewData): Html {
         ><a href="/admin/site">Site & access</a>
       </div>
       <div class="admin-card admin-stat">
+        <span class="admin-stat-label">Address</span
+        ><span class="admin-stat-value">${hostOf(d.publicUrl)}</span
+        ><a href="/admin/domain">Custom domain</a>
+      </div>
+      <div class="admin-card admin-stat">
         <span class="admin-stat-label">Docs repository</span
         ><span class="admin-stat-value"
           >${d.repo?.fullName ?? (d.repoCount > 1 ? `${d.repoCount} registered` : 'None')}</span
@@ -610,6 +621,14 @@ export function overviewPage(d: OverviewData): Html {
     </section>`;
 }
 
+const hostOf = (url: string) => {
+  try {
+    return new URL(url).host;
+  } catch {
+    return url;
+  }
+};
+
 // ---- site & access ---------------------------------------------------------
 
 export interface SitePageData {
@@ -620,6 +639,8 @@ export interface SitePageData {
   release: string | null;
   /** The live release of each line, newest first, e.g. `['2.1', '1.4']`. */
   published: string[];
+  /** Where the site is served (`PUBLIC_URL`). */
+  publicUrl: string;
   csrf: string;
 }
 
@@ -808,6 +829,11 @@ export function sitePage(d: SitePageData): Html {
           ${d.siteTitle}
           <span class="admin-muted">(from <code>opend.config.yaml</code> in the repository)</span>
         </dd>
+        <dt>Address</dt>
+        <dd>
+          <a href="${d.publicUrl}">${hostOf(d.publicUrl)}</a>
+          <span class="admin-muted">(<a href="/admin/domain">Custom domain</a>)</span>
+        </dd>
         <dt>Repository</dt>
         <dd><code>${d.repo.fullName}</code></dd>
         <dt>Newest release</dt>
@@ -880,6 +906,239 @@ export function sitePage(d: SitePageData): Html {
     </form>
     ${releaseLinesForm(d.repo, d.published, d.csrf)}
     ${versionPickerForm(d.repo, d.published, d.csrf)}`;
+}
+
+// ---- custom domain ---------------------------------------------------------
+
+export interface DomainPageData {
+  /** Managed hosting: the provider attaches domains (through its site API). */
+  managed: boolean;
+  /** The site's address now (`PUBLIC_URL`). */
+  publicUrl: string;
+  /** What the provider reports; null when self-hosted or it could not be reached. */
+  domain: HostingDomain | null;
+  /** Why the provider could not be asked. */
+  loadError: string | null;
+  csrf: string;
+}
+
+const DOMAIN_BADGE: Record<
+  HostingDomainStatus,
+  [string, 'ok' | 'warn' | 'danger' | 'info' | 'muted']
+> = {
+  none: ['No custom domain', 'muted'],
+  attaching: ['Being attached', 'info'],
+  'awaiting-dns': ['Waiting for DNS', 'warn'],
+  live: ['Live', 'ok'],
+  error: ['Needs attention', 'danger'],
+};
+
+/** What the staff reader reads at each status, in plain words. */
+function domainStatusText(d: HostingDomain): string {
+  const keeps = d.defaultAddress
+    ? `${hostOf(d.defaultAddress)} keeps working`
+    : 'The current address keeps working';
+  switch (d.status) {
+    case 'none':
+      return `The site is served at its own address. Add a domain you own, such as docs.example.com, to serve it there too.`;
+    case 'attaching':
+      return `${d.domain} is being attached. The DNS records to add appear here in a few minutes: reload this page.`;
+    case 'awaiting-dns':
+      return `Add the records below at your DNS provider. The site keeps its own address until they have propagated, then switches to ${d.domain} by itself. ${keeps}.`;
+    case 'live':
+      return `The site is served at ${d.domain}. ${keeps} too, so existing links still work.`;
+    case 'error':
+      return d.error ?? `${d.domain} could not be attached.`;
+  }
+}
+
+function dnsTable(d: HostingDomain): Html {
+  return html`<div class="admin-table-wrap">
+    <table class="admin-table admin-dns">
+      <caption class="opend-visually-hidden">
+        DNS records for ${d.domain}
+      </caption>
+      <thead>
+        <tr>
+          <th scope="col">Type</th>
+          <th scope="col">Name</th>
+          <th scope="col">Value</th>
+          <th scope="col">Propagated</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${d.records.map(
+          (r) =>
+            html`<tr>
+              <td data-label="Type"><code>${r.type}</code></td>
+              <td data-label="Name"><code class="admin-copy">${r.name}</code></td>
+              <td data-label="Value"><code class="admin-copy">${r.value}</code></td>
+              <td data-label="Propagated">
+                ${r.propagated ? badge('✓ In place', 'ok') : badge('Pending', 'warn')}
+              </td>
+            </tr>`,
+        )}
+      </tbody>
+    </table>
+  </div>`;
+}
+
+export function domainPage(d: DomainPageData): Html {
+  const intro = head(
+    'Site',
+    'Custom domain',
+    'Serve the documentation at a domain you own, such as docs.example.com.',
+  );
+  if (!d.managed)
+    return html`${intro}
+      <section class="admin-card" aria-labelledby="domain-self-h">
+        <h2 id="domain-self-h">Set by your server</h2>
+        <dl class="admin-facts">
+          <dt>Address</dt>
+          <dd><a href="${d.publicUrl}">${d.publicUrl}</a></dd>
+        </dl>
+        <p>
+          This site runs on your own server, so its address is whatever <code>PUBLIC_URL</code> says
+          and your reverse proxy or hosting platform serves. To move it to another domain:
+        </p>
+        <ol class="admin-steps">
+          <li>
+            <strong>Point the domain at your server</strong>
+            <p>At your DNS provider, add the record your server or platform asks for.</p>
+          </li>
+          <li>
+            <strong>Serve it with HTTPS</strong>
+            <p>Add the domain to your reverse proxy or platform, with a certificate.</p>
+          </li>
+          <li>
+            <strong>Set <code>PUBLIC_URL</code> and restart</strong>
+            <p>
+              Links, sign-in callbacks and the editor follow it. Register the new callback with your
+              sign-in provider and GitHub App before switching.
+            </p>
+          </li>
+        </ol>
+        <p class="admin-hint">There is nothing to set here: the console cannot change it.</p>
+      </section>`;
+  if (!d.domain)
+    return html`${intro}
+      <section class="admin-card" aria-labelledby="domain-h">
+        <h2 id="domain-h">Not available right now</h2>
+        <p>
+          ${d.loadError ?? 'Your hosting provider did not answer.'} The site keeps working at
+          <a href="${d.publicUrl}">${hostOf(d.publicUrl)}</a>. Reload the page to try again.
+        </p>
+      </section>`;
+  const dom = d.domain;
+  const [label, kind] = DOMAIN_BADGE[dom.status];
+  return html`${intro}
+    <section class="admin-card" aria-labelledby="domain-h">
+      <div class="admin-card-head">
+        <h2 id="domain-h">Status</h2>
+        ${badge(label, kind)}
+      </div>
+      <dl class="admin-facts">
+        <dt>Address now</dt>
+        <dd>
+          ${dom.publicUrl ? html`<a href="${dom.publicUrl}">${hostOf(dom.publicUrl)}</a>` : hostOf(d.publicUrl)}
+        </dd>
+        ${
+          dom.domain
+            ? html`<dt>Custom domain</dt>
+                <dd><code>${dom.domain}</code></dd>`
+            : ''
+        }
+        ${
+          dom.defaultAddress
+            ? html`<dt>Site address</dt>
+                <dd>
+                  ${hostOf(dom.defaultAddress)} <span class="admin-muted">(always works)</span>
+                </dd>`
+            : ''
+        }
+        ${
+          dom.checkedAt
+            ? html`<dt>Last checked</dt>
+                <dd>${time(dom.checkedAt)}</dd>`
+            : ''
+        }
+      </dl>
+      <p>${domainStatusText(dom)}</p>
+    </section>
+    ${
+      dom.records.length > 0
+        ? html`<section class="admin-card" aria-labelledby="dns-h">
+            <h2 id="dns-h">DNS records</h2>
+            <p>
+              ${
+                dom.status === 'live'
+                  ? 'All in place. Keep these records: removing them takes the domain offline.'
+                  : 'Add each record at your DNS provider (where you bought the domain, or where its DNS is hosted), exactly as shown. Click a name or value to select it for copying.'
+              }
+            </p>
+            ${dnsTable(dom)}
+            <p class="admin-hint">
+              Propagation usually takes minutes, sometimes a few hours. The provider checks every
+              few minutes and switches the site over by itself; reload this page to see the latest.
+            </p>
+          </section>`
+        : ''
+    }
+    ${
+      dom.available
+        ? html`<form
+            class="admin-card admin-form"
+            method="post"
+            action="/admin/domain"
+            aria-labelledby="domain-set-h"
+          >
+            ${csrfField(d.csrf)}
+            <h2 id="domain-set-h">${dom.domain ? 'Change the domain' : 'Add a domain'}</h2>
+            ${field({
+              name: 'domain',
+              label: 'Domain',
+              value: dom.domain ?? '',
+              placeholder: 'docs.example.com',
+              required: true,
+              hint: 'A domain or subdomain you own, without https://. A subdomain such as docs.example.com is easiest: it needs a CNAME record.',
+            })}
+            <div class="admin-buttons">
+              <button class="admin-button" type="submit">
+                ${dom.domain ? 'Change domain' : 'Add domain'}
+              </button>
+            </div>
+            ${
+              dom.domain
+                ? html`<p class="admin-hint">
+                    Changing it starts again with new DNS records; the site stays at its own address
+                    until they are in place.
+                  </p>`
+                : ''
+            }
+          </form>`
+        : html`<section class="admin-card">
+            <h2>Not available for this site</h2>
+            <p>${dom.unavailableReason ?? 'Ask your hosting provider.'}</p>
+          </section>`
+    }
+    ${
+      dom.domain
+        ? html`<section class="admin-card" aria-labelledby="domain-remove-h">
+            <h2 id="domain-remove-h">Remove the domain</h2>
+            <p>
+              The site goes back to
+              ${dom.defaultAddress ? hostOf(dom.defaultAddress) : 'its own address'} at once. You
+              can delete the DNS records afterwards.
+            </p>
+            ${confirmButton({
+              action: '/admin/domain/remove',
+              csrf: d.csrf,
+              label: 'Remove domain',
+              question: `Stop serving the site at ${dom.domain}?`,
+            })}
+          </section>`
+        : ''
+    }`;
 }
 
 // ---- docs source -----------------------------------------------------------
