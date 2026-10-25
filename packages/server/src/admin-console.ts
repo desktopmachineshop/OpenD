@@ -63,7 +63,9 @@ import {
 } from '@opend/model';
 import { publicationHref } from '@opend/render-html';
 import {
+  changeReleaseLines,
   entitlementsSchema,
+  publicEntitlementsSchema,
   repoSchema,
   slug as slugSchema,
   versionPickerSchema,
@@ -133,6 +135,9 @@ const DONE: Record<string, string> = {
     'Welcome. You are a staff reader: connect GitHub and choose the docs repository to get going.',
   access: 'Access saved. Every page follows it from now on.',
   versions: 'Version picker saved. Every page follows it from now on.',
+  'release-lines':
+    'Release lines saved. Live releases moved to their new lines; older versions come back with their next build.',
+  'release-lines-same': 'Release lines unchanged.',
   repo: 'Docs repository saved.',
   'repo-build': 'Docs repository saved and a build queued. It goes live when it passes validation.',
   build: 'Build queued. It goes live when it passes validation.',
@@ -223,15 +228,24 @@ function checked(body: Record<string, string>, prefix: string): string[] {
 }
 
 /** Entitlements from a form: `null` when no version is given. */
-function entitlementsFrom(body: Record<string, string>): Entitlements | null {
+/**
+ * Entitlements from a form: none without a version. The public set's version
+ * (`publicSet`) may also be `latest`, the newest live release line.
+ */
+function entitlementsFrom(body: Record<string, string>, publicSet = false): Entitlements | null {
   const version = (body.version ?? '').trim();
   if (!version) return null;
-  const parsed = entitlementsSchema.safeParse({
+  const parsed = (publicSet ? publicEntitlementsSchema : entitlementsSchema).safeParse({
     products: checked(body, 'product'),
     features: checked(body, 'feature'),
     version,
   });
-  if (!parsed.success) throw new InputError('Give the release version as a number such as 2.1.');
+  if (!parsed.success)
+    throw new InputError(
+      publicSet
+        ? 'Give the release version as a number such as 2.1, or latest.'
+        : 'Give the release version as a number such as 2.1.',
+    );
   return parsed.data;
 }
 
@@ -666,7 +680,7 @@ export function registerAdminConsole(app: FastifyInstance, ctx: AppContext): voi
     const access = body.access;
     if (access !== 'private' && access !== 'public')
       throw new InputError('Choose private or public.');
-    const pub = entitlementsFrom(body);
+    const pub = entitlementsFrom(body, true);
     const repo = await siteRepo(ctx);
     if (!repo) throw new InputError('Register the docs repository first.');
     await withTransaction(ctx.pool, async (db) => {
@@ -711,6 +725,20 @@ export function registerAdminConsole(app: FastifyInstance, ctx: AppContext): voi
     });
     ctx.caches.releaseChanged();
     return 'versions';
+  });
+
+  action('/admin/site/release-lines', 'site', async (s, body) => {
+    const lines = body.releaseLines;
+    if (lines !== 'major' && lines !== 'minor')
+      throw new InputError('Choose release lines by major or by minor version.');
+    const repo = await siteRepo(ctx);
+    if (!repo) throw new InputError('Register the docs repository first.');
+    if (repo.releaseLines === lines) return 'release-lines-same';
+    // The same change, and audit entry, as PUT /admin/api/repos/:id/release-lines.
+    await withTransaction(ctx.pool, (db) => changeReleaseLines(db, repo.id, lines, s.actor));
+    // Live releases may have moved to other lines: drop every cache.
+    ctx.caches.releaseChanged();
+    return 'release-lines';
   });
 
   // ---- appearance ----------------------------------------------------------

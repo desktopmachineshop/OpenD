@@ -56,8 +56,13 @@ curl -X POST "$PUBLIC_URL/admin/api/setup-links" -H "authorization: Bearer $OPEN
         <info><p><uicontrol>Private</uicontrol> or <uicontrol>Public</uicontrol>, and for a public site the
           products, features and release anonymous visitors see, chosen from those the published release
           declares in <filepath>opend.config.yaml</filepath>. See <xref href="access.dita"/>. The site title
-          comes from the repository and is shown read-only. <uicontrol>Version picker</uicontrol> sets what
-          readers can choose beside the site title; see <xref href="version-picker.dita"/>.</p></info>
+          comes from the repository and is shown read-only. The release version may be
+          <userinput>latest</userinput>, the newest live release line. <uicontrol>Release lines</uicontrol>
+          groups releases by major or by minor version; switching moves the live releases to their new
+          lines at once, and older minor versions come back only with their next build (see
+          <xref href="release-lines.dita"/>). The overview's <uicontrol>Live releases</uicontrol> card links
+          to it. <uicontrol>Version picker</uicontrol> sets what readers can choose beside the site title,
+          including <uicontrol>Every live version</uicontrol>; see <xref href="version-picker.dita"/>.</p></info>
       </step>
       <step>
         <cmd>Add organizations and readers on the <uicontrol>People</uicontrol> page.</cmd>

@@ -525,6 +525,7 @@ export function overviewPage(d: OverviewData): Html {
                   ? 'One live release per minor version (0.23.x, 0.24.x).'
                   : 'One live release per major version (1.x, 2.x).'
               }
+              <a href="/admin/site#lines-h">Change release lines</a>
             </p>`
           : ''
       }
@@ -593,7 +594,67 @@ const VERSION_MODES = [
     'Choose from a list',
     'Readers pick from the versions below. Their own version is always offered too, and is where they start.',
   ],
+  [
+    'live',
+    'Every live version',
+    'Readers pick from every release line that is live, newest first. A new line appears when it is published and a retired one disappears: there is no list to keep up to date.',
+  ],
 ] as const;
+
+const RELEASE_LINE_MODES = [
+  [
+    'major',
+    'By major version',
+    'One live release for each major version, such as 2.x and 1.x. A 2.4 build replaces the live 2.3 docs.',
+  ],
+  [
+    'minor',
+    'By minor version',
+    'One live release for each minor version, such as 0.23.x and 0.22.x. A 0.24 build goes live next to 0.23 instead of replacing it.',
+  ],
+] as const;
+
+function releaseLinesForm(repo: Repo, published: string[], csrf: string): Html {
+  return html`<form
+    class="admin-card admin-form"
+    method="post"
+    action="/admin/site/release-lines"
+    aria-labelledby="lines-h"
+  >
+    ${csrfField(csrf)}
+    <h2 id="lines-h">Release lines</h2>
+    <p class="admin-hint">
+      Each release line has one live release. Readers get the live release of their version’s line,
+      and the version picker offers lines.
+      ${published.length ? `Live now: ${published.join(', ')}.` : 'Nothing is live yet.'}
+    </p>
+    <fieldset class="admin-fieldset">
+      <legend class="admin-legend">Group releases</legend>
+      <div class="admin-options">
+        ${RELEASE_LINE_MODES.map(
+          ([lines, title, text]) =>
+            html`<label class="admin-option"
+              ><input
+                type="radio"
+                name="releaseLines"
+                value="${lines}"
+                ${raw(repo.releaseLines === lines ? ' checked' : '')}
+              /><span><strong>${title}</strong><span>${text}</span></span></label
+            >`,
+        )}
+      </div>
+    </fieldset>
+    <p class="admin-hint">
+      Switching moves each live release to its line under the new grouping, straight away. Going to
+      major versions, lines that merge keep the release built most recently. Going to minor
+      versions, only the releases live now stay live: older minor versions come back when their
+      branch or tag is built again.
+    </p>
+    <div class="admin-buttons">
+      <button class="admin-button" type="submit">Save release lines</button>
+    </div>
+  </form>`;
+}
 
 function versionPickerForm(repo: Repo, published: string[], csrf: string): Html {
   const picker = repo.versionPicker;
@@ -725,12 +786,13 @@ export function sitePage(d: SitePageData): Html {
       ${choices({ legend: 'Features', prefix: 'feature', values: d.attributes.feature, checked: pub?.features ?? [] })}
       ${d.attributes.product.length + d.attributes.feature.length === 0 && !pub ? html`<p class="admin-hint">The published release declares no products or features.</p>` : ''}
       <div class="admin-form-row">
-        ${field({ name: 'version', label: 'Release version', value: pub?.version ?? d.release ?? '', hint: 'Which release line visitors see, such as 2.1. Leave empty to show only ungated content on the newest line.' })}
+        ${field({ name: 'version', label: 'Release version', value: pub?.version ?? d.release ?? '', hint: 'Which release line visitors see, such as 2.1, or latest for the newest live line (it moves on by itself when a new line is published). Leave empty to show only ungated content on the newest line.' })}
       </div>
       <div class="admin-buttons">
         <button class="admin-button" type="submit">Save access</button>
       </div>
     </form>
+    ${releaseLinesForm(d.repo, d.published, d.csrf)}
     ${versionPickerForm(d.repo, d.published, d.csrf)}`;
 }
 
