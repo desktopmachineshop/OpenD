@@ -268,6 +268,13 @@ export class FakeGitHub {
     this.installations.set(id, { appId, account, repos });
   }
 
+  /** Issues an installation token directly, as a token broker hands one out. */
+  issueInstallationToken(installationId: number): string {
+    const t = `ghs_${randomBytes(8).toString('hex')}`;
+    this.installationTokens.set(t, installationId);
+    return t;
+  }
+
   // ---- object store --------------------------------------------------------
 
   private repo(fullName: string): FakeRepo {

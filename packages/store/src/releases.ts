@@ -1,5 +1,5 @@
 import type { CompiledRelease, Diagnostic, ReleaseLines } from '@opend/model';
-import { CHANNELS, notify, withTransaction, type Db, type Pool } from './db.js';
+import { CHANNELS, notify, withTransaction, type Db, type Pool, type PoolClient } from './db.js';
 import { writeSearchIndex, type SearchIndexInput } from './search.js';
 
 export interface PublishInput {
@@ -17,6 +17,13 @@ export interface PublishInput {
   diagnostics: Diagnostic[];
   /** Written in the same transaction, so a live release never lacks the index it was built with. */
   searchIndex?: SearchIndexInput;
+  /**
+   * Runs in the publishing transaction once the build went live, with the repo
+   * row locked for update, so whatever it changes (the site settings its
+   * config declares) takes effect together with the release: no reader is
+   * ever served the new release under the old settings.
+   */
+  onLive?: (client: PoolClient, releaseId: number) => Promise<void>;
 }
 
 export interface PublishResult {
@@ -32,9 +39,10 @@ export interface PublishResult {
  */
 export async function publishRelease(pool: Pool, input: PublishInput): Promise<PublishResult> {
   return withTransaction(pool, async (client) => {
-    // Locks the repo row against a release-line change (setRepoReleaseLines) until commit.
+    // Locks the repo row against a release-line change (setRepoReleaseLines) until commit;
+    // exclusively when `onLive` may change the repo, so concurrent publishes take turns.
     const { rows: repo } = await client.query<{ releaseLines: ReleaseLines }>(
-      'select release_lines as "releaseLines" from repos where id = $1 for share',
+      `select release_lines as "releaseLines" from repos where id = $1 for ${input.onLive ? 'update' : 'share'}`,
       [input.repoId],
     );
     const line =
@@ -72,6 +80,7 @@ export async function publishRelease(pool: Pool, input: PublishInput): Promise<P
     );
     const live = swap.rowCount === 1;
     if (live) await notify(client, CHANNELS.releaseChanged, String(input.repoId));
+    if (live && input.onLive) await input.onLive(client, releaseId);
     return { releaseId, live };
   });
 }

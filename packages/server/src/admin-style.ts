@@ -94,6 +94,8 @@ export const ADMIN_CSS = `
 .admin-option input { margin: 4px 0 0; accent-color: var(--opend-accent); }
 .admin-option strong { display: block; color: var(--opend-heading); }
 .admin-option span { color: var(--opend-muted); font-size: 14px; }
+.admin-fieldset:disabled .admin-option, .admin-choice:has(input:disabled) { cursor: not-allowed; }
+.admin-fieldset:disabled .admin-option:not(:has(input:checked)), .admin-choice:has(input:disabled):not(:has(input:checked)) { opacity: 0.6; }
 .admin-buttons { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
 .admin-inline { display: inline; margin: 0; }
 

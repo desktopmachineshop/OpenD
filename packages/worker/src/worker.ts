@@ -17,6 +17,7 @@ import {
   type Repo,
 } from '@opend/store';
 import { searchIndexInput } from './search.js';
+import { applySiteSettings } from './site-settings.js';
 import { fetchSource } from './source.js';
 import { nullReporter, type GitHubAccess, type StatusReporter } from './github.js';
 
@@ -113,6 +114,7 @@ export async function runJob(deps: WorkerDeps, job: BuildJob): Promise<JobOutcom
       sha: job.sha,
       release: outcome.release,
       live: outcome.live,
+      ...(outcome.settings?.length ? { siteSettings: outcome.settings } : {}),
     });
     return outcome.live ? 'published' : 'superseded';
   } catch (err) {
@@ -134,7 +136,7 @@ export async function runJob(deps: WorkerDeps, job: BuildJob): Promise<JobOutcom
 
 type BuildOutcome =
   | { kind: 'invalid'; message: string; diagnostics: Diagnostic[] }
-  | { kind: 'published'; release: string; live: boolean };
+  | { kind: 'published'; release: string; live: boolean; settings: string[] | null };
 
 async function buildAndPublish(deps: WorkerDeps, repo: Repo, job: BuildJob): Promise<BuildOutcome> {
   let token: string | undefined;
@@ -182,6 +184,7 @@ async function buildAndPublish(deps: WorkerDeps, repo: Repo, job: BuildJob): Pro
         `storing assets: ${err instanceof Error ? err.message : String(err)}`,
       );
     }
+    let settings: string[] | null = null;
     const published = await publishRelease(deps.pool, {
       jobId: job.id,
       repoId: repo.id,
@@ -191,8 +194,31 @@ async function buildAndPublish(deps: WorkerDeps, repo: Repo, job: BuildJob): Pro
       snapshot: release,
       diagnostics,
       searchIndex: searchIndexInput(release),
+      // The site: block of the build live on the newest line sets the site up, in the same
+      // transaction (see applySiteSettings). A failure is logged; the release still goes live.
+      onLive: async (client, releaseId) => {
+        await client.query('savepoint site_settings');
+        try {
+          settings = await applySiteSettings(
+            client,
+            repo.id,
+            { releaseId, ref: job.ref, sha: job.sha, release: release.release },
+            result.config?.site,
+          );
+          await client.query('release savepoint site_settings');
+        } catch (err) {
+          await client.query('rollback to savepoint site_settings');
+          (deps.log ?? jsonLog)({
+            level: 'error',
+            msg: 'site settings not applied',
+            job: job.id,
+            repo: repo.fullName,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      },
     });
-    return { kind: 'published', release: release.release, live: published.live };
+    return { kind: 'published', release: release.release, live: published.live, settings };
   } finally {
     await source.cleanup();
   }

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { pdfConfigSchema } from './appearance.js';
+import { siteSettingsSchema } from './site.js';
 
 /** Profiling attribute matched against the reader's version, using release ranges. */
 export const RELEASE_ATTRIBUTE = 'release';
@@ -80,6 +81,11 @@ export const projectConfigSchema = z
     pdf: pdfConfigSchema.optional(),
     /** Site title shown in the page header. */
     title: z.string().default('Documentation'),
+    /**
+     * Settings of the hosted site this repository publishes (access, version
+     * picker, release lines, release refs), applied by the hosted build.
+     */
+    site: siteSettingsSchema.optional(),
   })
   .refine((c) => !(RELEASE_ATTRIBUTE in c.attributes), {
     message: `"${RELEASE_ATTRIBUTE}" takes version ranges and must not be listed under attributes`,
@@ -88,6 +94,24 @@ export const projectConfigSchema = z
   .refine((c) => Object.keys(c.attributes).every(isFilterAttribute), {
     message: `attributes may only list filtering attributes: ${FILTER_ATTRIBUTES.join(', ')}`,
     path: ['attributes'],
+  })
+  .superRefine((c, ctx) => {
+    // The public set may only name declared products and features: anything
+    // else would match no content, so it is almost certainly a typo.
+    const pub = c.site?.publicEntitlements;
+    if (!pub) return;
+    const custom = 'custom' as const; // a zod issue, not a diagnostic code
+    for (const [attribute, field] of Object.entries(ENTITLEMENT_ATTRIBUTES)) {
+      const declared = new Set(c.attributes[attribute] ?? []);
+      pub[field].forEach((value, i) => {
+        if (!declared.has(value))
+          ctx.addIssue({
+            code: custom,
+            message: `"${value}" is not declared under attributes.${attribute}`,
+            path: ['site', 'publicEntitlements', field, i],
+          });
+      });
+    }
   });
 
 export type ProjectConfig = z.infer<typeof projectConfigSchema>;

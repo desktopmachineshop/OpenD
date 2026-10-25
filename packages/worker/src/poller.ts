@@ -17,6 +17,8 @@ export interface PollerDeps {
   log?: Log;
   /** Override for tests. */
   listRefs?: typeof listRemoteRefs;
+  /** Runs before each poll, e.g. connecting a docs source automatically; errors are logged. */
+  beforePoll?: () => Promise<unknown>;
 }
 
 export interface PollSummary {
@@ -50,6 +52,9 @@ export function releaseRefsToPoll(refs: RemoteRef[], patterns: readonly string[]
 export async function pollOnce(deps: PollerDeps): Promise<PollSummary> {
   const log = deps.log ?? jsonLog;
   const listRefs = deps.listRefs ?? listRemoteRefs;
+  await deps
+    .beforePoll?.()
+    .catch((err: unknown) => log({ level: 'warn', msg: 'before poll failed', error: String(err) }));
   const repos = await listRepos(deps.pool);
   const summary: PollSummary = { repos: repos.length, queued: [], errors: [] };
   for (const repo of repos) {

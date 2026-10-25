@@ -248,6 +248,28 @@ function badge(text: string, kind: 'ok' | 'warn' | 'danger' | 'info' | 'muted' =
   return html`<span class="admin-badge${kind === 'muted' ? '' : ` is-${kind}`}">${text}</span>`;
 }
 
+/** The site settings the repository's `opend.config.yaml` declares (`site:`), by field. */
+function declaredSet(repo: Repo | null): Set<string> {
+  return new Set(
+    Object.entries(repo?.declared?.settings ?? {})
+      .filter(([, v]) => v !== undefined)
+      .map(([k]) => k),
+  );
+}
+
+const REPO_SET = 'Set by opend.config.yaml';
+
+/** Where repository-declared settings came from, and how to change them. */
+function declaredHint(repo: Repo): Html {
+  const d = repo.declared;
+  return html`<p class="admin-hint">
+    Set by the <code>site:</code> block of
+    <code>opend.config.yaml</code
+    >${d ? html` on <code>${d.ref}</code> (commit <code>${d.sha.slice(0, 7)}</code>)` : ''}. Change
+    it in the docs repository: the next build applies it.
+  </p>`;
+}
+
 const SOURCE_LABEL: Record<SettingSource, [string, 'ok' | 'info' | 'muted']> = {
   env: ['Set by environment', 'info'],
   console: ['Set here', 'ok'],
@@ -340,6 +362,7 @@ function choices(o: {
   values: string[];
   checked: readonly string[];
   hint?: string;
+  disabled?: boolean;
 }): Html {
   const all = [...new Set([...o.values, ...o.checked])];
   if (all.length === 0) return html``;
@@ -353,7 +376,7 @@ function choices(o: {
               type="checkbox"
               name="${`${o.prefix}:${v}`}"
               value="1"
-              ${raw(o.checked.includes(v) ? ' checked' : '')}
+              ${raw(o.checked.includes(v) ? ' checked' : '')}${raw(o.disabled ? ' disabled' : '')}
             />${v}</label
           >`,
       )}
@@ -375,6 +398,11 @@ export interface OverviewData {
   audit: { at: Date; actor: string; action: string }[];
   github: SettingSource;
   publicUrl: string;
+  /** What automatic setup did on this visit: connected the docs source, or why it could not. */
+  autoConnect?:
+    | { status: 'connected'; repo: Repo; configPath: string; builds: number }
+    | { status: 'manual'; reason: string }
+    | { status: 'idle' };
 }
 
 const JOB_BADGE: Record<string, 'ok' | 'warn' | 'danger' | 'info'> = {
@@ -442,10 +470,16 @@ export function buildsTable(jobs: OverviewData['jobs']): Html {
 
 export function overviewPage(d: OverviewData): Html {
   const setup: Html[] = [];
+  const auto = d.autoConnect;
   if (!d.repo)
     setup.push(
       html`<li>
         <strong>Register the docs repository.</strong>
+        ${
+          auto?.status === 'manual'
+            ? html`<p>Automatic setup did not connect one: ${auto.reason}</p>`
+            : ''
+        }
         <p><a href="/admin/source">Docs source</a>: pick it from GitHub, or give its clone URL.</p>
       </li>`,
     );
@@ -483,6 +517,14 @@ export function overviewPage(d: OverviewData): Html {
         Nothing is published yet. A build goes live when it passes validation.
       </p>`;
   return html`${head('Admin', 'Overview', 'What readers see right now, the latest builds, and recent changes.')}
+    ${
+      auto?.status === 'connected'
+        ? flashBox({
+            kind: 'ok',
+            message: `Connected ${auto.repo.fullName} automatically: docs in ${auto.repo.docsPath === '.' ? 'the repository root' : `${auto.repo.docsPath}/`}, publishing ${auto.repo.releaseRefs.join(', ')} (from ${auto.configPath}). ${auto.builds} build(s) queued.`,
+          })
+        : ''
+    }
     ${
       setup.length
         ? html`<section class="admin-card" aria-labelledby="setup-h">
@@ -615,6 +657,7 @@ const RELEASE_LINE_MODES = [
 ] as const;
 
 function releaseLinesForm(repo: Repo, published: string[], csrf: string): Html {
+  const locked = declaredSet(repo).has('releaseLines');
   return html`<form
     class="admin-card admin-form"
     method="post"
@@ -622,13 +665,16 @@ function releaseLinesForm(repo: Repo, published: string[], csrf: string): Html {
     aria-labelledby="lines-h"
   >
     ${csrfField(csrf)}
-    <h2 id="lines-h">Release lines</h2>
+    <div class="admin-card-head">
+      <h2 id="lines-h">Release lines</h2>
+      ${locked ? badge(REPO_SET, 'info') : ''}
+    </div>
     <p class="admin-hint">
       Each release line has one live release. Readers get the live release of their version’s line,
       and the version picker offers lines.
       ${published.length ? `Live now: ${published.join(', ')}.` : 'Nothing is live yet.'}
     </p>
-    <fieldset class="admin-fieldset">
+    <fieldset class="admin-fieldset" ${raw(locked ? ' disabled' : '')}>
       <legend class="admin-legend">Group releases</legend>
       <div class="admin-options">
         ${RELEASE_LINE_MODES.map(
@@ -650,9 +696,13 @@ function releaseLinesForm(repo: Repo, published: string[], csrf: string): Html {
       versions, only the releases live now stay live: older minor versions come back when their
       branch or tag is built again.
     </p>
-    <div class="admin-buttons">
-      <button class="admin-button" type="submit">Save release lines</button>
-    </div>
+    ${
+      locked
+        ? declaredHint(repo)
+        : html`<div class="admin-buttons">
+            <button class="admin-button" type="submit">Save release lines</button>
+          </div>`
+    }
   </form>`;
 }
 
@@ -663,6 +713,7 @@ function versionPickerForm(repo: Repo, published: string[], csrf: string): Html 
   const hint = published.length
     ? `Published release lines: ${published.join(', ')}. Any version such as 2.0 or 1.4 works.`
     : 'A version such as 2.1.';
+  const locked = declaredSet(repo).has('versionPicker');
   return html`<form
     class="admin-card admin-form"
     method="post"
@@ -670,13 +721,16 @@ function versionPickerForm(repo: Repo, published: string[], csrf: string): Html 
     aria-labelledby="versions-h"
   >
     ${csrfField(csrf)}
-    <h2 id="versions-h">Version picker</h2>
+    <div class="admin-card-head">
+      <h2 id="versions-h">Version picker</h2>
+      ${locked ? badge(REPO_SET, 'info') : ''}
+    </div>
     <p class="admin-hint">
       What readers see next to the site title, and which version of the docs they are served.
       Products and features still come from each reader’s entitlements. On a public site, anonymous
       visitors get the same choice.
     </p>
-    <fieldset class="admin-fieldset">
+    <fieldset class="admin-fieldset" ${raw(locked ? ' disabled' : '')}>
       <legend class="admin-legend">What readers can choose</legend>
       <div class="admin-options">
         ${VERSION_MODES.map(
@@ -693,11 +747,15 @@ function versionPickerForm(repo: Repo, published: string[], csrf: string): Html 
       </div>
     </fieldset>
     <div class="admin-form-row">
-      ${field({ name: 'fixedVersion', label: 'Fixed version', value: fixed, hint: 'For “Fixed version”.' })}${field({ name: 'versions', label: 'Versions in the list', value: list, hint: `For “Choose from a list”, comma-separated. ${hint}` })}
+      ${field({ name: 'fixedVersion', label: 'Fixed version', value: fixed, hint: 'For “Fixed version”.', disabled: locked })}${field({ name: 'versions', label: 'Versions in the list', value: list, hint: `For “Choose from a list”, comma-separated. ${hint}`, disabled: locked })}
     </div>
-    <div class="admin-buttons">
-      <button class="admin-button" type="submit">Save version picker</button>
-    </div>
+    ${
+      locked
+        ? declaredHint(repo)
+        : html`<div class="admin-buttons">
+            <button class="admin-button" type="submit">Save version picker</button>
+          </div>`
+    }
   </form>`;
 }
 
@@ -721,7 +779,27 @@ export function sitePage(d: SitePageData): Html {
         <p><a class="admin-button" href="/admin/source">Docs source</a></p>
       </section>`;
   const pub = d.repo.publicEntitlements;
+  const declared = declaredSet(d.repo);
+  const lockAccess = declared.has('access');
+  const lockPublic = declared.has('publicEntitlements');
   return html`${intro}
+    ${
+      declared.size
+        ? html`<section class="admin-card" aria-labelledby="declared-h">
+            <div class="admin-card-head">
+              <h2 id="declared-h">Set by the repository</h2>
+              ${badge(REPO_SET, 'info')}
+            </div>
+            <p>
+              The docs repository declares
+              ${[...declared].map((f, i) => html`${i ? ', ' : ''}<code>${f}</code>`)} in the
+              <code>site:</code> block of its <code>opend.config.yaml</code>. Those settings are
+              read-only here; the rest stay yours to change.
+            </p>
+            ${declaredHint(d.repo)}
+          </section>`
+        : ''
+    }
     <section class="admin-card" aria-labelledby="title-h">
       <h2 id="title-h">Site</h2>
       <dl class="admin-facts">
@@ -743,8 +821,11 @@ export function sitePage(d: SitePageData): Html {
       aria-labelledby="access-h"
     >
       ${csrfField(d.csrf)}
-      <h2 id="access-h">Access</h2>
-      <fieldset class="admin-fieldset">
+      <div class="admin-card-head">
+        <h2 id="access-h">Access</h2>
+        ${lockAccess || lockPublic ? badge(REPO_SET, 'info') : ''}
+      </div>
+      <fieldset class="admin-fieldset" ${raw(lockAccess ? ' disabled' : '')}>
         <legend class="admin-legend">Who can read the site</legend>
         <div class="admin-options">
           <label class="admin-option"
@@ -782,15 +863,20 @@ export function sitePage(d: SitePageData): Html {
         Content with no product, feature or release condition is always shown. Choose which gated
         content is public too. Signed-in readers keep their own entitlements as well.
       </p>
-      ${choices({ legend: 'Products', prefix: 'product', values: d.attributes.product, checked: pub?.products ?? [], hint: d.attributes.product.length ? 'Declared in the published release’s opend.config.yaml.' : '' })}
-      ${choices({ legend: 'Features', prefix: 'feature', values: d.attributes.feature, checked: pub?.features ?? [] })}
+      ${choices({ legend: 'Products', prefix: 'product', values: d.attributes.product, checked: pub?.products ?? [], hint: d.attributes.product.length ? 'Declared in the published release’s opend.config.yaml.' : '', disabled: lockPublic })}
+      ${choices({ legend: 'Features', prefix: 'feature', values: d.attributes.feature, checked: pub?.features ?? [], disabled: lockPublic })}
       ${d.attributes.product.length + d.attributes.feature.length === 0 && !pub ? html`<p class="admin-hint">The published release declares no products or features.</p>` : ''}
       <div class="admin-form-row">
-        ${field({ name: 'version', label: 'Release version', value: pub?.version ?? d.release ?? '', hint: 'Which release line visitors see, such as 2.1, or latest for the newest live line (it moves on by itself when a new line is published). Leave empty to show only ungated content on the newest line.' })}
+        ${field({ name: 'version', label: 'Release version', value: lockPublic ? (pub?.version ?? '') : (pub?.version ?? d.release ?? ''), hint: 'Which release line visitors see, such as 2.1, or latest for the newest live line (it moves on by itself when a new line is published). Leave empty to show only ungated content on the newest line.', disabled: lockPublic })}
       </div>
-      <div class="admin-buttons">
-        <button class="admin-button" type="submit">Save access</button>
-      </div>
+      ${
+        lockAccess && lockPublic
+          ? declaredHint(d.repo)
+          : html`${lockAccess || lockPublic ? declaredHint(d.repo) : ''}
+              <div class="admin-buttons">
+                <button class="admin-button" type="submit">Save access</button>
+              </div>`
+      }
     </form>
     ${releaseLinesForm(d.repo, d.published, d.csrf)}
     ${versionPickerForm(d.repo, d.published, d.csrf)}`;
@@ -813,8 +899,9 @@ export function repoForm(d: SourcePageData): Html {
   const current = d.siteRepo ?? d.repos[0] ?? null;
   const refs = current?.releaseRefs.join(', ') ?? 'main';
   const docsPath = current?.docsPath ?? '.';
+  const lockRefs = declaredSet(current).has('releaseRefs');
   const common = html`<div class="admin-form-row">
-      ${field({ name: 'releaseRefs', label: 'Release branches and tags', value: refs, hint: 'Comma-separated; * matches anything, e.g. main, v*. Each push to one of these builds and publishes.', required: true })}${field({ name: 'docsPath', label: 'Docs folder', value: docsPath, hint: 'Where opend.config.yaml is, relative to the repository root.', required: true })}
+      ${field({ name: 'releaseRefs', label: 'Release branches and tags', value: refs, hint: lockRefs ? html`${REPO_SET} (<code>site.releaseRefs</code>) for this repository and folder; change it there.` : 'Comma-separated; * matches anything, e.g. main, v*. Each push to one of these builds and publishes.', required: true, disabled: lockRefs })}${field({ name: 'docsPath', label: 'Docs folder', value: docsPath, hint: 'Where opend.config.yaml is, relative to the repository root.', required: true })}
     </div>
     <label class="admin-choice"
       ><input type="checkbox" name="build" value="1" checked /> Build now</label

@@ -14,7 +14,9 @@ export interface GitHubUrls {
 }
 
 /** GitHub's web and API URLs: github.com, or the GitHub Enterprise Server the variables name. */
-export function githubUrls(ctx: AppContext): GitHubUrls {
+export function githubUrls(ctx: {
+  env: Pick<AppContext['env'], 'githubWebUrl' | 'githubApiUrl'>;
+}): GitHubUrls {
   const web = (ctx.env.githubWebUrl ?? 'https://github.com').replace(/\/+$/, '');
   const api = (
     ctx.env.githubApiUrl ??
@@ -205,7 +207,9 @@ export interface PickableRepo {
  * broker's list in managed hosting, or the connected app's installation.
  * `null` when there is nothing to pick from (not connected, or no installation yet).
  */
-export async function pickableRepos(ctx: AppContext): Promise<PickableRepo[] | null> {
+export async function pickableRepos(
+  ctx: Pick<AppContext, 'github' | 'settings'>,
+): Promise<PickableRepo[] | null> {
   const mode = ctx.github.mode();
   if (mode === 'broker') {
     const broker = ctx.github.broker as GitHubBroker;

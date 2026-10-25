@@ -7,6 +7,7 @@ import {
   refMatches,
   withTransaction,
 } from '@opend/store';
+import { autoConnect, forgetAutoConnect } from './auto-connect.js';
 import type { AppContext } from './context.js';
 
 /** Verifies GitHub's `X-Hub-Signature-256` header in constant time. */
@@ -104,6 +105,12 @@ export function registerWebhook(app: FastifyInstance, ctx: AppContext): void {
           return [202, { status: 'queued', job: job.id }];
         },
       );
+      // A push from a repository the site does not serve yet: with no docs source, try to
+      // connect the one repository the GitHub App exposes (it queues its own builds).
+      if (result.reason === 'repository not registered') {
+        forgetAutoConnect(ctx.pool);
+        void autoConnect(ctx).catch(() => {});
+      }
       return reply.code(code).send(result);
     });
   });
