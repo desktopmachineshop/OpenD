@@ -58,8 +58,9 @@
     <postreq>
       <section id="self-hosted">
         <title>Self-hosted sites</title>
-        <p>A site on your own server has no provider to attach domains: the <uicontrol>Custom
-          domain</uicontrol> page shows its address and explains this, with no form. To move it, point the
+        <p>A site on your own server has no provider to attach domains (no
+          <codeph>OPEND_HOSTING_URL</codeph>): the <uicontrol>Custom domain</uicontrol> page shows its
+          address and explains this, with no form. To move it, point the
           domain at your server, serve it with HTTPS from your reverse proxy or hosting platform, set
           <codeph>PUBLIC_URL</codeph> to the new address and restart. Register the new sign-in callback with
           your identity provider and GitHub App first. See <xref href="env-vars.dita"/>.</p>

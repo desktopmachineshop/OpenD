@@ -1,3 +1,4 @@
+import type { HostingClient } from './hosting.js';
 import { LRUCache } from 'lru-cache';
 import type { PublicationView, ReleaseView } from '@opend/filter';
 import type { PdfRenderer } from '@opend/pdf';
@@ -80,6 +81,8 @@ export interface AppContext {
   github: GitHubConnection;
   /** `fetch` for GitHub (tests pass a fake). */
   githubFetch: typeof fetch;
+  /** The managed host's site API (custom domain); null when self-hosted. */
+  hosting: HostingClient | null;
   /** Re-reads settings now and applies them (after a change in this process). */
   reloadSettings(): Promise<void>;
   pool: Pool;

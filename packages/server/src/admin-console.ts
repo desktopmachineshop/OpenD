@@ -50,7 +50,6 @@ import {
   type StoredRelease,
 } from '@opend/store';
 import { compareReleaseLines } from '@opend/filter';
-import { BrokerError, type BrokerDomain } from '@opend/worker';
 import {
   pdfTemplateSchema,
   PDF_TEMPLATES,
@@ -95,6 +94,7 @@ import { loginPath, safeReturnTo, setSession, siteSession } from './auth.js';
 import { API_KEY_EMAIL_DOMAIN } from './api-writes.js';
 import type { AppContext } from './context.js';
 import { siteRepo } from './delivery.js';
+import { HostingError, type HostingDomain } from './hosting.js';
 import {
   APP_NAME_MAX,
   buildManifest,
@@ -386,17 +386,17 @@ export function registerAdminConsole(app: FastifyInstance, ctx: AppContext): voi
       };
     },
     domain: async (s) => {
-      // Managed hosting attaches domains; the broker credential asks for this site only.
-      const broker = ctx.github.broker;
-      let domain: BrokerDomain | null = null;
+      // Managed hosting attaches domains; the site's own credential asks for this site only.
+      const hosting = ctx.hosting;
+      let domain: HostingDomain | null = null;
       let loadError: string | null = null;
-      if (broker) {
+      if (hosting) {
         try {
-          domain = await broker.domain();
+          domain = await hosting.domain();
         } catch (err) {
           ctx.log({ level: 'warn', msg: 'custom domain status failed', error: String(err) });
           loadError =
-            err instanceof BrokerError && err.status === 403
+            err instanceof HostingError && err.status === 403
               ? 'Your hosting provider does not change this site right now (it may be suspended).'
               : 'Could not reach your hosting provider.';
         }
@@ -404,7 +404,7 @@ export function registerAdminConsole(app: FastifyInstance, ctx: AppContext): voi
       return {
         title: 'Custom domain',
         body: domainPage({
-          managed: broker !== null,
+          managed: hosting !== null,
           publicUrl: ctx.env.publicUrl,
           domain,
           loadError,
@@ -724,15 +724,15 @@ export function registerAdminConsole(app: FastifyInstance, ctx: AppContext): voi
 
   /** Asks the hosting provider to change the domain; its refusals become form errors. */
   const changeDomain = async (s: Staff, domain: string | null): Promise<void> => {
-    const broker = ctx.github.broker;
-    if (!broker)
+    const hosting = ctx.hosting;
+    if (!hosting)
       throw new InputError(
         'This site is self-hosted: its address is PUBLIC_URL, served by your reverse proxy.',
       );
     try {
-      await broker.setDomain(domain, s.access.reader.email);
+      await hosting.setDomain(domain, s.access.reader.email);
     } catch (err) {
-      if (!(err instanceof BrokerError)) throw err;
+      if (!(err instanceof HostingError)) throw err;
       ctx.log({ level: 'warn', msg: 'custom domain change refused', error: err.message });
       throw new InputError(
         [400, 409, 429].includes(err.status)

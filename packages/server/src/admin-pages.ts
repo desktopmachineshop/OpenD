@@ -25,7 +25,7 @@ import type {
   Reader,
   Repo,
 } from '@opend/store';
-import type { BrokerDomain, BrokerDomainStatus } from '@opend/worker';
+import type { HostingDomain, HostingDomainStatus } from './hosting.js';
 import { ADMIN_CSS } from './admin-style.js';
 import type { PickableRepo } from './github-connect.js';
 import { GITHUB_ICON, KEY_ICON } from './pages.js';
@@ -911,19 +911,19 @@ export function sitePage(d: SitePageData): Html {
 // ---- custom domain ---------------------------------------------------------
 
 export interface DomainPageData {
-  /** Managed hosting: the provider attaches domains (through its broker). */
+  /** Managed hosting: the provider attaches domains (through its site API). */
   managed: boolean;
   /** The site's address now (`PUBLIC_URL`). */
   publicUrl: string;
   /** What the provider reports; null when self-hosted or it could not be reached. */
-  domain: BrokerDomain | null;
+  domain: HostingDomain | null;
   /** Why the provider could not be asked. */
   loadError: string | null;
   csrf: string;
 }
 
 const DOMAIN_BADGE: Record<
-  BrokerDomainStatus,
+  HostingDomainStatus,
   [string, 'ok' | 'warn' | 'danger' | 'info' | 'muted']
 > = {
   none: ['No custom domain', 'muted'],
@@ -934,7 +934,7 @@ const DOMAIN_BADGE: Record<
 };
 
 /** What the staff reader reads at each status, in plain words. */
-function domainStatusText(d: BrokerDomain): string {
+function domainStatusText(d: HostingDomain): string {
   const keeps = d.defaultAddress
     ? `${hostOf(d.defaultAddress)} keeps working`
     : 'The current address keeps working';
@@ -952,7 +952,7 @@ function domainStatusText(d: BrokerDomain): string {
   }
 }
 
-function dnsTable(d: BrokerDomain): Html {
+function dnsTable(d: HostingDomain): Html {
   return html`<div class="admin-table-wrap">
     <table class="admin-table admin-dns">
       <caption class="opend-visually-hidden">

@@ -26,60 +26,6 @@ export interface BrokerRepo {
   installationId: number;
 }
 
-/** The site's custom domain as the control plane reports it (`GET {broker}/domain`). */
-export interface BrokerDomain {
-  domain: string | null;
-  /** `none`, `attaching`, `awaiting-dns`, `live` or `error`. */
-  status: BrokerDomainStatus;
-  /** What to add at the DNS provider, each with whether it has propagated. */
-  records: { type: string; name: string; value: string; propagated: boolean }[];
-  /** ISO 8601, when the records were last checked. */
-  checkedAt: string | null;
-  /** The address the site keeps under the provider's domain. */
-  defaultAddress: string | null;
-  /** The site's address now: the custom domain once live. */
-  publicUrl: string | null;
-  available: boolean;
-  unavailableReason: string | null;
-  error: string | null;
-}
-
-export const BROKER_DOMAIN_STATUSES = [
-  'none',
-  'attaching',
-  'awaiting-dns',
-  'live',
-  'error',
-] as const;
-export type BrokerDomainStatus = (typeof BROKER_DOMAIN_STATUSES)[number];
-
-const str = (v: unknown): string | null => (typeof v === 'string' && v ? v : null);
-
-/** Reads a domain answer defensively: only known fields, the right types. */
-function brokerDomain(body: unknown): BrokerDomain {
-  const b = (body ?? {}) as Record<string, unknown>;
-  const status = BROKER_DOMAIN_STATUSES.find((s) => s === b.status);
-  if (!status) throw new BrokerError('the hosting provider returned no domain status', 502);
-  return {
-    domain: str(b.domain),
-    status,
-    records: (Array.isArray(b.records) ? (b.records as Record<string, unknown>[]) : [])
-      .filter((r) => typeof r.name === 'string' && typeof r.value === 'string')
-      .map((r) => ({
-        type: str(r.type) ?? 'CNAME',
-        name: r.name as string,
-        value: r.value as string,
-        propagated: r.propagated === true,
-      })),
-    checkedAt: str(b.checkedAt),
-    defaultAddress: str(b.defaultAddress),
-    publicUrl: str(b.publicUrl),
-    available: b.available !== false,
-    unavailableReason: str(b.unavailableReason),
-    error: str(b.error),
-  };
-}
-
 export class BrokerError extends Error {
   constructor(
     message: string,
@@ -100,7 +46,6 @@ const EXPIRY_MARGIN_MS = 60_000;
  * - `POST {url}/token` `{ repo, permissions }` → `{ token, expiresAt }`;
  *   404 when the repository is not in the installation, 401 for a bad secret.
  * - `GET {url}/repos` → `{ repos: [...] }`.
- * - `GET {url}/domain`, `PUT {url}/domain` `{ domain, actor? }` → the site's custom domain.
  */
 export class GitHubBroker implements GitHubAccess {
   readonly gitHosts: readonly string[];
@@ -185,35 +130,6 @@ export class GitHubBroker implements GitHubAccess {
         defaultBranch: typeof r.defaultBranch === 'string' ? r.defaultBranch : 'main',
         installationId: typeof r.installationId === 'number' ? r.installationId : 0,
       }));
-  }
-
-  /** The site's custom domain, its status and the DNS records to add. */
-  async domain(): Promise<BrokerDomain> {
-    const res = await this.fetchImpl(`${this.url}/domain`, { headers: this.headers() });
-    if (!res.ok) throw await this.domainRefused(res);
-    return brokerDomain(await readBody(res));
-  }
-
-  /**
-   * Sets, changes or (null) removes the site's custom domain. `actor` is the staff
-   * reader's email, for the provider's audit log; the broker secret authorizes.
-   */
-  async setDomain(domain: string | null, actor?: string): Promise<BrokerDomain> {
-    const res = await this.fetchImpl(`${this.url}/domain`, {
-      method: 'PUT',
-      headers: this.headers(),
-      body: JSON.stringify({ domain, ...(actor ? { actor } : {}) }),
-    });
-    if (!res.ok) throw await this.domainRefused(res);
-    return brokerDomain(await readBody(res));
-  }
-
-  /** The provider's own message for a refused domain change (400, 409, 429), else the status. */
-  private async domainRefused(res: Response): Promise<BrokerError> {
-    const body = (await readBody(res).catch(() => null)) as { error?: unknown } | null;
-    if ([400, 409, 429].includes(res.status) && typeof body?.error === 'string')
-      return new BrokerError(body.error.slice(0, 300), res.status);
-    return this.refused(res, 'domain request');
   }
 
   /**

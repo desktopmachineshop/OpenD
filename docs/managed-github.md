@@ -51,7 +51,14 @@ The instance asks for a token only for repositories whose clone URL is `https://
 
 The repositories this tenant's installation can access. The admin console's docs-source picker lists them; the instance registers the picked one as `https://github.com/<fullName>.git` and never trusts a repository name or installation id posted by the browser (it re-reads this list).
 
-### `GET {broker}/domain`, `PUT {broker}/domain`
+## Site API: custom domain
+
+Every managed site, whatever its GitHub connection (broker, a console-connected app, or
+none), gets `OPEND_HOSTING_URL` (such as `https://control.example/site/v1`) and
+`OPEND_HOSTING_TOKEN`, its bearer token there. Without them, a broker URL ending in
+`/broker/v1` implies `/site/v1` with the broker secret, which is the same credential.
+
+### `GET {hosting}/domain`, `PUT {hosting}/domain`
 
 The site's custom domain, for the admin console's **Custom domain** page. `PUT` takes
 `{"domain": "docs.example.com" | null, "actor": "<staff email>"}`; `actor` is recorded in the

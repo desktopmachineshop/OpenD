@@ -33,3 +33,4 @@ export * from './fleet/apps.js';
 export * from './fleet/serve.js';
 export * from './fleet/worker.js';
 export * from './auto-connect.js';
+export * from './hosting.js';

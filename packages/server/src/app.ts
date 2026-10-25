@@ -28,6 +28,7 @@ import { registerPdf } from './pdf.js';
 import { registerEntitlementSync } from './entitlement-sync.js';
 import { createOidcProvider, type OidcProvider } from './oidc.js';
 import { effectiveConfig } from './settings.js';
+import { HostingClient } from './hosting.js';
 import { registerWebhook } from './webhook.js';
 
 export interface AppDeps {
@@ -42,6 +43,8 @@ export interface AppDeps {
   pdf?: PdfRenderer;
   /** `fetch` for GitHub sign-in and the GitHub App (tests pass a fake GitHub's). */
   githubFetch?: typeof fetch;
+  /** `fetch` for the managed host's site API (tests pass a fake control plane). */
+  hostingFetch?: typeof fetch;
 }
 
 export interface OpendApp {
@@ -73,6 +76,7 @@ export async function createApp(config: ServerConfig, deps: AppDeps): Promise<Op
     settings,
     github,
     githubFetch,
+    hosting: config.hosting ? new HostingClient(config.hosting, deps.hostingFetch ?? fetch) : null,
     reloadSettings: async () => {
       await settings.reload();
     },
