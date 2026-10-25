@@ -56,7 +56,10 @@ export function effectiveConfig(env: ServerConfig, snapshot: SettingsSnapshot): 
         apiUrl: app.apiUrl,
       };
   }
-  if (!env.webhookSecret && app?.webhookSecret) config.webhookSecret = app.webhookSecret;
+  if (app?.webhookSecret) {
+    if (!env.webhookSecret) config.webhookSecret = app.webhookSecret;
+    else if (app.webhookSecret !== env.webhookSecret) config.appWebhookSecret = app.webhookSecret;
+  }
   if (!env.editorUrl) {
     const url = settingString(snapshot, SETTING.editor, 'url');
     if (url) {

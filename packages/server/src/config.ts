@@ -173,6 +173,12 @@ export interface ServerConfig {
   /** `OPEND_SECRET_KEY`: seals stored secrets. Without it, a key derived from `sessionSecret`. */
   secretKey?: string;
   webhookSecret?: string;
+  /**
+   * The webhook secret of the GitHub App created in the admin console, when
+   * `webhookSecret` comes from the environment: that app signs its pushes with
+   * its own secret, so both are accepted (a managed site has both).
+   */
+  appWebhookSecret?: string;
   github?: { appId: string; privateKey: string; apiUrl?: string };
   /** GitHub (or GitHub Enterprise Server) web and API URLs. */
   githubWebUrl?: string;

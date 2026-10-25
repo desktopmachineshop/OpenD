@@ -18,6 +18,17 @@ export function verifySignature(secret: string, body: Buffer, header: string | u
   return given.length === expected.length && timingSafeEqual(given, expected);
 }
 
+/**
+ * The secrets a push may be signed with: the environment's, and the admin
+ * console's GitHub App's when that app signs with a different one.
+ */
+export function webhookSecrets(config: {
+  webhookSecret?: string | undefined;
+  appWebhookSecret?: string | undefined;
+}): string[] {
+  return [config.webhookSecret, config.appWebhookSecret].filter((s): s is string => Boolean(s));
+}
+
 /** `refs/heads/main` → `main`, `refs/tags/v1` → `v1`. */
 export function shortRef(ref: string): string | null {
   const m = /^refs\/(?:heads|tags)\/(.+)$/.exec(ref);
@@ -43,14 +54,13 @@ export function registerWebhook(app: FastifyInstance, ctx: AppContext): void {
     );
 
     scope.post('/webhooks/github', async (request, reply) => {
-      const secret = ctx.config.webhookSecret;
-      if (!secret) return reply.code(503).send({ error: 'webhooks are not configured' });
+      const secrets = webhookSecrets(ctx.config);
+      if (!secrets.length) return reply.code(503).send({ error: 'webhooks are not configured' });
       const body = request.body;
       if (!Buffer.isBuffer(body))
         return reply.code(415).send({ error: 'expected application/json' });
-      if (
-        !verifySignature(secret, body, request.headers['x-hub-signature-256'] as string | undefined)
-      ) {
+      const signature = request.headers['x-hub-signature-256'] as string | undefined;
+      if (!secrets.some((secret) => verifySignature(secret, body, signature))) {
         return reply.code(401).send({ error: 'invalid signature' });
       }
       const event = String(request.headers['x-github-event'] ?? '');
