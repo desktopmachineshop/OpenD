@@ -7,10 +7,15 @@
   <conbody>
     <section id="off-by-default">
       <title>Off by default</title>
-      <p>Nothing under <filepath>/embed</filepath> or <filepath>/api/v1/help</filepath> exists unless both
-        <codeph>OPEND_EMBED_SECRET</codeph> (at least 32 characters) and <codeph>OPEND_EMBED_ORIGINS</codeph>
-        are set. Each origin is a scheme, host and optional port, such as
-        <codeph>https://console.example.com</codeph>, with no path or trailing slash.</p>
+      <p>Nothing under <filepath>/embed</filepath> exists, and <filepath>/api/v1/help</filepath>
+        accepts no token, unless both <codeph>OPEND_EMBED_SECRET</codeph> (at least 32 characters)
+        and <codeph>OPEND_EMBED_ORIGINS</codeph> are set. Each origin is a scheme, host and optional
+        port, such as <codeph>https://console.example.com</codeph>, with no path or trailing
+        slash.</p>
+      <p>The one exception is the help JSON API's anonymous answers on a public site: they are what
+        any visitor of the site reads already, so they are always on, for any origin, and need no
+        secret. A private site answers them with 401. See <xref href="json-api.dita#json-api/auth"
+        />.</p>
     </section>
 
     <section id="framing">
@@ -57,6 +62,8 @@ frame-src https://docs.example.com;</codeblock>
         <li>Anyone with the embed secret can sign in as any registered reader. Keep it in your backend only,
           and rotate it by changing it on both sides.</li>
         <li>There is one embed secret per deployment for now.</li>
+        <li>An app that needs only the public view of a public site needs no secret at all: it calls
+          the JSON API anonymously.</li>
       </ul>
     </section>
   </conbody>

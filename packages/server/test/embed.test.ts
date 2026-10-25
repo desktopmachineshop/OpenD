@@ -286,6 +286,11 @@ describe.skipIf(!url)('embedded help (hosted)', () => {
       );
       expect(v1.statusCode).toBe(200);
       expect(v1.headers['access-control-allow-origin']).toBe(HOST);
+      // Which release answered, readable by the host's script.
+      expect(v1.headers['opend-release']).toBe('1.4');
+      expect(v1.headers['opend-release-line']).toBe('1');
+      expect(v1.headers['access-control-expose-headers']).toBe('OpenD-Release, OpenD-Release-Line');
+      expect(v1.headers['cache-control']).toBe('private, no-store');
       expect(v1.json()).toMatchObject({
         topicId: 'topics/configure',
         key: 'settings',
@@ -356,7 +361,13 @@ describe.skipIf(!url)('embedded help (hosted)', () => {
         );
         expect(ids.includes('topics/release-notes-1')).toBe(name === 'v1-basic');
       }
-      expect((await get('/api/v1/help/nav', { origin: HOST })).statusCode).toBe(401);
+      // The site is private: no anonymous answers, from any origin.
+      for (const origin of [HOST, 'https://evil.example', '']) {
+        const res = await get('/api/v1/help/nav', origin ? { origin } : {});
+        expect(res.statusCode).toBe(401);
+        expect(res.headers['opend-release']).toBeUndefined();
+        expect(res.body).not.toContain('Widget');
+      }
     });
 
     it('requires a valid token and an allowed origin', async () => {
@@ -419,8 +430,18 @@ describe.skipIf(!url)('embedded help when not configured', () => {
       (await h.app.inject({ method: 'GET', url: '/embed/opend-help.js' })).statusCode,
     ).not.toBe(200);
     expect((await h.app.inject({ method: 'POST', url: '/embed/session' })).statusCode).toBe(404);
+    // The help API answers only anonymously on a public site; there is no site here.
+    expect((await h.app.inject({ method: 'GET', url: '/api/v1/help/search?q=x' })).statusCode).toBe(
+      401,
+    );
     expect(
-      (await h.app.inject({ method: 'GET', url: '/api/v1/help/search?q=x' })).statusCode,
-    ).not.toBe(200);
+      (
+        await h.app.inject({
+          method: 'GET',
+          url: '/api/v1/help/nav',
+          headers: { authorization: 'Bearer x' },
+        })
+      ).statusCode,
+    ).toBe(401);
   });
 });

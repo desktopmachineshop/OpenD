@@ -7,16 +7,69 @@
   <refbody>
     <section id="auth">
       <title>Authentication and CORS</title>
-      <p>Send an embed token, the same kind the widget uses, on every request:
-        <codeph>Authorization: Bearer &lt;token&gt;</codeph>. See <xref href="tokens.dita"/>.</p>
-      <ul>
-        <li>Browser requests must come from one of the allowed embed origins; others get 403
-          <codeph>{"error":"origin not allowed"}</codeph>. Requests without an <codeph>Origin</codeph> header,
-          such as from your backend, are allowed.</li>
-        <li>Preflight <codeph>OPTIONS</codeph> requests are answered for allowed origins, permitting
-          <codeph>GET</codeph> and the <codeph>authorization</codeph> header.</li>
-        <li>Responses are sent with <codeph>Cache-Control: private, no-store</codeph>.</li>
-      </ul>
+      <p>Each request is either a reader's, with a token, or anonymous, on a public site.</p>
+      <dl>
+        <dlentry>
+          <dt>With a token</dt>
+          <dd>Send an embed token, the same kind the widget uses: <codeph>Authorization: Bearer
+              &lt;token&gt;</codeph>. See <xref href="tokens.dita"/>. The answer is filtered for that
+            reader, on their release line.
+            <ul>
+              <li>Browser requests must come from one of the allowed embed origins; others get 403
+                <codeph>{"error":"origin not allowed"}</codeph>. Requests without an
+                <codeph>Origin</codeph> header, such as from your backend, are allowed.</li>
+              <li>Preflight <codeph>OPTIONS</codeph> requests are answered for allowed origins,
+                permitting <codeph>GET</codeph> and the <codeph>authorization</codeph> header.</li>
+              <li>Responses are sent with <codeph>Cache-Control: private, no-store</codeph>.</li>
+            </ul></dd>
+        </dlentry>
+        <dlentry>
+          <dt>Anonymous, on a public site</dt>
+          <dd>Send no <codeph>Authorization</codeph> header at all. On a site whose access is
+            public (see <xref href="../hosting/access.dita"/>), the answer is exactly what an
+            anonymous visitor of the site reads: the public entitlements, on the release the site
+            serves anonymous visitors. Nothing to sign, and no secret to copy into your app.
+            <ul>
+              <li>It works with embedding off: <codeph>OPEND_EMBED_SECRET</codeph> and
+                <codeph>OPEND_EMBED_ORIGINS</codeph> are not needed, because the answers hold
+                nothing the public site does not show.</li>
+              <li>Any origin may read it: responses carry <codeph>Access-Control-Allow-Origin:
+                *</codeph> and never use credentials. Server-to-server requests, without an
+                <codeph>Origin</codeph>, work the same. The help panel itself and token requests
+                keep their origin rules.</li>
+              <li>Responses are the same for everyone at a version, so they are sent with
+                <codeph>Cache-Control: public, max-age=60</codeph> and <codeph>Vary: Origin,
+                Authorization</codeph>. A new release reaches callers within a minute.</li>
+              <li>On a private site, an anonymous request gets 401, as one with a bad token does.
+                A request with an invalid token never falls back to the anonymous view.</li>
+              <li>The site's version cookie is ignored; only the <parmname>version</parmname>
+                parameter chooses a version.</li>
+            </ul></dd>
+        </dlentry>
+      </dl>
+    </section>
+
+    <section id="version">
+      <title>Choosing a version anonymously</title>
+      <p>Anonymous requests take an optional <parmname>version</parmname> query parameter on every
+        endpoint, such as <codeph>/api/v1/help/nav?version=0.22</codeph>. It is honoured exactly as
+        the site honours a reader's choice in the version picker (see
+        <xref href="../hosting/version-picker.dita"/>): only a version the picker offers anonymous
+        visitors is served. With the picker set to <codeph>live</codeph>, a version is matched by
+        its release line, so <codeph>0.22.1</codeph> asks for <codeph>0.22</codeph>. Anything else
+        (a version that is not offered, a retired line, a version that never existed, or text that
+        is not a version) is answered from the default release, never with an error, so the answer
+        does not reveal which versions exist. Token requests ignore the parameter.</p>
+    </section>
+
+    <section id="release-headers">
+      <title>Which release answered</title>
+      <p>Every answer from a release, with a token or anonymous, names it in two headers, so a
+        caller that asked for one version and was given the default can tell:</p>
+      <codeblock>OpenD-Release: 0.23.1
+OpenD-Release-Line: 0.23</codeblock>
+      <p>They are listed in <codeph>Access-Control-Expose-Headers</codeph>, so browser scripts can
+        read them. Errors before a release is chosen (401, 403) have neither.</p>
     </section>
 
     <section id="context">
@@ -46,7 +99,7 @@
         <property><proptype><parmname>title</parmname>, <parmname>shortdesc</parmname></proptype><propdesc>Plain text, filtered for the reader.</propdesc></property>
         <property><proptype><parmname>html</parmname></proptype><propdesc>The topic as an HTML <codeph>article</codeph>, filtered for the reader, with absolute links to the docs site. Sanitize or sandbox it like any HTML you did not write.</propdesc></property>
         <property><proptype><parmname>related</parmname></proptype><propdesc>Up to eight visible children and siblings in the navigation.</propdesc></property>
-        <property><proptype><parmname>fullUrl</parmname>, <parmname>embedUrl</parmname></proptype><propdesc>The page on the docs site, and in the panel.</propdesc></property>
+        <property><proptype><parmname>fullUrl</parmname>, <parmname>embedUrl</parmname></proptype><propdesc>The page on the docs site, and in the panel. <parmname>embedUrl</parmname> is <codeph>null</codeph> when embedding is not configured, as there is no panel.</propdesc></property>
       </properties>
     </section>
 
@@ -96,7 +149,7 @@
       <title>Errors</title>
       <simpletable relcolwidth="1* 5*">
         <sthead><stentry>Status</stentry><stentry>When</stentry></sthead>
-        <strow><stentry>401</stentry><stentry>The token is missing, invalid or expired.</stentry></strow>
+        <strow><stentry>401</stentry><stentry>The token is invalid or expired, or there is none and the site is private.</stentry></strow>
         <strow><stentry>403</stentry><stentry>The origin is not allowed, the email is not a registered reader of that organization, or the organization has no entitlements.</stentry></strow>
         <strow><stentry>404</stentry><stentry>No help for this context, no such topic (or one the reader cannot see), or nothing published yet for the reader's release line.</stentry></strow>
       </simpletable>
@@ -105,8 +158,9 @@
 
     <section id="images">
       <title>Images</title>
-      <p>Image URLs in <parmname>html</parmname> point at the docs site and need a docs session. If your app
-        renders help natively and the topics contain gated images, proxy them through your backend.</p>
+      <p>Image URLs in <parmname>html</parmname> point at the docs site. On a public site, the images of
+        anonymous answers at the default version open without signing in, like the site's own pages.
+        Otherwise they need a docs session: if your app renders help natively and the topics contain gated images, proxy them through your backend.</p>
     </section>
   </refbody>
 </reference>

@@ -24,7 +24,9 @@
           default, never a topic the reader cannot see. See <xref href="fallback.dita"/>.</li>
       </ol>
       <p>Apps that render help in their own UI can call the JSON API instead of showing the panel: see
-        <xref href="json-api.dita"/>.</p>
+        <xref href="json-api.dita"/>. If your docs site is public and the app needs only what any
+        visitor sees, it calls the API anonymously: no token, no secret, no embedding to turn
+        on.</p>
     </section>
     <section id="in-the-panel">
       <title>What the panel shows</title>
@@ -40,9 +42,11 @@
       <title>Turning it on</title>
       <p product="core">Embedding is off until you set <codeph>OPEND_EMBED_SECRET</codeph> and
         <codeph>OPEND_EMBED_ORIGINS</codeph> on <ph keyref="your-server"/>. Until then nothing under
-        <filepath>/embed</filepath> or <filepath>/api/v1/help</filepath> exists.</p>
+        <filepath>/embed</filepath> exists, and <filepath>/api/v1/help</filepath> answers only
+        anonymous requests on a public site.</p>
       <p product="hosted">Ask the operator of your docs site to turn on embedding for your app's origins and
-        to share the embed secret with your backend team.</p>
+        to share the embed secret with your backend team. A public site's anonymous JSON API needs
+        neither.</p>
       <p>To check context help before publishing, use the previewer's
         <xref href="../start/help-lab.dita">help lab</xref>.</p>
     </section>

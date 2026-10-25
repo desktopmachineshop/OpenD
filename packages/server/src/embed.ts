@@ -1,7 +1,13 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { LRUCache } from 'lru-cache';
 import { displayText, firstChild } from '@opend/model';
-import { resolveContext, visibleNav, type ReleaseView, type VisibleNavEntry } from '@opend/filter';
+import {
+  parseVersion,
+  resolveContext,
+  visibleNav,
+  type ReleaseView,
+  type VisibleNavEntry,
+} from '@opend/filter';
 import { frameScript, widgetScript } from '@opend/embed';
 import {
   handleEmbedRequest,
@@ -12,12 +18,12 @@ import {
   renderTopic,
   type EmbedOptions,
 } from '@opend/render-html';
-import { findReaderByEmail, getReaderAccess, type ReaderAccess } from '@opend/store';
+import { findReaderByEmail, getReaderAccess } from '@opend/store';
 import { appearance, siteThemeHref } from './appearance.js';
 import { FEEDBACK_MARKER, feedbackHtml } from './analytics.js';
 import { currentAccess, setEmbedSession } from './auth.js';
 import type { AppContext } from './context.js';
-import { readerRelease, type ReaderRelease } from './delivery.js';
+import { anonymousRelease, readerRelease, servedSiteRepo, type ReaderRelease } from './delivery.js';
 import { EmbedTokenError, verifyEmbedToken } from './embed-token.js';
 import { searchRelease } from './search.js';
 
@@ -31,16 +37,23 @@ export function embedFrameHeaders(origins: readonly string[]): Record<string, st
   };
 }
 
+/** Headers that say which release a help API answer was served from. */
+export const RELEASE_HEADERS = ['OpenD-Release', 'OpenD-Release-Line'] as const;
+
+/** How long browsers and proxies may keep an anonymous help API answer, in seconds. */
+export const ANONYMOUS_HELP_MAX_AGE = 60;
+
 /**
  * Embedded help for host apps: the panel pages a host frames, the widget and
  * frame scripts, the token-to-session exchange, and a JSON API for apps that
  * render help natively. Everything goes through the same reader filter as the
- * docs site. Without OPEND_EMBED_SECRET and OPEND_EMBED_ORIGINS none of it exists.
+ * docs site. Without OPEND_EMBED_SECRET and OPEND_EMBED_ORIGINS none of it
+ * exists, except the JSON API's anonymous answers on a public site: those are
+ * exactly what an anonymous visitor of the site reads, so they need no token.
  */
 export function registerEmbed(app: FastifyInstance, ctx: AppContext): void {
-  const embed = ctx.config.embed;
-  if (!embed) return;
-  const allowed = new Set(embed.origins);
+  const embed = ctx.config.embed ?? null;
+  const allowed = new Set(embed?.origins ?? []);
   const audience = ctx.config.publicUrl;
   /**
    * Verified bearer tokens → reader id, for at most a minute and never past the
@@ -51,12 +64,11 @@ export function registerEmbed(app: FastifyInstance, ctx: AppContext): void {
     ttl: 60_000,
   });
 
-  const frameHeaders = embedFrameHeaders([...allowed]);
-
-  /** Resolves a token to a reader whose org matches the claim. */
+  /** Resolves a token to a reader whose org matches the claim. No secret: no token is valid. */
   const readerForToken = async (
     token: string,
   ): Promise<{ readerId: number } | 'invalid' | 'forbidden'> => {
+    if (!embed) return 'invalid';
     const cached = tokens.get(token);
     if (cached && cached.expiresAtMs > Date.now()) return { readerId: cached.readerId };
     let claims;
@@ -89,6 +101,22 @@ export function registerEmbed(app: FastifyInstance, ctx: AppContext): void {
     const header = request.headers.authorization ?? '';
     return header.startsWith('Bearer ') ? header.slice(7).trim() || null : null;
   };
+
+  registerHelpApi(app, ctx, allowed, bearer, readerForToken);
+  if (embed) registerPanel(app, ctx, allowed, bearer, readerForToken);
+}
+
+type ReaderForToken = (token: string) => Promise<{ readerId: number } | 'invalid' | 'forbidden'>;
+type Bearer = (request: FastifyRequest) => string | null;
+
+function registerPanel(
+  app: FastifyInstance,
+  ctx: AppContext,
+  allowed: ReadonlySet<string>,
+  bearer: Bearer,
+  readerForToken: ReaderForToken,
+): void {
+  const frameHeaders = embedFrameHeaders([...allowed]);
 
   // The frame exchanges the host's token for a partitioned session cookie.
   app.post('/embed/session', async (request, reply) => {
@@ -196,33 +224,104 @@ export function registerEmbed(app: FastifyInstance, ctx: AppContext): void {
   app.get('/embed/context', panel);
   app.get('/embed/search', panel);
   app.get('/embed/topics/*', panel);
+}
 
-  // ---------------------------------------------------------------- JSON API
+/** The `version` a help API request asks for, when it looks like one; anything else is ignored. */
+function requestedVersion(request: FastifyRequest): string | undefined {
+  const v = (request.query as { version?: unknown }).version;
+  if (typeof v !== 'string') return undefined;
+  const version = v.trim();
+  return version && version.length <= 32 && parseVersion(version) ? version : undefined;
+}
 
+/**
+ * The help JSON API: `/api/v1/help/{context,topics/*,search,nav}`.
+ *
+ * - With an `Authorization` header: an embed token, for its reader, from any
+ *   server or from a browser on an OPEND_EMBED_ORIGINS origin. Never cached.
+ * - Without one, on a public site: the anonymous public view, at the
+ *   `version` the version picker allows (else the default), from anywhere
+ *   (`Access-Control-Allow-Origin: *`, no credentials), cacheable for a
+ *   minute. On a private site: 401.
+ *
+ * Every answer from a release says which in `OpenD-Release` and
+ * `OpenD-Release-Line`.
+ */
+function registerHelpApi(
+  app: FastifyInstance,
+  ctx: AppContext,
+  allowed: ReadonlySet<string>,
+  bearer: Bearer,
+  readerForToken: ReaderForToken,
+): void {
+  const expose = RELEASE_HEADERS.join(', ');
+
+  /** CORS for token requests: only the configured host origins (or no Origin: a server). */
   const cors = (request: FastifyRequest, reply: FastifyReply): boolean => {
     const origin = request.headers.origin;
-    void reply.header('vary', 'Origin');
     if (!origin) return true; // server-to-server
     if (!allowed.has(origin)) return false;
     void reply.headers({
       'access-control-allow-origin': origin,
       'access-control-allow-headers': 'authorization',
       'access-control-allow-methods': 'GET',
+      'access-control-expose-headers': expose,
       'access-control-max-age': '600',
     });
     return true;
   };
 
   app.options('/api/v1/help/*', async (request, reply) => {
+    void reply.header('vary', 'Origin');
     if (!cors(request, reply)) return reply.code(403).send();
     return reply.code(204).send();
   });
 
-  /** Resolves the API caller to a reader release, or answers the request itself. */
+  interface ApiCaller {
+    /** The reader's org, or null for the anonymous public view. */
+    orgSlug: string | null;
+    release: ReaderRelease;
+  }
+
+  const releaseHeaders = (reply: FastifyReply, release: ReaderRelease) =>
+    void reply.headers({
+      'opend-release': release.view.release.release,
+      'opend-release-line': release.line,
+    });
+
+  /** The anonymous public view, or null (answered) on a private site or when nothing is live. */
+  const anonymousCaller = async (
+    request: FastifyRequest,
+    reply: FastifyReply,
+  ): Promise<ApiCaller | null> => {
+    // The same for every origin, and readable by any: it is what the public site shows.
+    void reply.headers({
+      'access-control-allow-origin': '*',
+      'access-control-expose-headers': expose,
+      'cache-control': 'private, no-store',
+    });
+    const repo = await servedSiteRepo(ctx);
+    if (repo?.access !== 'public') {
+      await reply.code(401).send({ error: 'invalid or missing token' });
+      return null;
+    }
+    const release = await anonymousRelease(ctx, repo, requestedVersion(request));
+    if (typeof release === 'string') {
+      await reply.code(404).send({ error: release });
+      return null;
+    }
+    void reply.header('cache-control', `public, max-age=${ANONYMOUS_HELP_MAX_AGE}`);
+    releaseHeaders(reply, release);
+    return { orgSlug: null, release };
+  };
+
+  /** Resolves the API caller to a release, or answers the request itself. */
   const apiReader = async (
     request: FastifyRequest,
     reply: FastifyReply,
-  ): Promise<{ access: ReaderAccess; release: ReaderRelease } | null> => {
+  ): Promise<ApiCaller | null> => {
+    void reply.header('vary', 'Origin, Authorization');
+    if (request.headers.authorization === undefined) return anonymousCaller(request, reply);
     if (!cors(request, reply)) {
       await reply.code(403).send({ error: 'origin not allowed' });
       return null;
@@ -248,7 +347,8 @@ export function registerEmbed(app: FastifyInstance, ctx: AppContext): void {
       await reply.code(404).send({ error: release });
       return null;
     }
-    return { access, release };
+    releaseHeaders(reply, release);
+    return { orgSlug: access.orgSlug, release };
   };
 
   const topicJson = (view: ReleaseView, topicId: string, extra: Record<string, unknown> = {}) => {
@@ -265,18 +365,17 @@ export function registerEmbed(app: FastifyInstance, ctx: AppContext): void {
       html: renderTopic(view, topic, { base }),
       related: navNeighbours(view, topicId).map((e) => ({ topicId: e.topicId!, title: e.title })),
       fullUrl: `${base}${pageHref(topicId, '')}`,
-      embedUrl: `${ctx.config.publicUrl}/embed/topics/${pageHref(topicId, '')}`,
+      // The help panel exists only with embedding configured.
+      embedUrl: ctx.config.embed
+        ? `${ctx.config.publicUrl}/embed/topics/${pageHref(topicId, '')}`
+        : null,
     };
   };
 
-  const apiView = (
-    request: FastifyRequest,
-    r: { access: ReaderAccess; release: ReaderRelease },
-    topicId: string,
-  ) =>
+  const apiView = (request: FastifyRequest, r: ApiCaller, topicId: string) =>
     ctx.analytics.view(request, {
       surface: 'api',
-      orgSlug: r.access.orgSlug,
+      orgSlug: r.orgSlug,
       releaseLine: r.release.line,
       topicId,
     });
@@ -330,7 +429,7 @@ export function registerEmbed(app: FastifyInstance, ctx: AppContext): void {
     const hits = await searchRelease(ctx.pool, r.release, q);
     ctx.analytics.search(request, {
       surface: 'api',
-      orgSlug: r.access.orgSlug,
+      orgSlug: r.orgSlug,
       releaseLine: r.release.line,
       query: q,
       resultCount: hits.length,
