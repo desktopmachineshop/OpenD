@@ -3,7 +3,8 @@
 <task id="version-picker" product="core hosted" audience="admin">
   <title>Let readers choose the version they read</title>
   <shortdesc>The version picker beside the site title decides which version of the docs readers are served:
-    their own, one fixed version, one they choose from a list you set, or no picker at all.</shortdesc>
+    their own, one fixed version, one they choose from a list you set or from every live release line, or
+    no picker at all.</shortdesc>
   <taskbody>
     <context>
       <p>Each reader normally gets the version their organization is entitled to, and anonymous visitors of a
@@ -16,6 +17,7 @@
         <strow><stentry><codeph>reader</codeph></stentry><stentry>The reader's own</stentry><stentry>That version, for example <uicontrol>Version 1.4</uicontrol></stentry></strow>
         <strow><stentry><codeph>fixed</codeph></stentry><stentry>The fixed version, for everyone</stentry><stentry>That version</stentry></strow>
         <strow><stentry><codeph>list</codeph></stentry><stentry>The one the reader chose; at first, their own</stentry><stentry>A menu of the listed versions and the reader's own, newest first</stentry></strow>
+        <strow><stentry><codeph>live</codeph></stentry><stentry>The line the reader chose; at first, their own line (at their own version), or the newest line when theirs is not live</stentry><stentry>A menu of every live release line, newest first</stentry></strow>
       </simpletable>
     </context>
     <steps>
@@ -26,8 +28,15 @@
       </step>
       <step>
         <cmd>Under <uicontrol>Version picker</uicontrol>, choose what readers can pick: <uicontrol>Off</uicontrol>,
-          <uicontrol>Reader’s version</uicontrol>, <uicontrol>Fixed version</uicontrol> or
-          <uicontrol>Choose from a list</uicontrol>.</cmd>
+          <uicontrol>Reader’s version</uicontrol>, <uicontrol>Fixed version</uicontrol>,
+          <uicontrol>Choose from a list</uicontrol> or <uicontrol>Every live version</uicontrol>.</cmd>
+        <info><p><uicontrol>Every live version</uicontrol> (<codeph>live</codeph>) needs no list: the menu is
+          the repository's live release lines, such as <uicontrol>0.23</uicontrol>,
+          <uicontrol>0.22</uicontrol> and <uicontrol>0.21</uicontrol> with release lines by minor version.
+          Publishing 0.24 adds it to the menu, and retiring a line removes it, with nothing to change here.
+          A version is matched by its line, so a cookie or request for 0.22.1 picks 0.22. A reader on a live
+          line keeps their own version there (0.22.3 rather than 0.22), so release conditions within the line
+          still apply to them as before; on another line they get the line's name as their version.</p></info>
       </step>
       <step>
         <cmd>For <uicontrol>Fixed version</uicontrol>, type the version everyone gets in
@@ -52,7 +61,7 @@
           <codeblock>H="authorization: Bearer $OPEND_ADMIN_TOKEN"
 curl -X PUT "$PUBLIC_URL/admin/api/repos/1/versions" -H "$H" -H 'content-type: application/json' \
   -d '{"mode":"list","versions":["2.1","2.0","1.4"]}'
-# or {"mode":"fixed","version":"2.1"}, {"mode":"reader"}, {"mode":"off"}</codeblock>
+# or {"mode":"live"}, {"mode":"fixed","version":"2.1"}, {"mode":"reader"}, {"mode":"off"}</codeblock>
         </stepxmp>
       </step>
       <step importance="optional" product="core">
@@ -61,7 +70,8 @@ curl -X PUT "$PUBLIC_URL/admin/api/repos/1/versions" -H "$H" -H 'content-type: a
           <codeblock>repos:
   - fullName: acme/docs
     sourceUrl: https://github.com/acme/docs.git
-    versionPicker: { mode: list, versions: ['2.1', '2.0', '1.4'] }</codeblock>
+    versionPicker: { mode: list, versions: ['2.1', '2.0', '1.4'] }
+    # or versionPicker: { mode: live }</codeblock>
         </stepxmp>
         <info><p>A seed without <parmname>versionPicker</parmname> leaves the picker as it is.</p></info>
       </step>
@@ -83,8 +93,14 @@ curl -X PUT "$PUBLIC_URL/admin/api/repos/1/versions" -H "$H" -H 'content-type: a
           by major or by minor version. See <xref href="release-lines.dita"/>.</li>
         <li><b>Everything follows it.</b> Pages, navigation, search, images and PDFs are served for the
           version chosen, and cached per version. The staff view moves to the chosen version's release line.
-          The embedded help panel and the public API are unchanged: they always use the reader's own
-          version.</li>
+          The embedded help panel, token requests to the help JSON API and the public API are unchanged:
+          they always use the reader's own version. Anonymous requests to the help JSON API on a public
+          site follow the picker through their <parmname>version</parmname> parameter, as a visitor's
+          choice does (see <xref href="../help/json-api.dita#json-api/version"/>).</li>
+        <li><b>Defaulting to the newest version.</b> On a public site, set the public set's version to
+          <codeph>latest</codeph> (see <xref href="access.dita"/>): anonymous visitors start on the
+          newest live line, and with <codeph>live</codeph> the menu offers the others. Each new line
+          becomes the default the moment it goes live.</li>
         <li>The picker is a list of links in a <codeph>&lt;details&gt;</codeph> menu, so it works without
           scripts, and sits in the <uicontrol>Menu</uicontrol> panel on narrow screens. What readers see is
           described in <xref href="../start/switch-version.dita"/>.</li>

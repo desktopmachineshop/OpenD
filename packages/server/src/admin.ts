@@ -10,6 +10,7 @@ import {
 } from '@opend/model';
 import { releaseLine } from '@opend/filter';
 import {
+  LATEST_VERSION,
   setRepoReleaseLines,
   SETTING,
   deleteSetting,
@@ -75,6 +76,17 @@ export const entitlementsSchema = z.object({
   version: z.string().regex(/^v?\d+(\.\d+)*$/, 'a version such as 1.4'),
 });
 
+/**
+ * What anonymous visitors of a public site are entitled to: entitlements whose
+ * version may also be `latest`, the newest live release line at request time.
+ */
+export const publicEntitlementsSchema = entitlementsSchema.extend({
+  version: z.union([
+    z.literal(LATEST_VERSION),
+    z.string().regex(/^v?\d+(\.\d+)*$/, 'a version such as 1.4, or latest'),
+  ]),
+});
+
 const pickerVersion = z
   .string()
   .max(32)
@@ -83,7 +95,8 @@ const pickerVersion = z
 /**
  * The site's version picker: `off` (no picker), `reader` (show each reader
  * their own version), `fixed` (every reader gets `version`) or `list`
- * (readers choose among `versions`, and their own).
+ * (readers choose among `versions`, and their own) or `live` (readers choose
+ * among the live release lines).
  */
 export const versionPickerSchema = z.discriminatedUnion('mode', [
   z.object({ mode: z.literal('off') }),
@@ -97,6 +110,7 @@ export const versionPickerSchema = z.discriminatedUnion('mode', [
       .max(50)
       .transform((vs) => [...new Set(vs)]),
   }),
+  z.object({ mode: z.literal('live') }),
 ]);
 
 const orgSchema = z.object({
@@ -120,7 +134,7 @@ const staffSchema = z.object({ staff: z.boolean() });
  */
 export const accessSchema = z.object({
   access: z.enum(['private', 'public']),
-  publicEntitlements: entitlementsSchema.nullable().optional(),
+  publicEntitlements: publicEntitlementsSchema.nullable().optional(),
 });
 function urlWithProtocol(value: string, protocol: string): boolean {
   try {

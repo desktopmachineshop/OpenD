@@ -13,13 +13,22 @@ export type RepoAccess = 'private' | 'public';
  * What the site's version picker offers readers. `off`: no picker, each reader
  * gets their own version. `reader`: their own version, shown in the header.
  * `fixed`: every reader gets `version`. `list`: readers choose among
- * `versions` (and their own).
+ * `versions` (and their own). `live`: readers choose among the repo's live
+ * release lines, newest first, which follow publishing and retiring with no
+ * list to maintain.
  */
 export type VersionPicker =
   | { mode: 'off' }
   | { mode: 'reader' }
   | { mode: 'fixed'; version: string }
-  | { mode: 'list'; versions: string[] };
+  | { mode: 'list'; versions: string[] }
+  | { mode: 'live' };
+
+/**
+ * The public entitlements' version keyword for "the newest live release line,
+ * at request time": the site follows each new line as it goes live.
+ */
+export const LATEST_VERSION = 'latest';
 
 export interface Repo {
   id: number;
@@ -32,7 +41,7 @@ export interface Repo {
   /**
    * What anonymous visitors of a public site are entitled to. `null`: nothing
    * gated, so they see only content without product, feature or release
-   * conditions (fail-closed).
+   * conditions (fail-closed). Its `version` may be `LATEST_VERSION`.
    */
   publicEntitlements: Entitlements | null;
   /** What readers may switch between; see `VersionPicker`. */

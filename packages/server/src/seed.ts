@@ -12,7 +12,12 @@ import {
   type Pool,
 } from '@opend/store';
 import { RELEASE_LINES } from '@opend/model';
-import { changeReleaseLines, entitlementsSchema, versionPickerSchema } from './admin.js';
+import {
+  changeReleaseLines,
+  entitlementsSchema,
+  publicEntitlementsSchema,
+  versionPickerSchema,
+} from './admin.js';
 
 const seedSchema = z.object({
   repos: z
@@ -25,7 +30,7 @@ const seedSchema = z.object({
         docsPath: z.string().optional(),
         /** Omitted: keep the repo's current access (new repos: private). */
         access: z.enum(['private', 'public']).optional(),
-        publicEntitlements: entitlementsSchema.nullable().optional(),
+        publicEntitlements: publicEntitlementsSchema.nullable().optional(),
         /** Omitted: keep the repo's current version picker (new repos: off). */
         versionPicker: versionPickerSchema.optional(),
         /** Omitted: keep the repo's release lines (new repos: major). */

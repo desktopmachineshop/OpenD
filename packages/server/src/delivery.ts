@@ -34,6 +34,7 @@ import {
   findRepoByName,
   getLiveReleaseId,
   getRelease,
+  LATEST_VERSION,
   listLiveReleases,
   listRepos,
   type ReaderAccess,
@@ -189,6 +190,41 @@ async function servablePicker(ctx: AppContext, repo: Repo): Promise<Repo> {
 }
 
 /**
+ * The repo as requests are served from it: a public set whose version is
+ * `latest` is on the newest live release line, now. With nothing live, it is
+ * no public set at all (and nothing is published to show). Caches of the
+ * newest line drop when a release goes live or is retired, so the site
+ * follows a new line with no admin call.
+ */
+export async function servedRepo(ctx: AppContext, repo: Repo): Promise<Repo> {
+  const pub = repo.publicEntitlements;
+  if (pub?.version !== LATEST_VERSION) return repo;
+  const line = await newestLine(ctx, repo.id);
+  return { ...repo, publicEntitlements: line ? { ...pub, version: line } : null };
+}
+
+/** The site's repo as requests are served from it (see `servedRepo`), or null. */
+export async function servedSiteRepo(ctx: AppContext): Promise<Repo | null> {
+  const repo = await siteRepo(ctx);
+  return repo && servedRepo(ctx, repo);
+}
+
+/**
+ * The version the version picker serves for a `requested` version (checked
+ * against the picker, see `versionChoice`), and what it offers. `repo` is
+ * the served repo (see `servedRepo`).
+ */
+export async function pickVersion(
+  ctx: AppContext,
+  repo: Repo,
+  access: ReaderAccess | null,
+  requested: string | undefined,
+): Promise<VersionChoice | null> {
+  const live = repo.versionPicker.mode === 'live' ? await liveLines(ctx, repo.id) : [];
+  return versionChoice(await servablePicker(ctx, repo), ownVersion(repo, access), requested, live);
+}
+
+/**
  * The version the version picker serves a request (its `versions` cookie
  * checked against the picker, see `versionChoice`), and what it offers.
  */
@@ -198,11 +234,22 @@ export async function requestVersionChoice(
   repo: Repo,
   access: ReaderAccess | null,
 ): Promise<VersionChoice | null> {
-  return versionChoice(
-    await servablePicker(ctx, repo),
-    ownVersion(repo, access),
-    request.cookies[VERSION_COOKIE],
-  );
+  return pickVersion(ctx, repo, access, request.cookies[VERSION_COOKIE]);
+}
+
+/**
+ * What anonymous visitors of a public site get when they ask for `requested`
+ * (the version picker's cookie, or the help API's `version`): the public set,
+ * on the version the picker allows, else on the default. `repo` is the served
+ * repo (see `servedRepo`).
+ */
+export async function anonymousRelease(
+  ctx: AppContext,
+  repo: Repo,
+  requested: string | undefined,
+): Promise<ReaderRelease | string> {
+  const choice = await pickVersion(ctx, repo, null, requested);
+  return audienceRelease(ctx, repo, publicAudience(repo, chosenVersion(choice)));
 }
 
 /** The live release of the audience's line, filtered for the audience. */
@@ -271,7 +318,7 @@ export function readerPublications(ctx: AppContext, release: ReaderRelease): Pub
  * visitors could read it anyway. Private sites reveal nothing before sign-in.
  */
 export async function publicSiteTitle(ctx: AppContext): Promise<string | undefined> {
-  const repo = await siteRepo(ctx);
+  const repo = await servedSiteRepo(ctx);
   if (repo?.access !== 'public') return undefined;
   const release = await audienceRelease(ctx, repo, publicAudience(repo));
   return typeof release === 'string' ? undefined : release.view.release.title || undefined;
@@ -304,7 +351,7 @@ export async function viewerRelease(
   | { refused: 'unpublished'; message: string }
 > {
   const access = await currentAccess(request, ctx);
-  const repo = await siteRepo(ctx);
+  const repo = await servedSiteRepo(ctx);
   // Without a site there is no access mode: fail closed, as a private site.
   if (!repo)
     return access
@@ -532,10 +579,9 @@ export function registerDelivery(app: FastifyInstance, ctx: AppContext): void {
     if (urlPath.endsWith('.html'))
       return sitePage(request, reply, decodeURIComponent(urlPath.slice(1)));
     const { app: appName, key } = request.params as { app: string; key?: string };
-    const repo = await siteRepo(ctx);
+    const repo = await servedSiteRepo(ctx);
     if (repo?.access !== 'public') return notFoundPage(reply);
-    const choice = await requestVersionChoice(ctx, request, repo, null);
-    const release = await audienceRelease(ctx, repo, publicAudience(repo, chosenVersion(choice)));
+    const release = await anonymousRelease(ctx, repo, request.cookies[VERSION_COOKIE]);
     if (typeof release === 'string') return notFoundPage(reply);
     const req: { app: string; key?: string; path?: string } = { app: appName };
     const path = (request.query as { path?: unknown }).path;
