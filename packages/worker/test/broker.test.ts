@@ -205,3 +205,76 @@ describe.skipIf(!url)('polling in broker mode', () => {
     expect(fake.calls[0]!.body).toEqual({ repo: 'acme/docs', permissions: 'read' });
   });
 });
+
+describe('GitHubBroker: the site’s custom domain', () => {
+  const answer = {
+    site: 'acme',
+    domain: 'docs.acme.example',
+    status: 'awaiting-dns',
+    records: [
+      { type: 'CNAME', name: 'docs', value: 'x.up.railway.app', propagated: false },
+      { type: 'TXT', name: '_railway-verify.docs.acme.example', value: 'v', propagated: true },
+      { type: 'CNAME', name: 42, value: 'ignored' },
+    ],
+    checkedAt: '2026-10-25T10:00:00.000Z',
+    defaultAddress: 'https://acme.opend.app',
+    publicUrl: 'https://acme.opend.app',
+    available: true,
+    unavailableReason: null,
+    error: null,
+  };
+  const calls: { method: string; path: string; body: unknown; auth: string | null }[] = [];
+  const fetchImpl = (async (input: string | URL | Request, init?: RequestInit) => {
+    const u = new URL(String(input));
+    const body = typeof init?.body === 'string' ? (JSON.parse(init.body) as unknown) : null;
+    const auth = new Headers(init?.headers).get('authorization');
+    calls.push({ method: init?.method ?? 'GET', path: u.pathname, body, auth });
+    if (auth !== `Bearer ${SECRET}`)
+      return new Response('{"error":"unauthorized"}', { status: 401 });
+    const domain = (body as { domain?: string | null } | null)?.domain;
+    if (domain === 'taken.example')
+      return Response.json(
+        { error: 'taken.example is already another site’s domain' },
+        { status: 409 },
+      );
+    if (domain === 'boom.example')
+      return Response.json({ error: 'internal error' }, { status: 500 });
+    return Response.json(answer);
+  }) as typeof fetch;
+
+  it('reads and sets the domain with the instance secret, keeping only known fields', async () => {
+    const broker = new GitHubBroker({ url: BROKER, secret: SECRET }, fetchImpl);
+    const read = await broker.domain();
+    expect(read.status).toBe('awaiting-dns');
+    expect(read.records).toEqual([
+      { type: 'CNAME', name: 'docs', value: 'x.up.railway.app', propagated: false },
+      { type: 'TXT', name: '_railway-verify.docs.acme.example', value: 'v', propagated: true },
+    ]);
+    expect(read).not.toHaveProperty('site');
+    await broker.setDomain('docs.acme.example', 'olive@acme.example');
+    await broker.setDomain(null);
+    expect(calls.map(({ method, path, body }) => ({ method, path, body }))).toEqual([
+      { method: 'GET', path: '/broker/v1/domain', body: null },
+      {
+        method: 'PUT',
+        path: '/broker/v1/domain',
+        body: { domain: 'docs.acme.example', actor: 'olive@acme.example' },
+      },
+      { method: 'PUT', path: '/broker/v1/domain', body: { domain: null } },
+    ]);
+  });
+
+  it('passes on the provider’s reason for a refusal, and nothing from a failure', async () => {
+    const broker = new GitHubBroker({ url: BROKER, secret: SECRET }, fetchImpl);
+    await expect(broker.setDomain('taken.example')).rejects.toMatchObject({
+      status: 409,
+      message: 'taken.example is already another site’s domain',
+    });
+    await expect(broker.setDomain('boom.example')).rejects.toMatchObject({
+      status: 500,
+      message: 'token broker domain request failed: 500',
+    });
+    const wrong = new GitHubBroker({ url: BROKER, secret: 'nope' }, fetchImpl);
+    await expect(wrong.domain()).rejects.toBeInstanceOf(BrokerError);
+  });
+});

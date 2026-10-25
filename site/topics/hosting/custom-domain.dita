@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE task PUBLIC "-//OASIS//DTD DITA Task//EN" "task.dtd">
+<task id="custom-domain" product="core hosted" audience="admin">
+  <title>Serve your site at your own domain</title>
+  <shortdesc>On a managed site, staff set a custom domain such as <codeph>docs.example.com</codeph> on the
+    admin console's <uicontrol>Custom domain</uicontrol> page and add the DNS records it shows. A self-hosted
+    site's domain is its <codeph>PUBLIC_URL</codeph>.</shortdesc>
+  <taskbody>
+    <context>
+      <p>On a managed site the hosting provider attaches the domain and switches the site over once your DNS
+        is ready. Until then the site keeps its own address, so sign-in and links keep working, and the
+        site's own address (such as <codeph>acme.opend.app</codeph>) keeps working afterwards too. Owners can
+        do the same from their account panel at <codeph>https://opend.app/account</codeph>.</p>
+      <p>A subdomain such as <codeph>docs.example.com</codeph> is the easiest choice: it needs one
+        <codeph>CNAME</codeph> record. A domain belongs to one site at a time.</p>
+    </context>
+    <steps>
+      <step>
+        <cmd>Open <menucascade><uicontrol>Admin</uicontrol><uicontrol>Custom domain</uicontrol></menucascade>.</cmd>
+        <info><p>The page is also linked from the <uicontrol>Overview</uicontrol> and from
+          <uicontrol>Site &amp; access</uicontrol>. Only staff readers can open it.</p></info>
+      </step>
+      <step>
+        <cmd>Enter the domain, without <codeph>https://</codeph>, and select <uicontrol>Add domain</uicontrol>.</cmd>
+        <stepresult><p>The status is <uicontrol>Being attached</uicontrol>. In a few minutes it changes to
+          <uicontrol>Waiting for DNS</uicontrol> and the page lists the records to add.</p></stepresult>
+      </step>
+      <step>
+        <cmd>Add each record at your DNS provider, exactly as shown.</cmd>
+        <info>
+          <p>Your DNS provider is where you bought the domain, or where its DNS is hosted. The table gives
+            each record's type, name and value; click a name or value to select it for copying. There is a
+            <codeph>CNAME</codeph> that points the domain at the site and a <codeph>TXT</codeph> record named
+            <codeph>_railway-verify.<varname>your domain</varname></codeph> that proves you own it.</p>
+          <p>The <uicontrol>Propagated</uicontrol> column shows <uicontrol>Pending</uicontrol> until the
+            provider sees a record, then <uicontrol>✓ In place</uicontrol>. <uicontrol>Last checked</uicontrol>
+            says when it last looked; it checks every few minutes.</p>
+        </info>
+      </step>
+      <step>
+        <cmd>Wait for the records to propagate.</cmd>
+        <info><p>Usually minutes, sometimes a few hours. Nothing else is needed: the site switches to the
+          domain by itself.</p></info>
+        <stepresult><p>The status is <uicontrol>Live</uicontrol>. Links, sign-in and the editor use the new
+          domain; the site's own address keeps working, so existing links still reach it.</p></stepresult>
+      </step>
+    </steps>
+    <result>
+      <p>To use another domain, enter it and select <uicontrol>Change domain</uicontrol>: the new one starts
+        again with its own records, and the site stays at its own address until they are in place.
+        <uicontrol>Remove domain</uicontrol> puts the site back on its own address at once; delete the DNS
+        records afterwards. Keep the records while the domain is live: removing them takes it offline.</p>
+      <p><uicontrol>Needs attention</uicontrol> means the provider could not attach the domain. Check its
+        spelling and that no other service uses it, then remove it and add it again; if it keeps failing,
+        ask <ph keyref="help-contact"/>. A suspended site cannot change its domain until it is running
+        again.</p>
+    </result>
+    <postreq>
+      <section id="self-hosted">
+        <title>Self-hosted sites</title>
+        <p>A site on your own server has no provider to attach domains: the <uicontrol>Custom
+          domain</uicontrol> page shows its address and explains this, with no form. To move it, point the
+          domain at your server, serve it with HTTPS from your reverse proxy or hosting platform, set
+          <codeph>PUBLIC_URL</codeph> to the new address and restart. Register the new sign-in callback with
+          your identity provider and GitHub App first. See <xref href="env-vars.dita"/>.</p>
+      </section>
+    </postreq>
+  </taskbody>
+</task>

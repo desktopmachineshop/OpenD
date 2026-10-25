@@ -17,6 +17,8 @@
           access, the version picker and release lines (<xref href="site-settings.dita"/>). With several,
           <uicontrol>Docs source</uicontrol> lists them: pick yours and the first build starts. Pushes reach
           the site through the provider, already verified.</li>
+        <li><uicontrol>Custom domain</uicontrol> serves the site at your own domain: add the DNS records it
+          lists, and it switches over once they have propagated (<xref href="custom-domain.dita"/>).</li>
         <li>Readers and staff sign in with <uicontrol>Sign in with GitHub</uicontrol>, which goes through the
           provider's sign-in service; the web editor signs authors in the same way.</li>
       </ul>

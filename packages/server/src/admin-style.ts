@@ -162,6 +162,9 @@ ${Object.entries(THEME_PRESETS)
   })
   .join('\n')}
 .admin-reset { margin: -8px 0 20px; }
+/* Custom domain: DNS records to copy, as rows of cards on phones. */
+.admin-dns code { white-space: normal; overflow-wrap: anywhere; }
+.admin-copy { user-select: all; cursor: text; }
 .admin-preview-links { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 0; padding: 0; list-style: none; font-size: 14.5px; }
 
 @media (max-width: 60rem) {
@@ -173,5 +176,13 @@ ${Object.entries(THEME_PRESETS)
   .admin-table th, .admin-table td { padding: 9px 10px; }
   .admin-table td.admin-actions { white-space: normal; }
   .site-menu-panel .admin-nav-label { margin-top: 12px; }
+}
+@media (max-width: 40rem) {
+  .admin-dns thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .admin-dns, .admin-dns tbody, .admin-dns tr { display: block; }
+  .admin-dns tr { padding: 8px 12px; border-bottom: 1px solid var(--opend-border); }
+  .admin-dns tbody tr:last-child { border-bottom: 0; }
+  .admin-dns td { display: grid; grid-template-columns: 6.5rem minmax(0, 1fr); gap: 8px; align-items: start; justify-items: start; padding: 4px 0; border: 0; }
+  .admin-dns td::before { content: attr(data-label); font-size: 13px; font-weight: 650; color: var(--opend-muted); }
 }
 `;
