@@ -305,6 +305,15 @@ export async function startFleet(
         return;
       }
       if (host === fleet.host) return admin.routing(req, res);
+      const redirect = fleet.redirects.get(host);
+      if (redirect) {
+        res.writeHead(301, {
+          location: `${redirect}${req.url ?? '/'}`,
+          'cache-control': 'max-age=3600',
+        });
+        res.end();
+        return;
+      }
       const found = await lookup(host);
       if (!found)
         return page(res, 404, 'No site here', 'There is no documentation site at this address.');

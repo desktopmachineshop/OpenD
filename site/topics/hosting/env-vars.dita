@@ -114,6 +114,7 @@
         <property id="OPEND_FLEET_TOKEN"><proptype><codeph>OPEND_FLEET_TOKEN</codeph></proptype><propvalue>none (required)</propvalue><propdesc>Bearer token for the fleet admin API. At least 32 characters.</propdesc></property>
         <property id="OPEND_FLEET_HOST"><proptype><codeph>OPEND_FLEET_HOST</codeph></proptype><propvalue>none (required)</propvalue><propdesc>The fleet's own host name, where the admin API answers. No site may use it.</propdesc></property>
         <property id="OPEND_FLEET_MAX_SITES"><proptype><codeph>OPEND_FLEET_MAX_SITES</codeph></proptype><propvalue><codeph>200</codeph></propvalue><propdesc>How many site apps (docs and editor counted separately) stay running at once. The least recently used are closed beyond it and restart on their next request.</propdesc></property>
+        <property id="OPEND_FLEET_REDIRECTS"><proptype><codeph>OPEND_FLEET_REDIRECTS</codeph></proptype><propvalue>(none)</propvalue><propdesc>Hosts under the fleet's domain answered with a permanent redirect instead of a site, keeping the path and query: comma-separated <codeph>host=https://origin</codeph> pairs, such as <codeph>www.opend.app=https://opend.app</codeph>.</propdesc></property>
         <property id="OPEND_FLEET_WORKER_CONCURRENCY"><proptype><codeph>OPEND_FLEET_WORKER_CONCURRENCY</codeph></proptype><propvalue><codeph>2</codeph></propvalue><propdesc>Build jobs the fleet worker runs at once, across all sites. One site never runs two at a time.</propdesc></property>
       </properties>
     </section>
