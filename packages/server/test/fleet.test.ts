@@ -124,6 +124,7 @@ describe.skipIf(!url)('a fleet of sites', () => {
       OPEND_FLEET_HOST: 'fleet.test',
       // One running site at a time, so every switch between sites restarts one.
       OPEND_FLEET_MAX_SITES: '1',
+      OPEND_FLEET_REDIRECTS: 'www.docs.test=https://docs.test',
       BLOB_DIR: blobDir,
       NODE_ENV: 'test',
     });
@@ -283,6 +284,27 @@ describe.skipIf(!url)('a fleet of sites', () => {
         { site: 'b', ran: [] },
       ]),
     );
+  });
+
+  it('redirects the hosts it is told to, keeping path and query', async () => {
+    const res = await call('WWW.docs.test', 'GET', '/pricing?plan=team');
+    expect(res.status).toBe(301);
+    expect(res.headers.location).toBe('https://docs.test/pricing?plan=team');
+    expect((await call('nowhere.docs.test', 'GET', '/')).status).toBe(404);
+    for (const bad of [
+      'www.docs.test',
+      'www.docs.test=http://docs.test',
+      'x=https://docs.test/path',
+    ])
+      expect(() =>
+        loadFleetConfig({
+          DATABASE_URL: 'postgres://x',
+          OPEND_FLEET_KEY: 'fleet-key-0123456789abcdef0123456789',
+          OPEND_FLEET_TOKEN: FLEET_TOKEN,
+          OPEND_FLEET_HOST: 'fleet.test',
+          OPEND_FLEET_REDIRECTS: bad,
+        }),
+      ).toThrow(/OPEND_FLEET_REDIRECTS/);
   });
 
   it('forwards hosts it holds to a dedicated instance elsewhere', async () => {

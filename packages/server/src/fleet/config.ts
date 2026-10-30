@@ -33,6 +33,11 @@ const schema = z.object({
   /** The fleet's own host name, where its admin API answers (`/fleet/api`). */
   OPEND_FLEET_HOST: z.string().min(1),
   OPEND_FLEET_MAX_SITES: z.coerce.number().int().min(1).default(200),
+  /**
+   * Hosts answered with a permanent redirect instead of a site, such as
+   * `www.opend.app=https://opend.app`: comma-separated `host=https origin` pairs.
+   */
+  OPEND_FLEET_REDIRECTS: z.string().default(''),
   OPEND_FLEET_WORKER_CONCURRENCY: z.coerce.number().int().min(1).max(32).default(2),
   PORT: z.coerce.number().int().default(3000),
   HOST: z.string().default('0.0.0.0'),
@@ -44,6 +49,8 @@ export interface FleetConfig {
   token: string;
   host: string;
   maxSites: number;
+  /** Hosts answered with a permanent redirect to an origin, keeping path and query. */
+  redirects: Map<string, string>;
   workerConcurrency: number;
   port: number;
   bindHost: string;
@@ -64,11 +71,39 @@ export function loadFleetConfig(env: NodeJS.ProcessEnv = process.env): FleetConf
     token: e.OPEND_FLEET_TOKEN,
     host: normaliseHost(e.OPEND_FLEET_HOST),
     maxSites: e.OPEND_FLEET_MAX_SITES,
+    redirects: parseRedirects(e.OPEND_FLEET_REDIRECTS),
     workerConcurrency: e.OPEND_FLEET_WORKER_CONCURRENCY,
     port: e.PORT,
     bindHost: e.HOST,
     env,
   };
+}
+
+/** `host=https://origin` pairs, comma-separated; throws on anything else. */
+function parseRedirects(value: string): Map<string, string> {
+  const redirects = new Map<string, string>();
+  for (const pair of value
+    .split(',')
+    .map((p) => p.trim())
+    .filter(Boolean)) {
+    const [host, target] = pair.split('=').map((p) => p.trim());
+    let origin: string | null;
+    try {
+      const url = target ? new URL(target) : null;
+      origin =
+        url?.protocol === 'https:' && url.origin === target!.replace(/\/+$/, '')
+          ? url.origin
+          : null;
+    } catch {
+      origin = null;
+    }
+    if (!host || !origin)
+      throw new Error(
+        `invalid fleet configuration: OPEND_FLEET_REDIRECTS: "${pair}" is not host=https://origin`,
+      );
+    redirects.set(normaliseHost(host), origin);
+  }
+  return redirects;
 }
 
 /** A database URL whose connections use the site's schema. */
