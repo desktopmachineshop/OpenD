@@ -7,7 +7,8 @@ on:
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    # Pinned: ubuntu-latest is now 26.04, where Playwright cannot install its browsers.
+    runs-on: ubuntu-24.04
     services:
       postgres:
         image: postgres:16
