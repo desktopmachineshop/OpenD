@@ -74,14 +74,17 @@ OpenD-Release-Line: 0.23</codeblock>
 
     <section id="context">
       <title>GET /api/v1/help/context</title>
-      <p>The help for a context. Query parameters: <parmname>app</parmname> (required), and
-        <parmname>key</parmname> or <parmname>path</parmname>. Resolves as described in
-        <xref href="fallback.dita"/>.</p>
+      <p>The help for a context. Query parameters: <parmname>app</parmname> (required), the view as
+        <parmname>key</parmname> or <parmname>path</parmname>, and optionally what the reader is doing:
+        <parmname>focus</parmname>, <parmname>action</parmname> and <parmname>pane</parmname>, each a context
+        key (see <xref href="activity.dita"/>). Values longer than 256 characters are ignored. Resolves as
+        described in <xref href="fallback.dita"/>.</p>
       <codeblock>curl -H "Authorization: Bearer $TOKEN" \
   "https://docs.example.com/api/v1/help/context?app=opend-console&amp;path=/tenants/acme"</codeblock>
       <codeblock>{
   "key": "tenants",
   "via": "parent",
+  "signal": "view",
   "fragment": null,
   "topicId": "topics/next/console",
   "title": "Operator console (coming soon)",
@@ -94,6 +97,7 @@ OpenD-Release-Line: 0.23</codeblock>
       <properties relcolwidth="2* 5*">
         <prophead><proptypehd>Field</proptypehd><propdeschd>Meaning</propdeschd></prophead>
         <property><proptype><parmname>key</parmname>, <parmname>via</parmname></proptype><propdesc>The key that matched, and how: <codeph>key</codeph>, <codeph>parent</codeph> or <codeph>default</codeph>.</propdesc></property>
+        <property><proptype><parmname>signal</parmname></proptype><propdesc>Which signal gave the key: <codeph>focus</codeph>, <codeph>action</codeph>, <codeph>pane</codeph> or <codeph>view</codeph>; <codeph>null</codeph> when the app default answered.</propdesc></property>
         <property><proptype><parmname>fragment</parmname></proptype><propdesc>The element or nested topic to scroll to, or <codeph>null</codeph>. It is <codeph>null</codeph> when that element is filtered out for this reader, so it never names a section they cannot see.</propdesc></property>
         <property><proptype><parmname>topicId</parmname></proptype><propdesc>The topic's page id, for <filepath>/api/v1/help/topics/</filepath>.</propdesc></property>
         <property><proptype><parmname>title</parmname>, <parmname>shortdesc</parmname></proptype><propdesc>Plain text, filtered for the reader.</propdesc></property>
@@ -106,8 +110,8 @@ OpenD-Release-Line: 0.23</codeblock>
     <section id="topics">
       <title>GET /api/v1/help/topics/&lt;topicId&gt;</title>
       <p>One topic by page id, such as <filepath>/api/v1/help/topics/topics/help/widget</filepath>. Same
-        fields as above, without <parmname>key</parmname>, <parmname>via</parmname> and
-        <parmname>fragment</parmname>.</p>
+        fields as above, without <parmname>key</parmname>, <parmname>via</parmname>,
+        <parmname>signal</parmname> and <parmname>fragment</parmname>.</p>
     </section>
 
     <section id="nav">

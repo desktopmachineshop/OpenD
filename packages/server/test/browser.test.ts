@@ -91,6 +91,28 @@ describe.skipIf(!url || !hasBrowser)('embedded help widget in a browser', () => 
         return;
       }
       res.setHeader('content-type', 'text/html');
+      if (u.pathname === '/settings') {
+        // A host view whose fields, buttons and tabs say which help they need.
+        res.end(`<!doctype html><html><body>
+<h1>Settings</h1>
+<div role="tablist"><button role="tab" id="audit-tab" data-help-pane="settings.audit">Audit</button></div>
+<form data-help-key="settings">
+  <label>Identity provider URL <input id="idp" data-help-key="settings.sso.idp"></label>
+  <button type="button" id="pair" data-help-key="devices.gadget">Pair a device</button>
+</form>
+<label>Search <input id="plain"></label>
+<opend-help-button></opend-help-button>
+<script src="${docsUrl}/embed/opend-help.js"></script>
+<script>
+  OpenDHelp.init({
+    docsUrl: ${JSON.stringify(docsUrl)},
+    app: 'console',
+    getToken: () => fetch('/token?user=gus').then((r) => r.text()),
+  });
+  OpenDHelp.setContext({ path: '/' });
+</script></body></html>`);
+        return;
+      }
       res.end(`<!doctype html><html><body>
 <h1>Host app</h1>
 <button id="before">Focus me</button>
@@ -193,6 +215,64 @@ describe.skipIf(!url || !hasBrowser)('embedded help widget in a browser', () => 
     expect(await page.evaluate(() => document.activeElement?.tagName.toLowerCase())).toBe(
       'opend-help-button',
     );
+    await page.close();
+  });
+
+  it('follows the focused field, the last button and the last pane', async () => {
+    type Help = {
+      OpenDHelp: {
+        activity(): Record<string, string>;
+        open(c?: object): void;
+        close(): void;
+        setContext(c: object): void;
+      };
+    };
+    const page = await browser.newPage();
+    await page.goto(`${hostUrl}/settings`);
+    const activity = () => page.evaluate(() => (window as unknown as Help).OpenDHelp.activity());
+
+    // The tab sets the pane; the help button itself is not activity.
+    await page.click('#audit-tab');
+    await page.locator('opend-help-button').locator('button').click();
+    await expect.poll(() => frameText(page), { timeout: 10_000 }).toContain('Audit log events');
+    expect(await activity()).toEqual({ pane: 'settings.audit', path: '/' });
+
+    // While the panel is open it follows: a pressed button beats the pane…
+    await page.click('#pair');
+    await expect.poll(() => frameText(page)).toContain('Pair a Gadget');
+    // …a focused field beats the button, falling back to its parent key…
+    await page.focus('#idp');
+    await expect.poll(() => frameText(page)).toContain('Configure single sign-on');
+    // …and focus on an unlabelled field leaves the last button in charge.
+    await page.focus('#plain');
+    await expect.poll(() => frameText(page)).toContain('Pair a Gadget');
+    expect(await activity()).toEqual({
+      action: 'devices.gadget',
+      pane: 'settings.audit',
+      path: '/',
+    });
+
+    // Once the reader navigates inside the panel, it stays where they took it.
+    const frame = await helpFrame(page);
+    await frame.waitForSelector('input[name=q]');
+    await frame.fill('input[name=q]', 'install');
+    await frame.press('input[name=q]', 'Enter');
+    await expect.poll(() => frameText(page)).toContain('Search help');
+    await page.focus('#idp');
+    await page.waitForTimeout(600);
+    expect(await frameText(page)).toContain('Search help');
+
+    // An explicit context ignores activity; a new view forgets the old button and pane.
+    await page.evaluate(() => {
+      const help = (window as unknown as Help).OpenDHelp;
+      help.close();
+      help.open({ key: 'overview' });
+    });
+    await expect
+      .poll(async () => (await helpFrame(page)).textContent('h1').catch(() => ''))
+      .toContain('Widget Platform overview');
+    await page.evaluate(() => (window as unknown as Help).OpenDHelp.setContext({ path: '/x' }));
+    expect(await activity()).toEqual({ focus: 'settings.sso.idp', path: '/x' });
     await page.close();
   });
 

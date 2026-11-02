@@ -1,5 +1,13 @@
 import type { NavEntry } from '@opend/model';
-import { resolveContext, searchView, type ReleaseView, type SearchHit } from '@opend/filter';
+import {
+  ACTIVITY_SIGNALS,
+  parseContextRequest,
+  resolveContext,
+  searchView,
+  type ContextRequest,
+  type ReleaseView,
+  type SearchHit,
+} from '@opend/filter';
 import { encodePath, escapeHtml } from './escape.js';
 import { pageHref, renderTopic, type RenderOptions } from './render.js';
 import { DEFAULT_CSS } from './style.js';
@@ -192,11 +200,12 @@ export function renderEmbedSignIn(next: string, o: EmbedOptions = {}): string {
   });
 }
 
-export function embedContextHref(
-  o: EmbedOptions,
-  request: { key?: string; path?: string },
-): string {
+export function embedContextHref(o: EmbedOptions, request: Omit<ContextRequest, 'app'>): string {
   const extra: Record<string, string> = {};
+  for (const signal of ACTIVITY_SIGNALS) {
+    const value = request[signal];
+    if (value) extra[signal] = value;
+  }
   if (request.key) extra.key = request.key;
   if (request.path) extra.path = request.path;
   return `${embedBase(o)}/context${carry(o, extra)}`;
@@ -220,7 +229,8 @@ export interface EmbedResult {
  * Answers an embed request for one reader's view. Shared by the previewer and
  * hosted delivery so both resolve contexts, topics and search the same way:
  *
- *   /embed/context?app=&key=|path=   the help for a host-app context
+ *   /embed/context?app=&focus=&action=&pane=&key=|path=
+ *                                    the help for a host-app context
  *   /embed/topics/<id>.html          a topic in the panel
  *   /embed/search?q=                 search the reader's visible topics
  *
@@ -237,13 +247,7 @@ export function handleEmbedRequest(
 ): EmbedResult {
   const base = embedBase(o);
   if (path === `${base}/context`) {
-    const app = params.get('app') ?? '';
-    const request: { app: string; key?: string; path?: string } = { app };
-    const key = params.get('key');
-    const hostPath = params.get('path');
-    if (key) request.key = key;
-    else if (hostPath) request.path = hostPath;
-    const resolved = resolveContext(view, request);
+    const resolved = resolveContext(view, parseContextRequest(params));
     // resolveContext only returns topics this reader can see.
     if (resolved?.fragment) {
       const location = `${embedTopicHref(resolved.topicId, o)}#${encodeURIComponent(resolved.fragment)}`;

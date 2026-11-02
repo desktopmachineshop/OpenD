@@ -33,7 +33,40 @@ export interface WidgetOptions {
   zIndex?: number;
   /** Called when the reader navigates inside the help panel. */
   onNavigate?: (topic: { topicId: string; title: string }) => void;
+  /**
+   * Watch focus and clicks for `data-help-key` and `data-help-pane` attributes,
+   * and send what they say with every help request. Default true; elements
+   * without those attributes are never reported.
+   */
+  activity?: boolean;
+  /**
+   * While the panel is open, move it to the help for the reader's new focus,
+   * action or pane, until the reader navigates inside the panel. Default true.
+   */
+  follow?: boolean;
 }
 
-/** What the host passes to `open` and `setContext`: a context key, or its current path. */
+/** What the host passes to `open` and `setContext`: the view, as a context key or its current path. */
 export type HelpContext = { key: string } | { path: string };
+
+/**
+ * What the reader is doing inside the view, most specific first. Each is a
+ * context key; `null` clears it.
+ */
+export interface Activity {
+  /** The field or control that is selected or has focus. */
+  focus?: string | null;
+  /** The button or command the reader last pressed. */
+  action?: string | null;
+  /** The tab or pane the reader last worked in. */
+  pane?: string | null;
+}
+
+/** Everything a help request carries, as query parameters for `/embed/context` or the JSON API. */
+export interface ContextQuery {
+  focus?: string;
+  action?: string;
+  pane?: string;
+  key?: string;
+  path?: string;
+}

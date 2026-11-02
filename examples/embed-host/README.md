@@ -12,6 +12,6 @@
    ```
    OPEND_URL=http://localhost:3000 OPEND_EMBED_SECRET=<same secret> node examples/embed-host/server.mjs
    ```
-3. Open http://localhost:5173/?user=ann and http://localhost:5173/?user=gus. Click **?** and move between pages: the panel follows the route through `help-contexts.yaml`, and each user sees only the help their org is entitled to.
+3. Open http://localhost:5173/?user=ann and http://localhost:5173/?user=gus. Click **?** and move between pages: the panel follows the route through `help-contexts.yaml`, and each user sees only the help their org is entitled to. With the panel open, choose a tab, click into a field or press **Pair a device**: the panel follows the focused field, then the last button, then the tab (`data-help-key`, `data-help-pane`). **F1** opens help for the field that has focus.
 
 The `/token` endpoint stands in for your backend. It signs a short-lived embed token for the user signed in to your app. The secret never reaches the browser.

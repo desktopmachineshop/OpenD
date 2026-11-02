@@ -12,6 +12,9 @@
         <strow><stentry><filepath>GET /context/<varname>app</varname>/<varname>key</varname></filepath></stentry><stentry>Resolves the key as described in <xref href="fallback.dita"/> (the key, its parents, then the app default) in anonymous visitors' view, and answers 302 to the topic page, with <codeph>#<varname>fragment</varname></codeph> when the key points at a section.</stentry></strow>
         <strow><stentry><filepath>GET /context/<varname>app</varname>?path=<varname>path</varname></filepath></stentry><stentry>The same, for a path of your app, mapped to a key by the routes in <filepath>help-contexts.yaml</filepath>. Without a key or path, the app's default.</stentry></strow>
       </simpletable>
+      <p>Both also take the activity signals <parmname>focus</parmname>, <parmname>action</parmname> and
+        <parmname>pane</parmname> (see <xref href="activity.dita"/>), which are tried before the key or
+        path: <codeph>/context/console?focus=settings.sso.issuer&amp;path=/settings/sso</codeph>.</p>
       <codeblock>&lt;a href="https://docs.example.com/context/console/settings.sso"&gt;Help&lt;/a&gt;</codeblock>
     </section>
     <section id="rules">

@@ -53,6 +53,19 @@ OpenDHelp.setContext({ key: 'tenants.detail' });</codeblock>
         </info>
       </step>
       <step>
+        <cmd>Optional: mark the fields, buttons and panes that have their own help.</cmd>
+        <stepxmp>
+          <codeblock><![CDATA[<section role="tabpanel" data-help-pane="tenants.detail.domains">
+  <input name="domain" data-help-key="tenants.detail.domains.add">
+  <button data-help-key="tenants.detail.domains.verify">Verify</button>
+</section>]]></codeblock>
+        </stepxmp>
+        <info>
+          <p>The panel then opens on the help for the focused field, then the last button pressed, then the
+            pane, then the page. See <xref href="activity.dita"/>.</p>
+        </info>
+      </step>
+      <step>
         <cmd>Add a help button where it fits your layout.</cmd>
         <stepxmp>
           <codeblock><![CDATA[<opend-help-button></opend-help-button>

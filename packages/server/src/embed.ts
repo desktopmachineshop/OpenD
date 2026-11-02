@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { LRUCache } from 'lru-cache';
 import { displayText, firstChild } from '@opend/model';
 import {
+  parseContextRequest,
   parseVersion,
   resolveContext,
   visibleNav,
@@ -383,16 +384,14 @@ function registerHelpApi(
   app.get('/api/v1/help/context', async (request, reply) => {
     const r = await apiReader(request, reply);
     if (!r) return reply;
-    const q = request.query as { app?: string; key?: string; path?: string };
-    const req: { app: string; key?: string; path?: string } = { app: q.app ?? '' };
-    if (q.key) req.key = q.key;
-    else if (q.path) req.path = q.path;
+    const req = parseContextRequest(request.query as Record<string, unknown>);
     const resolved = resolveContext(r.release.view, req);
     const body =
       resolved &&
       topicJson(r.release.view, resolved.topicId, {
         key: resolved.key,
         via: resolved.via,
+        signal: resolved.signal ?? null,
         fragment: resolved.fragment ?? null,
       });
     if (!body) return reply.code(404).send({ error: 'no help for this context' });

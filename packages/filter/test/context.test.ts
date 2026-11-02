@@ -7,8 +7,11 @@ import {
   parseRoutePattern,
   pathSegments,
   readerPolicy,
+  MAX_CONTEXT_VALUE,
+  parseContextRequest,
   resolveContext,
   viewRelease,
+  type ContextRequest,
 } from '../src/index.js';
 
 describe('route patterns', () => {
@@ -79,7 +82,18 @@ describe('resolveContext', () => {
     title: 'Docs',
     builtAt: '2026-10-16T00:00:00Z',
     attributes: {},
-    nav: ['overview', 'settings', 'sso', 'gadget', 'notes1', 'notes2'].map((id) => ({
+    nav: [
+      'overview',
+      'settings',
+      'sso',
+      'gadget',
+      'notes1',
+      'notes2',
+      'issuer',
+      'advanced',
+      'export',
+      'secret',
+    ].map((id) => ({
       title: id,
       topicId: id,
       condition: {},
@@ -94,6 +108,10 @@ describe('resolveContext', () => {
       gadget: topic('gadget', { product: 'gadget' }),
       notes1: topic('notes1'),
       notes2: topic('notes2'),
+      issuer: topic('issuer'),
+      advanced: topic('advanced'),
+      export: topic('export'),
+      secret: topic('secret', { feature: 'secret' }),
     },
     chunkUsage: {},
     assets: [],
@@ -114,6 +132,10 @@ describe('resolveContext', () => {
           'settings.missing': [{ topicId: 'settings', fragment: 'no-such-id', conditions: [] }],
           'settings.sso': [{ topicId: 'sso', fragment: 'setup', conditions: [] }],
           'devices.gadget': [{ topicId: 'gadget', conditions: [] }],
+          'settings.sso.issuer': [{ topicId: 'issuer', conditions: [] }],
+          'settings.sso.advanced': [{ topicId: 'advanced', conditions: [] }],
+          'settings.sso.secret': [{ topicId: 'secret', conditions: [] }],
+          'export.csv': [{ topicId: 'export', conditions: [] }],
           'whats-new': [
             { topicId: 'notes1', conditions: [{ release: '1' }] },
             { topicId: 'notes2', conditions: [{ release: '2' }] },
@@ -134,6 +156,7 @@ describe('resolveContext', () => {
       fragment: 'setup',
       key: 'settings.sso',
       via: 'key',
+      signal: 'view',
     });
     expect(resolveContext(pro, { app: 'console', path: '/devices/7/pair' })).toMatchObject({
       topicId: 'gadget',
@@ -148,6 +171,7 @@ describe('resolveContext', () => {
       topicId: 'settings',
       key: 'settings',
       via: 'parent',
+      signal: 'view',
     });
     expect(resolveContext(basicV1, { app: 'console', path: '/devices/7/pair' })).toEqual({
       topicId: 'overview',
@@ -174,17 +198,124 @@ describe('resolveContext', () => {
       fragment: 'audit-retention',
       key: 'settings.retention',
       via: 'key',
+      signal: 'view',
     });
     // The section is filtered out for this reader, so its id must not leak.
     expect(resolveContext(pro, { app: 'console', key: 'settings.retention' })).toEqual({
       topicId: 'settings',
       key: 'settings.retention',
       via: 'key',
+      signal: 'view',
     });
     expect(resolveContext(audit, { app: 'console', key: 'settings.missing' })).toEqual({
       topicId: 'settings',
       key: 'settings.missing',
       via: 'key',
+      signal: 'view',
+    });
+  });
+
+  describe('activity signals', () => {
+    const resolve = (request: Omit<ContextRequest, 'app'>, v = pro) =>
+      resolveContext(v, { app: 'console', ...request });
+
+    it('prefers focus, then the last action, then the pane, then the view', () => {
+      const all = {
+        focus: 'settings.sso.issuer',
+        action: 'export.csv',
+        pane: 'settings.sso.advanced',
+        key: 'settings',
+      };
+      expect(resolve(all)).toEqual({
+        topicId: 'issuer',
+        key: all.focus,
+        via: 'key',
+        signal: 'focus',
+      });
+      const { focus: _f, ...noFocus } = all;
+      expect(resolve(noFocus)).toMatchObject({ topicId: 'export', signal: 'action' });
+      const { action: _a, ...paneAndView } = noFocus;
+      expect(resolve(paneAndView)).toMatchObject({ topicId: 'advanced', signal: 'pane' });
+      expect(resolve({ key: 'settings' })).toMatchObject({ topicId: 'settings', signal: 'view' });
+    });
+
+    it('falls back to a signal’s parents before the next signal', () => {
+      expect(
+        resolve({ focus: 'settings.sso.issuer.hint', action: 'export.csv', key: 'overview' }),
+      ).toEqual({ topicId: 'issuer', key: 'settings.sso.issuer', via: 'parent', signal: 'focus' });
+      // settings.sso is the field's own section: it beats an unrelated action.
+      expect(
+        resolve({ focus: 'settings.sso.nofield', action: 'export.csv', key: 'overview' }),
+      ).toMatchObject({ topicId: 'sso', key: 'settings.sso', via: 'parent', signal: 'focus' });
+    });
+
+    it('leaves a parent shared with a later signal to that signal', () => {
+      // settings.sso is also the pane's parent, so the more specific pane wins first.
+      expect(resolve({ focus: 'settings.sso.nofield', pane: 'settings.sso.advanced' })).toEqual({
+        topicId: 'advanced',
+        key: 'settings.sso.advanced',
+        via: 'key',
+        signal: 'pane',
+      });
+      expect(resolve({ focus: 'settings.sso.nofield', key: 'settings.sso' })).toMatchObject({
+        key: 'settings.sso',
+        via: 'key',
+        signal: 'view',
+      });
+    });
+
+    it('maps a path view under the signals, and ends at the default', () => {
+      expect(resolve({ focus: 'nope', path: '/devices/7/pair' })).toMatchObject({
+        topicId: 'gadget',
+        signal: 'view',
+      });
+      expect(resolve({ focus: 'nope', action: 'also.nope' })).toEqual({
+        topicId: 'overview',
+        key: 'overview',
+        via: 'default',
+      });
+    });
+
+    it('never opens a hidden topic for a signal: it falls back', () => {
+      expect(
+        resolve({ focus: 'settings.sso.secret', pane: 'settings.sso.advanced' }),
+      ).toMatchObject({ topicId: 'advanced', signal: 'pane' });
+      expect(resolve({ action: 'settings.sso.secret' })).toMatchObject({
+        topicId: 'sso',
+        via: 'parent',
+      });
+      const insider = view(['widget'], ['sso', 'secret'], '2.1');
+      expect(resolve({ action: 'settings.sso.secret' }, insider)).toMatchObject({
+        topicId: 'secret',
+        signal: 'action',
+      });
+    });
+  });
+
+  describe('parseContextRequest', () => {
+    it('reads the signals and the view from query parameters', () => {
+      expect(
+        parseContextRequest(
+          new URLSearchParams('app=console&focus=a.b&action=c&pane=d&key=e&path=/f'),
+        ),
+      ).toEqual({ app: 'console', focus: 'a.b', action: 'c', pane: 'd', key: 'e' });
+      expect(parseContextRequest({ app: 'console', path: '/f' })).toEqual({
+        app: 'console',
+        path: '/f',
+      });
+    });
+
+    it('ignores empty, repeated, non-string and over-long values', () => {
+      expect(
+        parseContextRequest({
+          app: ['a', 'b'],
+          focus: '',
+          action: 'x'.repeat(MAX_CONTEXT_VALUE + 1),
+          pane: { toString: () => 'p' },
+          key: 'ok',
+        }),
+      ).toEqual({ app: '', key: 'ok' });
+      expect(parseContextRequest(JSON.parse('{"__proto__": {"focus": "x"}}'))).toEqual({ app: '' });
     });
   });
 

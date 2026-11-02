@@ -268,6 +268,13 @@ describe.skipIf(!url)('release lines by minor version', () => {
       // devices.gadget points at a Gadget-only topic: never that, the app default instead.
       expect(await ctx('/context/console/devices.gadget')).toBe('/topics/overview.html');
       expect(await ctx('/context/console')).toBe('/topics/overview.html');
+      // Activity signals work in links too, under the same anonymous view.
+      expect(await ctx('/context/console?focus=setup.install&path=/settings')).toBe(
+        '/topics/install.html',
+      );
+      expect(await ctx('/context/console/setup.install?focus=devices.gadget')).toBe(
+        '/topics/install.html',
+      );
       expect(await ctx('/context/nope/overview')).toBe(404);
       expect(await ctx('/context/__proto__/overview')).toBe(404);
       // A signed-in reader with sso still gets the public view's answer.

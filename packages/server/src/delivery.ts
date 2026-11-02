@@ -12,6 +12,7 @@ import {
   compareReleaseLines,
   parseVersion,
   releaseLine,
+  parseContextRequest,
   resolveContext,
   viewPublication,
   viewRelease,
@@ -583,10 +584,12 @@ export function registerDelivery(app: FastifyInstance, ctx: AppContext): void {
     if (repo?.access !== 'public') return notFoundPage(reply);
     const release = await anonymousRelease(ctx, repo, request.cookies[VERSION_COOKIE]);
     if (typeof release === 'string') return notFoundPage(reply);
-    const req: { app: string; key?: string; path?: string } = { app: appName };
-    const path = (request.query as { path?: unknown }).path;
-    if (key) req.key = key;
-    else if (typeof path === 'string' && path) req.path = path;
+    const req = parseContextRequest(request.query as Record<string, unknown>);
+    req.app = appName;
+    if (key) {
+      req.key = key;
+      delete req.path;
+    }
     const resolved = resolveContext(release.view, req);
     if (!resolved) return notFoundPage(reply);
     const fragment = resolved.fragment ? `#${encodeURIComponent(resolved.fragment)}` : '';

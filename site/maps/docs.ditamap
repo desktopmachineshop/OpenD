@@ -50,6 +50,7 @@
     <topicref href="../topics/help/fallback.dita"/>
     <topicref href="../topics/help/widget.dita"/>
     <topicref href="../topics/help/widget-api.dita"/>
+    <topicref href="../topics/help/activity.dita"/>
     <topicref href="../topics/help/tokens.dita"/>
     <topicref href="../topics/help/json-api.dita"/>
     <topicref href="../topics/help/context-links.dita"/>

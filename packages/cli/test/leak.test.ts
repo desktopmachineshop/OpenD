@@ -76,6 +76,12 @@ describe('no content leaks to readers who are not entitled to it', async () => {
           path: r.pattern.replace(/:\w+/g, 'x').replace('/**', '/a/b'),
         })),
       ];
+      // Every key as a focused field, last action or pane, over every other key as the view.
+      const keys = Object.keys(app.keys);
+      for (const signal of ['focus', 'action', 'pane'] as const)
+        for (const key of keys)
+          for (const view of keys)
+            requests.push({ app: 'console', [signal]: `${key}.field`, key: view });
       for (const request of requests) {
         const resolved = resolveContext(view, request);
         expect(resolved, JSON.stringify(request)).not.toBeNull();
