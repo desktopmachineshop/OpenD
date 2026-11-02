@@ -95,6 +95,14 @@
           <xref href="../help/security.dita#security/host-csp"/>.</li>
       </ul>
     </section>
+    <section id="patch-0.3.2">
+      <title>In 0.3.2</title>
+      <ul>
+        <li audience="author">New command <cmdname>opend package</cmdname> writes one reader's docs as a
+          static site that opens offline, as a zip file or a folder, optionally with their PDFs. Only what
+          that reader may see goes in. See <xref href="../start/package-offline.dita"/>.</li>
+      </ul>
+    </section>
     <section id="upgrade" product="core">
       <title>Upgrading from 0.2</title>
       <p>Deploy the new image. Migrations <codeph>012_release_lines</codeph> and

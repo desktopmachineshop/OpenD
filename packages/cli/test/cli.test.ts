@@ -1,11 +1,13 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { inflateRawSync } from 'node:zlib';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   audienceFromOptions,
   createProgram,
   startPreview,
+  zipFiles,
   type PreviewServer,
 } from '../src/index.js';
 import type { PdfRenderer } from '@opend/pdf';
@@ -72,6 +74,107 @@ describe('opend build', () => {
     const release = JSON.parse(readFileSync(out, 'utf8'));
     expect(release).toMatchObject({ schemaVersion: 1, release: '2.1' });
     expect(Object.keys(release.topics)).toHaveLength(8);
+  });
+});
+
+/** The files in a zip archive, by path; enough of the format to check `zipFiles`. */
+function unzip(zip: Buffer): Map<string, Buffer> {
+  const end = zip.lastIndexOf(Buffer.from([0x50, 0x4b, 0x05, 0x06]));
+  const count = zip.readUInt16LE(end + 10);
+  let at = zip.readUInt32LE(end + 16);
+  const files = new Map<string, Buffer>();
+  for (let i = 0; i < count; i++) {
+    expect(zip.readUInt32LE(at)).toBe(0x02014b50);
+    const method = zip.readUInt16LE(at + 10);
+    const size = zip.readUInt32LE(at + 20);
+    const nameLength = zip.readUInt16LE(at + 28);
+    const offset = zip.readUInt32LE(at + 42);
+    const name = zip.toString('utf8', at + 46, at + 46 + nameLength);
+    const start = offset + 30 + zip.readUInt16LE(offset + 26) + zip.readUInt16LE(offset + 28);
+    const body = zip.subarray(start, start + size);
+    files.set(name, method === 8 ? inflateRawSync(body) : Buffer.from(body));
+    at += 46 + nameLength;
+  }
+  return files;
+}
+
+describe('opend package', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'opend-package-'));
+  afterAll(() => rmSync(dir, { recursive: true, force: true }));
+
+  it('refuses to guess who the package is for', async () => {
+    const r = await run('package', STARTER, '--out', join(dir, 'none.zip'));
+    expect(r.code).toBe(1);
+    expect(r.err).toContain('choose who the package is for');
+    expect(readdirSync(dir)).toEqual([]);
+  });
+
+  it("writes a reader's docs as a zip of a static site with relative links", async () => {
+    const out = join(dir, 'widget-docs.zip');
+    const r = await run('package', STARTER, '--as', 'v2-basic', '--out', out);
+    expect(r.code).toBe(0);
+    expect(r.out).toContain('Packaged for v2-basic');
+    const files = unzip(readFileSync(out));
+    const paths = [...files.keys()];
+    expect(paths.every((p) => p.startsWith('widget-docs/'))).toBe(true);
+    expect(paths).toContain('widget-docs/index.html');
+    expect(paths).toContain('widget-docs/_theme.css');
+    expect(paths).toContain('widget-docs/_assets/images/logo.svg');
+    const page = files.get('widget-docs/topics/overview.html')!.toString('utf8');
+    expect(page).toContain('href="../_theme.css"');
+    expect(page).toContain('src="../_assets/images/logo.svg"');
+    expect(page).toContain('class="site-title" href="../index.html"');
+    for (const [path, data] of files) {
+      if (!path.endsWith('.html')) continue;
+      const html = data.toString('utf8');
+      // Nothing that needs a server: no root-relative URLs, no search form, no scripts.
+      expect(html, path).not.toMatch(/(?:href|src|action)="\//);
+      expect(html, path).not.toContain('role="search"');
+      expect(html, path).not.toContain('<script');
+    }
+  });
+
+  it('leaves out topics and images the reader cannot see', async () => {
+    const project = join(dir, 'gated');
+    mkdirSync(join(project, 'images'), { recursive: true });
+    writeFileSync(
+      join(project, 'opend.config.yaml'),
+      'release: "1.0"\ntitle: Gated\nmap: main.ditamap\nattributes:\n  product: [free, paid]\n',
+    );
+    writeFileSync(
+      join(project, 'main.ditamap'),
+      '<map><topicref href="a.dita"/><topicref href="secret.dita" product="paid"/></map>',
+    );
+    writeFileSync(join(project, 'a.dita'), '<topic id="a"><title>Open</title><body/></topic>');
+    writeFileSync(
+      join(project, 'secret.dita'),
+      '<topic id="s"><title>Secret plan</title><body><image href="images/plan.svg"/></body></topic>',
+    );
+    writeFileSync(join(project, 'images/plan.svg'), '<svg xmlns="http://www.w3.org/2000/svg"/>');
+
+    const free = join(dir, 'free');
+    expect((await run('package', project, '--product', 'free', '--out', free)).code).toBe(0);
+    expect(readdirSync(free).sort()).toEqual(['a.html', 'index.html']);
+    expect(readFileSync(join(free, 'index.html'), 'utf8')).not.toContain('Secret plan');
+
+    const paid = join(dir, 'paid');
+    expect((await run('package', project, '--product', 'paid', '--out', paid)).code).toBe(0);
+    expect(readdirSync(paid).sort()).toEqual(['_assets', 'a.html', 'index.html', 'secret.html']);
+
+    // An existing folder with files in it is never written into.
+    await expect(run('package', project, '--product', 'paid', '--out', paid)).rejects.toThrow(
+      'is not empty',
+    );
+  });
+});
+
+describe('zipFiles', () => {
+  it('round-trips stored and deflated entries with UTF-8 names', () => {
+    const files = new Map([
+      ['a/ä.html', Buffer.from('<p>'.repeat(500))],
+      ['b.bin', Buffer.from([1, 2, 3])],
+    ]);
+    expect(unzip(zipFiles(files))).toEqual(files);
   });
 });
 
