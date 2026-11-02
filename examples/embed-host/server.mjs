@@ -39,13 +39,28 @@ nav a{margin-right:12px} main{padding:16px}</style></head>
   <span style="flex:1"></span><span>Signed in as ${user}</span>
   <opend-help-button label="Help for this page"></opend-help-button>
 </header>
-<main><h1 id="title"></h1><p>Open the help panel with the ? button; it follows the page you are on.</p></main>
+<main><h1 id="title"></h1><p>Open the help panel with the ? button; it follows the page you are on,
+  and within it the field you are in, the button you pressed last and the tab you chose.</p>
+  <div role="tablist" aria-label="Settings">
+    <button role="tab" data-help-pane="settings.sso">Single sign-on</button>
+    <button role="tab" data-help-pane="settings.audit">Audit log</button>
+  </div>
+  <form data-help-key="settings">
+    <p><label>Hub name <input name="hub"></label></p>
+    <p><label>Identity provider URL <input name="idp" data-help-key="settings.sso.idp"></label></p>
+    <p><button type="button" data-help-key="devices.gadget">Pair a device</button></p>
+  </form>
+</main>
 <script src="${OPEND_URL}/embed/opend-help.js"></script>
 <script>
   OpenDHelp.init({
     docsUrl: ${JSON.stringify(OPEND_URL)},
     app: 'console',
     getToken: () => fetch('/token').then((r) => r.text()),
+  });
+  // F1 opens the help for whatever has focus (data-help-key), like a desktop app.
+  addEventListener('keydown', (e) => {
+    if (e.key === 'F1') { e.preventDefault(); OpenDHelp.open(); }
   });
   // An SPA tells the widget its route on every change, like OpenV's useLocation.
   const route = () => {

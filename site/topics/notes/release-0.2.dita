@@ -26,6 +26,18 @@
           action and migration <codeph>011_version_picker</codeph>, applied on start.</li>
       </ul>
     </section>
+    <section id="activity">
+      <title>Help for the field, button or pane in use</title>
+      <ul>
+        <li product="embed">Context help can follow what the reader is doing, not just the page: the field
+          with focus, the button pressed last and the tab or pane in use, in that order, before the view.
+          Mark them with <codeph>data-help-key</codeph> and <codeph>data-help-pane</codeph>, or report them
+          with <codeph>OpenDHelp.setActivity</codeph>. See <xref href="../help/activity.dita"/>.</li>
+        <li product="embed">The help JSON API and context links take <parmname>focus</parmname>,
+          <parmname>action</parmname> and <parmname>pane</parmname> parameters, and the API's answer says
+          which <parmname>signal</parmname> it used.</li>
+      </ul>
+    </section>
     <section id="appearance">
       <title>Site themes and PDF templates</title>
       <ul>

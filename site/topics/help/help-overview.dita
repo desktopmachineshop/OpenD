@@ -17,7 +17,8 @@
         <li><b>Authors map routes to keys</b> in <filepath>help-contexts.yaml</filepath>, so an app can just
           send its current path. See <xref href="help-contexts.dita"/>.</li>
         <li><b>The app loads the widget</b>, tells it the current route, and opens the panel from a help
-          button. See <xref href="widget.dita"/>.</li>
+          button. See <xref href="widget.dita"/>. It can also say which field, button and pane the reader
+          is using, so help opens on exactly that. See <xref href="activity.dita"/>.</li>
         <li><b>The app's backend signs a short-lived token</b> for its signed-in user, which the panel
           exchanges for a session. See <xref href="tokens.dita"/>.</li>
         <li><b>OpenD resolves the context</b> for that reader: the key, then its parents, then the app's

@@ -2,7 +2,7 @@ import { watch, type FSWatcher } from 'node:fs';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { posix } from 'node:path';
 import { findPublication, formatDiagnostic, logoRoute, type Diagnostic } from '@opend/model';
-import { searchView, viewRelease } from '@opend/filter';
+import { parseContextRequest, searchView, viewRelease, type ContextRequest } from '@opend/filter';
 import { readSourceFile } from '@opend/build';
 import { frameScript, widgetScript } from '@opend/embed';
 import { createPdfRenderer, type PdfRenderer } from '@opend/pdf';
@@ -252,7 +252,7 @@ export async function startPreview(options: PreviewOptions): Promise<PreviewServ
           view,
           audience,
           `http://${req.headers.host ?? 'localhost'}`,
-          url.searchParams.get('path') ?? '',
+          contextTest(url.searchParams),
         ),
       );
       return;
@@ -405,3 +405,14 @@ const LIVE_RELOAD = `<script>
   events.onmessage = (e) => { if (e.data === 'reload') location.reload(); };
 })();
 </script>`;
+
+/** The help lab's "try" form: the signals and path to resolve, without the app. */
+function contextTest(params: URLSearchParams): Omit<ContextRequest, 'app'> {
+  const request = parseContextRequest(params);
+  const test: Omit<ContextRequest, 'app'> = {};
+  for (const name of ['focus', 'action', 'pane', 'path'] as const) {
+    const value = request[name];
+    if (value) test[name] = value;
+  }
+  return test;
+}

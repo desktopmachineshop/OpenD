@@ -24,9 +24,18 @@
         </info>
       </step>
       <step>
-        <cmd>Type a host-app path, such as <userinput>/tenants/acme</userinput>, into
-          <uicontrol>Try a host-app path</uicontrol> and choose <uicontrol>Resolve</uicontrol>.</cmd>
+        <cmd>Under <uicontrol>Try what a reader is doing</uicontrol>, type a host-app path, such as
+          <userinput>/tenants/acme</userinput>, into <uicontrol>Host-app path</uicontrol> and choose
+          <uicontrol>Resolve</uicontrol>.</cmd>
         <stepresult>The lab shows the topic that path opens for the current reader.</stepresult>
+      </step>
+      <step>
+        <cmd>Optional: add keys to <uicontrol>Focused field</uicontrol>, <uicontrol>Last pressed</uicontrol>
+          and <uicontrol>Tab or pane</uicontrol> to see how the activity signals change the answer.</cmd>
+        <stepresult>The lab names the signal that answered, for example
+          <systemoutput>(via focus: tenants.detail.domains)</systemoutput> or
+          <systemoutput>(via parent of pane: tenants.detail)</systemoutput>. See
+          <xref href="../help/activity.dita"/>.</stepresult>
       </step>
       <step>
         <cmd>Choose <uicontrol>Open in widget</uicontrol> next to a key to open the real help panel.</cmd>

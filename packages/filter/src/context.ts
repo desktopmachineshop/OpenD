@@ -99,11 +99,25 @@ export function keyAncestry(key: string): string[] {
   return parts.map((_, i) => parts.slice(0, parts.length - i).join('.'));
 }
 
+/**
+ * What the host app tells OpenD about where the reader is, most specific
+ * first. Every signal is a context key, except that the view may be given as a
+ * path instead.
+ */
+export const ACTIVITY_SIGNALS = ['focus', 'action', 'pane'] as const;
+export type ActivitySignal = (typeof ACTIVITY_SIGNALS)[number];
+
 export interface ContextRequest {
   app: string;
-  /** A context key from the host app, e.g. `settings.network`. */
+  /** The field or control that is selected or has focus, e.g. `settings.sso.issuer`. */
+  focus?: string;
+  /** The button or command the reader last pressed, e.g. `settings.sso.test`. */
+  action?: string;
+  /** The tab or pane the reader last worked in, e.g. `settings.sso.advanced`. */
+  pane?: string;
+  /** The view: a context key from the host app, e.g. `settings.network`. */
   key?: string;
-  /** The host app's current path, mapped to a key by `help-contexts.yaml`. */
+  /** The view as the host app's current path, mapped to a key by `help-contexts.yaml`. */
   path?: string;
 }
 
@@ -112,8 +126,42 @@ export interface ResolvedContext {
   fragment?: string;
   /** The key that matched, after route mapping and fallback. */
   key: string;
-  /** How it was found: the requested key, a parent key, or the app default. */
+  /** How it was found: a signal's own key, a parent of it, or the app default. */
   via: 'key' | 'parent' | 'default';
+  /** Which signal the key came from; absent when the app default answered. */
+  signal?: ActivitySignal | 'view';
+}
+
+/** Longest context key or path a request may carry; longer values are ignored. */
+export const MAX_CONTEXT_VALUE = 256;
+
+/**
+ * Reads a context request from query parameters (`app`, `focus`, `action`,
+ * `pane`, and `key` or `path`), as the panel, the JSON API and context links
+ * accept them. Empty, repeated, non-string and over-long values are ignored.
+ */
+export function parseContextRequest(
+  query: URLSearchParams | Readonly<Record<string, unknown>>,
+): ContextRequest {
+  const get = (name: string): string | undefined => {
+    const v =
+      query instanceof URLSearchParams
+        ? query.get(name)
+        : Object.hasOwn(query, name)
+          ? query[name]
+          : undefined;
+    return typeof v === 'string' && v && v.length <= MAX_CONTEXT_VALUE ? v : undefined;
+  };
+  const request: ContextRequest = { app: get('app') ?? '' };
+  for (const signal of ACTIVITY_SIGNALS) {
+    const value = get(signal);
+    if (value) request[signal] = value;
+  }
+  const key = get('key');
+  const path = get('path');
+  if (key) request.key = key;
+  else if (path) request.path = path;
+  return request;
 }
 
 /** Whether an element with this `id` is in the tree. */
@@ -134,20 +182,27 @@ function routesOf(app: HelpApp): CompiledRoute[] {
 }
 
 /**
- * Finds the help topic for a host-app context. Tries the key (or the key the
- * path maps to), then its parents, then the app default. A target is used only
- * when its conditions pass for this reader and its topic is visible to them,
- * so a context lookup can never reveal a hidden topic: it falls back instead.
- * A fragment is kept only when the reader's filtered topic has an element with
- * that id, so it never names a section the reader cannot see.
+ * Finds the help topic for a host-app context. The signals are tried most
+ * specific first: the focused field, the last action, the pane, then the view
+ * (its key, or the key its path maps to), then the app default.
+ *
+ * Each signal falls back to its parents before the next signal is tried,
+ * except parents it shares with a later signal: those wait for that signal's
+ * turn, so a field's generic ancestor never beats a more specific pane.
+ *
+ * A target is used only when its conditions pass for this reader and its
+ * topic is visible to them, so a context lookup can never reveal a hidden
+ * topic: it falls back instead. A fragment is kept only when the reader's
+ * filtered topic has an element with that id, so it never names a section the
+ * reader cannot see.
  */
 export function resolveContext(view: ReleaseView, request: ContextRequest): ResolvedContext | null {
-  // Own properties only: the app and key come from the request, and names such
+  // Own properties only: the app and keys come from the request, and names such
   // as `__proto__` or `toString` must read as unknown, not as Object.prototype.
   const contexts = view.release.contexts;
   const app = contexts && Object.hasOwn(contexts, request.app) ? contexts[request.app] : undefined;
   if (!app) return null;
-  const requested =
+  const viewKey =
     request.key ?? (request.path !== undefined ? matchRoute(routesOf(app), request.path) : null);
 
   const tryKey = (key: string): ContextTarget | undefined =>
@@ -155,16 +210,33 @@ export function resolveContext(view: ReleaseView, request: ContextRequest): Reso
       (t) => view.includes(t.conditions) && view.isVisible(t.topicId),
     );
 
-  const attempts: [string, ResolvedContext['via']][] = [];
-  if (requested)
-    keyAncestry(requested).forEach((k, i) => attempts.push([k, i === 0 ? 'key' : 'parent']));
-  if (app.default)
-    attempts.push(...keyAncestry(app.default).map((k): [string, 'default'] => [k, 'default']));
+  const signals: [string, NonNullable<ResolvedContext['signal']>][] = [];
+  for (const signal of ACTIVITY_SIGNALS) {
+    const key = request[signal];
+    if (key) signals.push([key, signal]);
+  }
+  if (viewKey) signals.push([viewKey, 'view']);
 
-  for (const [key, via] of attempts) {
+  type Attempt = [string, ResolvedContext['via'], ResolvedContext['signal']];
+  const attempts: Attempt[] = [];
+  signals.forEach(([key, signal], i) => {
+    const later = new Set(signals.slice(i + 1).flatMap(([k]) => keyAncestry(k)));
+    for (const [depth, k] of keyAncestry(key).entries()) {
+      if (depth > 0 && later.has(k)) break;
+      attempts.push([k, depth === 0 ? 'key' : 'parent', signal]);
+    }
+  });
+  if (app.default)
+    attempts.push(...keyAncestry(app.default).map((k): Attempt => [k, 'default', undefined]));
+
+  const tried = new Set<string>();
+  for (const [key, via, signal] of attempts) {
+    if (tried.has(key)) continue;
+    tried.add(key);
     const target = tryKey(key);
     if (target) {
       const resolved: ResolvedContext = { topicId: target.topicId, key, via };
+      if (signal) resolved.signal = signal;
       const body = target.fragment ? view.topic(target.topicId)?.body : undefined;
       if (target.fragment && body && hasElementId(body, target.fragment))
         resolved.fragment = target.fragment;

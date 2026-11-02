@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="activity" product="embed" audience="developer author">
+  <title>Help for the field, button or pane in use</title>
+  <shortdesc>Besides the page, your app can tell <keyword keyref="product-name"/> which field has focus,
+    which button the reader pressed last and which tab or pane they are in, so help opens on exactly the
+    thing they are working on.</shortdesc>
+  <conbody>
+    <section id="signals">
+      <title>Signals, most specific first</title>
+      <p>Every help request can carry up to four signals. Each one is a context key, like the keys authors
+        tag topics with (see <xref href="resourceid.dita"/>), except that the view may also be a path.</p>
+      <simpletable relcolwidth="2* 3* 4*">
+        <sthead><stentry>Signal</stentry><stentry>What it is</stentry><stentry>Example key</stentry></sthead>
+        <strow><stentry><parmname>focus</parmname></stentry><stentry>The field or control that is selected or has focus now.</stentry><stentry><codeph>settings.sso.issuer</codeph></stentry></strow>
+        <strow><stentry><parmname>action</parmname></stentry><stentry>The button or command the reader pressed last.</stentry><stentry><codeph>settings.sso.test</codeph></stentry></strow>
+        <strow><stentry><parmname>pane</parmname></stentry><stentry>The tab, pane or dialog the reader last worked in.</stentry><stentry><codeph>settings.sso.advanced</codeph></stentry></strow>
+        <strow><stentry>view: <parmname>key</parmname> or <parmname>path</parmname></stentry><stentry>The page or view, as before.</stentry><stentry><codeph>settings.sso</codeph>, <codeph>/settings/sso</codeph></stentry></strow>
+      </simpletable>
+      <p>The first signal that has help this reader can see wins. A signal whose key has no help falls back
+        to its own parents before the next signal is tried, but a parent it shares with a later signal waits
+        for that signal's turn. So with focus on <codeph>settings.sso.nickname</codeph> (no topic) and the
+        <codeph>settings.sso.advanced</codeph> pane, the pane's topic opens rather than the general
+        <codeph>settings.sso</codeph> one. See <xref href="fallback.dita"/> for the full order.</p>
+      <p>Authors write help for a field or button exactly as for a screen: a topic, or a section in one,
+        tagged with a <codeph>resourceid</codeph> for its key. Nothing new is needed in
+        <filepath>help-contexts.yaml</filepath>.</p>
+    </section>
+
+    <section id="markup">
+      <title>Mark up your app</title>
+      <p>With the widget (see <xref href="widget.dita"/>), add two attributes to your markup. The widget
+        watches focus and clicks and keeps the signals up to date.</p>
+      <codeblock><![CDATA[<div role="tablist">
+  <button role="tab" data-help-pane="settings.sso.general">General</button>
+  <button role="tab" data-help-pane="settings.sso.advanced">Advanced</button>
+</div>
+<section role="tabpanel" data-help-pane="settings.sso.advanced">
+  <label>Issuer URL <input name="issuer" data-help-key="settings.sso.issuer"></label>
+  <button type="button" data-help-key="settings.sso.test">Test connection</button>
+</section>
+<opend-help-button></opend-help-button>]]></codeblock>
+      <dl>
+        <dlentry>
+          <dt><codeph>data-help-key</codeph></dt>
+          <dd>On a field, control, or a group of them. When focus is inside it, it is the
+            <parmname>focus</parmname>. When the reader presses a button, link, tab, menu item, checkbox
+            or radio button inside it, it is also the <parmname>action</parmname>.</dd>
+        </dlentry>
+        <dlentry>
+          <dt><codeph>data-help-pane</codeph></dt>
+          <dd>On a tab panel, pane or dialog, or on the tab that shows it. Focus or a press inside it makes
+            it the <parmname>pane</parmname>.</dd>
+        </dlentry>
+      </dl>
+      <ul>
+        <li>The nearest attribute wins, and the widget looks through shadow DOM, so attributes work inside
+          your own web components.</li>
+        <li>Focus moving to an element without a key clears <parmname>focus</parmname>. The last
+          <parmname>action</parmname> and <parmname>pane</parmname> are kept until the view changes with
+          <codeph>setContext</codeph>.</li>
+        <li>The help button and the panel never count, so pressing <uicontrol>?</uicontrol> keeps the
+          field the reader was on.</li>
+        <li>To open help from the keyboard while a field has focus, call <codeph>OpenDHelp.open()</codeph>
+          from your own shortcut, such as <uicontrol>F1</uicontrol>.</li>
+      </ul>
+    </section>
+
+    <section id="follow">
+      <title>While the panel is open</title>
+      <p>The open panel follows the reader: when the focus, last action or pane changes, it moves to the
+        new help after a quarter of a second. It stops following as soon as the reader navigates inside the
+        panel, by link or search, so it never takes away what they are reading; it follows again the next
+        time it opens. Set <parmname>follow</parmname> to <codeph>false</codeph> in
+        <codeph>OpenDHelp.init</codeph> to use activity only when the panel opens.</p>
+      <p>Opening the panel on an explicit context, with <codeph>OpenDHelp.open({ key })</codeph> or
+        <codeph>&lt;opend-help-button key="…"&gt;</codeph>, opens exactly that context and ignores activity
+        until it closes. Call <codeph>open()</codeph> with no argument to let activity count.</p>
+    </section>
+
+    <section id="set-activity">
+      <title>Apps that track activity themselves</title>
+      <p>If your app already knows what is selected, such as a row in a grid, a node on a canvas or a
+        command from a menu, report it instead of, or as well as, using the attributes:</p>
+      <codeblock>// The reader selected a row in the users grid.
+OpenDHelp.setActivity({ focus: 'users.row' });
+// They ran a command from the command palette.
+OpenDHelp.setActivity({ action: 'users.invite' });
+// They switched to the Permissions pane; null clears a signal.
+OpenDHelp.setActivity({ pane: 'users.permissions', focus: null });</codeblock>
+      <p>Only the signals you name change. Pass <codeph>activity: false</codeph> to
+        <codeph>OpenDHelp.init</codeph> to stop the widget watching the page at all, so that only what you
+        report is sent.</p>
+    </section>
+
+    <section id="native">
+      <title>Rendering help in your own UI</title>
+      <p>Apps that call the JSON API (see <xref href="json-api.dita"/>), and apps that are not web pages at
+        all, send the same signals as query parameters. Any you leave out are simply not used.</p>
+      <codeblock>GET /api/v1/help/context?app=console
+    &amp;focus=settings.sso.issuer
+    &amp;action=settings.sso.test
+    &amp;pane=settings.sso.advanced
+    &amp;path=/settings/sso</codeblock>
+      <p>The answer says which signal it used in <parmname>signal</parmname>
+        (<codeph>focus</codeph>, <codeph>action</codeph>, <codeph>pane</codeph> or <codeph>view</codeph>,
+        or <codeph>null</codeph> when the app default answered). A web app can let the widget do the
+        tracking and read the signals from it, without ever opening the panel:</p>
+      <codeblock>OpenDHelp.init({ docsUrl: 'https://docs.example.com', app: 'console' });
+OpenDHelp.setContext({ path: location.pathname });
+
+async function helpForNow(token) {
+  const params = new URLSearchParams({ app: 'console', ...OpenDHelp.activity() });
+  const res = await fetch(`https://docs.example.com/api/v1/help/context?${params}`, {
+    headers: { authorization: `Bearer ${token}` },
+  });
+  return res.ok ? res.json() : null;
+}</codeblock>
+      <p><codeph>OpenDHelp.activity()</codeph> returns only the signals that are set, for example
+        <codeph>{ focus: 'settings.sso.issuer', pane: 'settings.sso.advanced', path: '/settings/sso' }</codeph>.
+        Context links on public sites take the same parameters (see <xref href="context-links.dita"/>).</p>
+    </section>
+
+    <section id="privacy">
+      <title>What leaves the page</title>
+      <ul>
+        <li>Only the keys you put in <codeph>data-help-key</codeph> and <codeph>data-help-pane</codeph>, or
+          pass to <codeph>setActivity</codeph>. Never what the reader typed, element text, ids or
+          selectors, and nothing at all from elements without those attributes.</li>
+        <li>Keys longer than 256 characters are ignored, by the widget and by the server.</li>
+        <li>Signals are resolved under the same rules as every context: a key whose help the reader cannot
+          see falls back, so a signal never reveals a hidden topic.</li>
+      </ul>
+    </section>
+
+    <section id="check">
+      <title>Check it before publishing</title>
+      <p>The previewer's <xref href="../start/help-lab.dita">help lab</xref> has fields for a focused
+        field, last pressed button, pane and path. It shows what they resolve to for the preview reader, and
+        which signal answered.</p>
+    </section>
+  </conbody>
+</concept>

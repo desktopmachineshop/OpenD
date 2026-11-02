@@ -208,6 +208,17 @@ describe.skipIf(!url)('embedded help (hosted)', () => {
     expect(v1.body).not.toContain('single sign-on');
     expect((await ctxPage('v1-basic', 'path=/whats-new')).body).toContain('Release notes for 1.x');
     expect((await ctxPage('v2-pro', 'path=/whats-new')).body).toContain('Release notes for 2.x');
+    // Activity signals beat the view, most specific first, and still fall back per reader.
+    const activity = 'focus=settings.sso.idp&action=devices.gadget&path=/whats-new';
+    expect((await ctxPage('v2-pro', activity)).body).toContain('Configure single sign-on');
+    expect((await ctxPage('v2-pro', `pane=settings.audit&path=/`)).body).toContain(
+      'Audit log events',
+    );
+    // v1-basic sees neither SSO nor Gadget: the field's parent answers, never a hidden topic.
+    const basic = (await ctxPage('v1-basic', activity)).body;
+    expect(basic).toContain('Configure the hub');
+    expect(basic).not.toContain('single sign-on');
+    expect(basic).not.toContain('Pair a Gadget');
     const asset = await get('/_assets/images/logo.svg', { cookie: sessions['v1-basic']! });
     expect(asset.statusCode).toBe(200);
   });
@@ -305,6 +316,27 @@ describe.skipIf(!url)('embedded help (hosted)', () => {
         title: 'Configure single sign-on',
       });
       expect(pro.html).toContain('<article');
+      expect(
+        (
+          await get(
+            '/api/v1/help/context?app=console&focus=devices.gadget&pane=settings.audit&key=overview',
+            await auth('v2-pro'),
+          )
+        ).json(),
+      ).toMatchObject({
+        topicId: 'topics/gadget-pairing',
+        key: 'devices.gadget',
+        via: 'key',
+        signal: 'focus',
+      });
+      expect(
+        (
+          await get(
+            '/api/v1/help/context?app=console&focus=devices.gadget&key=overview',
+            await auth('v1-basic'),
+          )
+        ).json(),
+      ).toMatchObject({ topicId: 'topics/overview', via: 'key', signal: 'view' });
       expect(
         (await get('/api/v1/help/topics/topics/gadget-pairing', await auth('v1-basic'))).statusCode,
       ).toBe(404);

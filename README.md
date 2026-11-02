@@ -333,7 +333,16 @@ const token = await new SignJWT({ email: user.email, org: user.openDOrg })
 
 `OpenDHelp.open()`, `close()` and `toggle()` drive the panel, and `<opend-help-button key="...">` opens a specific context.
 
-**Rendering help yourself.** Apps that render help natively can call `GET /api/v1/help/context?app=console&path=/settings/sso` (also `/topics/<id>`, `/search?q=` and `/nav`, the reader's filtered table of contents) with `Authorization: Bearer <token>`. On a public site they also answer without any `Authorization` header, even with embedding off: exactly what an anonymous visitor sees, at an optional `version=` the version picker offers (anything else gets the default), with `Access-Control-Allow-Origin: *` and `Cache-Control: public, max-age=60`. Every answer names its release in `OpenD-Release` and `OpenD-Release-Line`. See `site/topics/help/json-api.dita`.
+**Help for the field, button or pane in use.** Mark fields and buttons with `data-help-key` and tabs or panes with `data-help-pane`, and help opens on what the reader is doing: the focused field first, then the last button pressed, then the pane, then the page. Each is a context key with the usual parent fallback, and the open panel follows along until the reader navigates inside it. Apps that track selection themselves call `OpenDHelp.setActivity({ focus, action, pane })`; apps that render natively read `OpenDHelp.activity()` or send `focus=`, `action=` and `pane=` to the JSON API, whose answer names the `signal` it used. Only those keys leave the page, never field values. See `site/topics/help/activity.dita` and [ADR 0018](docs/adr/0018-activity-signals.md).
+
+```html
+<section role="tabpanel" data-help-pane="settings.sso.advanced">
+  <input name="issuer" data-help-key="settings.sso.issuer" />
+  <button data-help-key="settings.sso.test">Test connection</button>
+</section>
+```
+
+**Rendering help yourself.** Apps that render help natively can call `GET /api/v1/help/context?app=console&path=/settings/sso` (optionally with `focus=`, `action=` and `pane=`; also `/topics/<id>`, `/search?q=` and `/nav`, the reader's filtered table of contents) with `Authorization: Bearer <token>`. On a public site they also answer without any `Authorization` header, even with embedding off: exactly what an anonymous visitor sees, at an optional `version=` the version picker offers (anything else gets the default), with `Access-Control-Allow-Origin: *` and `Cache-Control: public, max-age=60`. Every answer names its release in `OpenD-Release` and `OpenD-Release-Line`. See `site/topics/help/json-api.dita`.
 
 **Checking locally.** `opend preview` serves the same panel. Open `/_opend/help-lab` to see what every key and route resolves to for each preview reader, and click through it in the real widget.
 
@@ -428,6 +437,7 @@ The store, worker, server and editor integration tests need Postgres. Set `TEST_
 - [0012 Signed commits from the web editor](docs/adr/0012-signed-commits-from-the-editor.md)
 - [0013 Visual editing in the web editor](docs/adr/0013-visual-editor.md)
 - [0014 Public API and API keys](docs/adr/0014-public-api.md)
+- [0018 Activity signals for context help](docs/adr/0018-activity-signals.md)
 
 ## Licence
 
