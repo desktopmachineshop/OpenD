@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE topic PUBLIC "-//OASIS//DTD DITA Topic//EN" "topic.dtd">
+<!-- release="0.3..": every reader on 0.3 or later sees these notes. -->
+<topic id="release-0.3" release="0.3.." audience="author admin developer">
+  <title>Release notes for 0.3</title>
+  <shortdesc>Release lines per minor version, a version picker that follows them, site settings declared in
+    the docs repository, and context help that follows the field, button or pane in use and answers public
+    apps without a token.</shortdesc>
+  <prolog>
+    <resourceid appname="opend-console" appid="whats-new-0.3"/>
+  </prolog>
+  <body>
+    <section id="release-lines">
+      <title>Release lines and versions</title>
+      <ul>
+        <li audience="admin">Release lines by minor version: a repository can keep one live release per minor
+          (0.22, 0.23) instead of per major, so each reader keeps the docs of their own minor. Switch it under
+          <uicontrol>Site &amp; access</uicontrol> → <uicontrol>Release lines</uicontrol> in the admin
+          console. Repositories stay on major lines until staff switch.<ph product="core"> See
+          <xref href="../hosting/release-lines.dita"/>.</ph></li>
+        <li audience="admin">The version picker has a new mode, <uicontrol>Every live version</uicontrol>
+          (<codeph>live</codeph>), which offers every live line, newest first, with no list to keep. The
+          public release version can be <codeph>latest</codeph>, the newest live line. Both follow
+          publishing and retiring by themselves. A list offers only versions that have a live release. See
+          <xref href="../hosting/version-picker.dita"/>.</li>
+        <li audience="admin" product="core">New admin API route <codeph>PUT
+          /admin/api/repos/:id/release-lines</codeph>, a <parmname>releaseLines</parmname> field on
+          <codeph>POST /admin/api/repos</codeph> and in seed files, and the
+          <codeph>repo.release-lines</codeph> audit action.</li>
+      </ul>
+    </section>
+    <section id="site-settings">
+      <title>Site settings in the docs repository</title>
+      <ul>
+        <li audience="admin author">A <parmname>site</parmname> block in
+          <filepath>opend.config.yaml</filepath> declares release refs, release lines, access, public
+          entitlements and the version picker. The build that goes live on the newest release line applies
+          it, and the declared settings are read-only in the console. See
+          <xref href="../hosting/site-settings.dita"/>.</li>
+        <li audience="admin">A site with no docs source connects by itself to the one repository its GitHub
+          App can access, when that repository has an <filepath>opend.config.yaml</filepath>.</li>
+        <li audience="admin" product="core">The admin API answers 409 for a setting the repository declares,
+          and seeds leave declared settings alone. New audit action <codeph>repo.release-refs</codeph>.</li>
+      </ul>
+    </section>
+    <section id="help">
+      <title>Context help</title>
+      <ul>
+        <li audience="developer" product="embed">Help for the field, button or pane in use: context help can
+          follow what the reader is doing, not just the page. It tries the field with focus, then the button
+          pressed last, then the tab or pane, then the view. Mark them with <codeph>data-help-key</codeph>
+          and <codeph>data-help-pane</codeph>, or report them with <codeph>OpenDHelp.setActivity</codeph>.
+          The help JSON API and context links take <parmname>focus</parmname>, <parmname>action</parmname>
+          and <parmname>pane</parmname> parameters, and the API's answer says which
+          <parmname>signal</parmname> it used. See <xref href="../help/activity.dita"/>.</li>
+        <li audience="developer" product="embed">On a public site, the help JSON API answers without a token:
+          exactly what an anonymous visitor sees, even with embedding off, so no secret goes into your app.
+          Every answer names its release in <codeph>OpenD-Release</codeph> and
+          <codeph>OpenD-Release-Line</codeph>. See <xref href="../help/json-api.dita"/>.</li>
+        <li audience="developer" product="embed"><codeph>GET /api/v1/help/nav</codeph>: the reader's
+          navigation, for apps that draw a help sidebar.</li>
+        <li audience="developer" product="embed">Context links for public sites,
+          <filepath>/context/<varname>app</varname>/<varname>key</varname></filepath>, redirect to the
+          help topic. See <xref href="../help/context-links.dita"/>.</li>
+        <li audience="author" product="embed">The previewer's help lab tries a focused field, last pressed
+          button and pane as well as a path. See <xref href="../start/help-lab.dita"/>.</li>
+      </ul>
+    </section>
+    <section id="console">
+      <title>Admin console</title>
+      <ul>
+        <li audience="admin" product="hosted">A <uicontrol>Custom domain</uicontrol> page, where staff of a
+          managed site set, change or remove its domain and see the DNS records to add and whether they are in
+          place. See <xref href="../hosting/custom-domain.dita"/>.</li>
+        <li audience="admin">The <uicontrol>Release lines</uicontrol> form and the new version picker
+          choices described above.</li>
+      </ul>
+    </section>
+    <section id="fixes">
+      <title>Fixes</title>
+      <ul>
+        <li audience="developer"><codeph>GET /api/v1/nav</codeph> no longer lists the navtitle of a topic that
+          the key's audience cannot see.</li>
+        <li audience="admin" product="hosted">Managed sites rebuild on pushes from a GitHub App created in
+          their admin console. Before, those pushes were refused.</li>
+        <li>The version menu's label keeps full contrast in every theme.</li>
+      </ul>
+    </section>
+    <section id="upgrade" product="core">
+      <title>Upgrading from 0.2</title>
+      <p>Deploy the new image. Migrations <codeph>012_release_lines</codeph> and
+        <codeph>013_declared_site_settings</codeph> are applied on start. Repositories keep major release
+        lines and their stored settings, so readers see no change until staff switch lines or the repository
+        declares a <parmname>site</parmname> block.</p>
+      <p>The new environment variables are optional: <codeph>OPEND_HOSTING_URL</codeph> and
+        <codeph>OPEND_HOSTING_TOKEN</codeph> are set by a hosting provider, and
+        <codeph>OPEND_FLEET_REDIRECTS</codeph> applies only to a multi-site fleet. See
+        <xref href="../hosting/env-vars.dita"/> and <xref href="../hosting/upgrades.dita"/>.</p>
+    </section>
+  </body>
+</topic>

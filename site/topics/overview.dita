@@ -59,14 +59,18 @@
       <ul>
         <li>The build and filter core, the <cmdname>opend</cmdname> CLI and a local previewer.</li>
         <li>The hosted path: push to publish, OIDC reader sign-in, filtered delivery and an admin API.</li>
-        <li>Context-sensitive help embedded in your own web apps.</li>
+        <li>Context-sensitive help embedded in your own web apps, following the page and the field, button or
+          pane in use.</li>
         <li>PDF publications from bookmaps, filtered per reader.</li>
         <li>A web editor for authors who do not use Git, with live preview and publishing through pull
           requests.</li>
-        <li>A version picker, so readers can choose which version of the docs they read.</li>
+        <li>A version picker, so readers can choose which version of the docs they read, and release lines
+          per major or minor version.</li>
+        <li>Site settings declared in the docs repository's <filepath>opend.config.yaml</filepath>.</li>
       </ul>
       <p>Multi-tenancy and an operator console come later and reuse the same packages. See
-        <xref href="notes/release-0.2.dita"/> and <xref href="notes/release-0.1.dita"/>.</p>
+        <xref href="notes/release-0.3.dita"/>, <xref href="notes/release-0.2.dita"/> and
+        <xref href="notes/release-0.1.dita"/>.</p>
     </section>
     <section id="where-next">
       <title>Where to go next</title>

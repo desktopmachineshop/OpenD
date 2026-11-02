@@ -115,6 +115,7 @@
   </topichead>
 
   <topichead navtitle="Release notes">
+    <topicref href="../topics/notes/release-0.3.dita"/>
     <topicref href="../topics/notes/release-0.2.dita"/>
     <topicref href="../topics/notes/release-0.1.dita"/>
   </topichead>
