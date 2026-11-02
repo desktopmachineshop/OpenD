@@ -1,6 +1,6 @@
 {
   "name": "@opend/server",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Hosted OpenD: GitHub webhook, reader sign-in, filtered delivery and admin API",
   "license": "MIT",
   "type": "module",

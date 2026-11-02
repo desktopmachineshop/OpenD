@@ -38,7 +38,12 @@
       <codeblock>script-src 'self' https://docs.example.com;
 frame-src https://docs.example.com;</codeblock>
       <p>Apps that call the JSON API from the browser also need
-        <codeph>connect-src https://docs.example.com</codeph>.</p>
+        <codeph>connect-src https://docs.example.com</codeph>, and a <parmname>getToken</parmname> that
+        fetches from your own backend needs <codeph>connect-src 'self'</codeph>.</p>
+      <p>Nothing else is needed: the widget runs no inline script, and styles its button and panel with
+        constructable stylesheets, which <codeph>style-src</codeph> does not restrict, so it works under
+        <codeph>style-src 'self'</codeph>. Initialise it from a script file of your own rather than an inline
+        <codeph>&lt;script&gt;</codeph> if your policy forbids inline scripts.</p>
     </section>
 
     <section id="cookies">
