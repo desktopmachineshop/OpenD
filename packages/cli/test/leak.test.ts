@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { ReaderContext } from '@opend/model';
 import { readerPolicy, resolveContext, viewPublication, viewRelease } from '@opend/filter';
 import { renderIndex, renderNotFound, renderPage, renderPublication } from '@opend/render-html';
-import { loadProject } from '../src/index.js';
+import { loadProject, packageOffline } from '../src/index.js';
 import { MARKERS } from './markers.js';
 
 const STARTER = join(import.meta.dirname, '../../../templates/docs-starter');
@@ -112,6 +112,30 @@ describe('no content leaks to readers who are not entitled to it', async () => {
           /data-applies=|opend-target=|opend-asset=|<opend-cond|<opend-choice/,
         );
         expect(print).not.toMatch(/\b(product|feature|release|audience)="/);
+      });
+    });
+
+    describe('offline package', async () => {
+      const files = await packageOffline(project, { audience: { kind: 'inline', context } });
+      const text = [...files]
+        .filter(([path]) => path.endsWith('.html'))
+        .map(([, data]) => data.toString('utf8'))
+        .join('\n');
+      it.each(MARKERS)('%s', (phrase, rule) => {
+        expect(text.includes(phrase)).toBe(rule(context));
+      });
+      it('holds a page for each visible topic and nothing else', () => {
+        const pages = [...files.keys()].filter((p) => p.endsWith('.html') && p !== 'index.html');
+        expect(pages.sort()).toEqual(
+          view
+            .topicIds()
+            .map((id) => `${id}.html`)
+            .sort(),
+        );
+        expect(text).not.toMatch(
+          /data-applies=|opend-target=|opend-asset=|<opend-cond|<opend-choice/,
+        );
+        expect(text).not.toMatch(/\b(product|feature|release|audience)="/);
       });
     });
 

@@ -7,3 +7,4 @@ export { TAGS } from './elements.js';
 export * from './embed.js';
 export * from './publication.js';
 export * from './theme.js';
+export * from './offline.js';

@@ -1,7 +1,7 @@
 {
   "name": "@opend/cli",
-  "version": "0.3.1",
-  "description": "OpenD command line: build, validate and local preview",
+  "version": "0.3.2",
+  "description": "OpenD command line: build, validate, local preview and offline packages",
   "license": "MIT",
   "type": "module",
   "exports": {

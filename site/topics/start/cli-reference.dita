@@ -50,5 +50,24 @@
         <strow><stentry><option>--no-watch</option></stentry><stentry>watching</stentry><stentry>Do not rebuild when files change.</stentry></strow>
       </simpletable>
     </refsyn>
+
+    <refsyn id="package">
+      <title>opend package [dir]</title>
+      <p>Writes one reader's docs as a static site that opens offline: a page per topic they can see, the
+        images and files those topics use, the theme and the logo, with relative links and no scripts. One
+        reader option is required. Fails without writing anything when there is an error. See
+        <xref href="package-offline.dita"/>.</p>
+      <simpletable relcolwidth="1* 1* 3*">
+        <sthead><stentry>Option</stentry><stentry>Default</stentry><stentry>Meaning</stentry></sthead>
+        <strow><stentry><option>--as &lt;name&gt;</option></stentry><stentry></stentry><stentry>Package for a named reader from <filepath>preview-contexts.yaml</filepath>.</stentry></strow>
+        <strow><stentry><option>--product &lt;list&gt;</option></stentry><stentry></stentry><stentry>Package for a reader holding these products, comma-separated. Can be repeated.</stentry></strow>
+        <strow><stentry><option>--feature &lt;list&gt;</option></stentry><stentry></stentry><stentry>Package for a reader holding these features, comma-separated. Can be repeated.</stentry></strow>
+        <strow><stentry><option>--version &lt;version&gt;</option></stentry><stentry>the project's release</stentry><stentry>The reader's release, such as <codeph>0.1</codeph>.</stentry></strow>
+        <strow><stentry><option>--all</option></stentry><stentry>off</stentry><stentry>The staff view: everything, with conditions marked. Only for your own team.</stentry></strow>
+        <strow><stentry><option>--ref &lt;ref&gt;</option></stentry><stentry>working tree</stentry><stentry>Package a git branch or tag.</stentry></strow>
+        <strow><stentry><option>--out &lt;path&gt;</option></stentry><stentry><filepath>.opend/package/&lt;title&gt;-&lt;release&gt;-&lt;reader&gt;.zip</filepath></stentry><stentry>A <filepath>.zip</filepath> file, whose pages sit in one folder named after it, or any other path for a new or empty folder.</stentry></strow>
+        <strow><stentry><option>--pdf</option></stentry><stentry>off</stentry><stentry>Also print each publication the reader can see into <filepath>pdf/</filepath>. Needs headless Chromium.</stentry></strow>
+      </simpletable>
+    </refsyn>
   </refbody>
 </reference>

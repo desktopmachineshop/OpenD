@@ -10,6 +10,8 @@ export interface PageOptions extends RenderOptions {
   siteThemeHref?: string;
   /** URL of the project logo, shown before the site title in the header. */
   logoHref?: string;
+  /** Where the site title links. Default: `base`. Offline packages name `index.html`. */
+  homeHref?: string;
   /** Trusted HTML inserted at the top of the page body, e.g. the previewer banner. */
   banner?: string;
   /** Trusted HTML inserted at the end of the body, e.g. the live-reload script. */
@@ -211,7 +213,7 @@ ${theme}${siteTheme}
 <body class="opend-site">
 <a class="opend-skip" href="#opend-main">Skip to content</a>
 ${options.banner ?? ''}
-<header class="site-header">${menu(nav, options)}<a class="site-title" href="${escapeHtml(base)}">${logo}<span>${escapeHtml(release.title)}</span></a>${options.version?.header ?? `<span class="site-release">Release ${escapeHtml(release.release)}</span>`}${publicationLinks(options)}${searchBox(options)}${options.account?.header ?? ''}</header>
+<header class="site-header">${menu(nav, options)}<a class="site-title" href="${escapeHtml(options.homeHref ?? base)}">${logo}<span>${escapeHtml(release.title)}</span></a>${options.version?.header ?? `<span class="site-release">Release ${escapeHtml(release.release)}</span>`}${publicationLinks(options)}${searchBox(options)}${options.account?.header ?? ''}</header>
 <div class="layout">
 <nav class="toc opend-nav" id="opend-toc" aria-label="Contents">${nav}</nav>
 <main id="opend-main">${main}</main>

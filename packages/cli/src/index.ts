@@ -1,3 +1,5 @@
 export * from './project.js';
 export * from './server.js';
 export * from './program.js';
+export * from './package.js';
+export * from './zip.js';

@@ -2,6 +2,8 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join, relative } from 'node:path';
 import { Command, InvalidArgumentError } from 'commander';
 import { formatDiagnostic, hasErrors, type Diagnostic } from '@opend/model';
+import { createPdfRenderer } from '@opend/pdf';
+import { packageName, packageOffline, writePackage } from './package.js';
 import { audienceFromOptions, collectList, describeAudience, loadProject } from './project.js';
 import { startPreview } from './server.js';
 
@@ -57,7 +59,7 @@ export function createProgram(
 ): Command {
   const program = new Command('opend')
     .description('Build, validate and preview DITA docs where release and entitlement are one rule')
-    .version('0.3.1')
+    .version('0.3.2')
     // Program options only before the subcommand, so `preview --version 1.4` reaches preview.
     .enablePositionalOptions()
     .configureOutput({
@@ -162,6 +164,73 @@ export function createProgram(
         io.out(
           `Serving ${preview.url}${opts.ref ? ` (git ref ${opts.ref})` : opts.watch ? ' (watching for changes)' : ''}`,
         );
+      },
+    );
+
+  program
+    .command('package')
+    .description(
+      "write one reader's docs as a static site that opens offline: a .zip file or a folder",
+    )
+    .argument('[dir]', 'docs root containing opend.config.yaml', '.')
+    .option('--as <name>', 'package for a named reader from preview-contexts.yaml')
+    .option('--product <list>', 'package for a reader holding these products', collectList)
+    .option('--feature <list>', 'package for a reader holding these features', collectList)
+    .option('--version <version>', "reader's release, e.g. 1.4 (default: the project's release)")
+    .option('--all', 'package everything with conditions marked (staff only)')
+    .option('--ref <ref>', 'package a git branch or tag instead of the working tree')
+    .option(
+      '--out <path>',
+      'a .zip file, or a new or empty folder (default: .opend/package/<name>.zip in the docs root)',
+    )
+    .option('--pdf', 'also print the publications the reader can see into pdf/ (needs Chromium)')
+    .action(
+      async (
+        dir: string,
+        opts: {
+          as?: string;
+          product?: string[];
+          feature?: string[];
+          version?: string;
+          all?: boolean;
+          ref?: string;
+          out?: string;
+          pdf?: boolean;
+        },
+      ) => {
+        // Fail closed: a package leaves the machine, so it never defaults to the staff view.
+        if (!opts.all && !opts.as && !opts.product && !opts.feature && !opts.version) {
+          io.err(
+            'choose who the package is for: --as <name>, --product/--feature/--version, or --all',
+          );
+          setExitCode(1);
+          return;
+        }
+        const project = await loadProject(dir, opts.ref);
+        report(io, project.diagnostics, 'text');
+        if (!project.build.release || hasErrors(project.diagnostics)) {
+          setExitCode(1);
+          return;
+        }
+        const audience = audienceFromOptions(
+          opts,
+          project.contexts,
+          project.build.config?.release ?? '0',
+        );
+        const pdf = opts.pdf ? createPdfRenderer() : undefined;
+        try {
+          const files = await packageOffline(project, pdf ? { audience, pdf } : { audience });
+          const out =
+            opts.out ??
+            join(project.root, '.opend', 'package', `${packageName(project, audience)}.zip`);
+          await writePackage(files, out);
+          const pages = [...files.keys()].filter((f) => f.endsWith('.html')).length;
+          io.out(`Packaged for ${describeAudience(audience)}`);
+          io.out(`wrote ${displayPath(out)} (${pages} pages, ${files.size} files)`);
+          setExitCode(0);
+        } finally {
+          await pdf?.close();
+        }
       },
     );
 

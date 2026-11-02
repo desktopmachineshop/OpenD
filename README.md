@@ -27,7 +27,12 @@ pnpm opend preview templates/docs-starter --product widget,gadget --feature sso 
 
 # Write the release snapshot the hosted build would store
 pnpm opend build templates/docs-starter --out release.json
+
+# Package one reader's docs as a static site that opens offline (zip, or a folder)
+pnpm opend package templates/docs-starter --as v2-pro --out widget-docs.zip
 ```
+
+`opend package` writes the pages a reader can see, the images they use, the theme and the logo, with relative links and no scripts, so they open from disk with no server; `--pdf` adds that reader's PDFs. It needs a reader option (`--as`, `--product`/`--feature`/`--version`, or `--all` for the staff view) and leaves out everything else. See `site/topics/start/package-offline.dita`.
 
 The preview banner switches between reader contexts and lists any problems. The search box in the page header searches the current reader's pages in memory. `--ref v1` previews a release branch or tag without checking it out.
 
@@ -87,7 +92,7 @@ See [docs/adr/0003-applicability.md](docs/adr/0003-applicability.md) for the det
 | [`@opend/validate`](packages/validate)       | Every check, shared by CI, the CLI and the previewer                                                |
 | [`@opend/render-html`](packages/render-html) | Filtered view to HTML pages and navigation, and a publication to one print HTML document            |
 | [`@opend/pdf`](packages/pdf)                 | Prints self-contained HTML to PDF with one reused headless Chromium (`playwright-core`)             |
-| [`@opend/cli`](packages/cli)                 | `opend validate`, `opend build`, `opend preview`                                                    |
+| [`@opend/cli`](packages/cli)                 | `opend validate`, `opend build`, `opend preview`, `opend package` (offline docs)                    |
 | [`@opend/store`](packages/store)             | Postgres schema and migrations, build queue, releases, orgs, readers and entitlements; blob store   |
 | [`@opend/worker`](packages/worker)           | Fetches a pushed commit, builds, validates, then publishes or reports the failure                   |
 | [`@opend/embed`](packages/embed)             | Help widget (`OpenDHelp`, `<opend-help-button>`) and in-frame script for host apps                  |

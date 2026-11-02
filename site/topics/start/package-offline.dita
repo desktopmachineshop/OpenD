@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE task PUBLIC "-//OASIS//DTD DITA Task//EN" "task.dtd">
+<task id="package-offline" audience="author">
+  <title>Package the docs for offline reading</title>
+  <shortdesc>Write one reader's docs as a static site that opens straight from disk, with no server and
+    no network, to ship with a release, hand to a customer or read on a machine with no access to the
+    docs site.</shortdesc>
+  <taskbody>
+    <context>
+      <p><cmdname>opend package</cmdname> builds the docs, filters them for one reader exactly as the
+        previewer and the hosted site do, and writes every page that reader can see. The package holds a
+        page per visible topic, <filepath>index.html</filepath> (the first topic), the images and files those
+        topics use, the theme and the logo. Topics and images the reader cannot see are left out, so a
+        package is safe to give to that reader.</p>
+      <p>Every link is relative and nothing needs scripts, so the pages work from a
+        <codeph>file://</codeph> address, a USB stick or any static web server, in light and dark mode and
+        on narrow screens. The package has no search box, as there is no server to answer it; readers
+        browse the contents or use their browser's find.</p>
+    </context>
+    <steps>
+      <step>
+        <cmd>Choose who the package is for and package it.</cmd>
+        <info>
+          <p>Name a reader from <filepath>preview-contexts.yaml</filepath>, or give their products, features
+            and version. There is no default: a package leaves your machine, so the command refuses to guess
+            and never falls back to the staff view.</p>
+        </info>
+        <stepxmp>
+          <codeblock>pnpm opend package path/to/docs --as v2-pro
+pnpm opend package path/to/docs --product widget --feature sso --version 2.1 --out widget-2.1.zip</codeblock>
+        </stepxmp>
+        <stepresult>
+          <p>It prints any problems, then <systemoutput>wrote .opend/package/&lt;name&gt;.zip (… pages, …
+            files)</systemoutput>. The zip holds one folder named after the file. A build error writes
+            nothing.</p>
+        </stepresult>
+      </step>
+      <step importance="optional">
+        <cmd>Write a folder instead of a zip file.</cmd>
+        <info>
+          <p>Give <option>--out</option> a path that does not end in <filepath>.zip</filepath>. The folder must
+            be new or empty, so an old package is never mixed with a new one.</p>
+        </info>
+        <stepxmp>
+          <codeblock>pnpm opend package path/to/docs --as v2-pro --out dist/offline-docs</codeblock>
+        </stepxmp>
+      </step>
+      <step importance="optional">
+        <cmd>Bundle the PDF publications with <option>--pdf</option>.</cmd>
+        <info>
+          <p>Each publication the reader can see is printed for them into <filepath>pdf/</filepath> and linked
+            from the page header. Printing needs headless Chromium, as in
+            <xref href="../pdf/pdf-overview.dita"/>; set <codeph>OPEND_CHROMIUM_PATH</codeph> if Playwright's
+            browser is not installed. Links in a PDF to topics outside the publication print as plain
+            text.</p>
+        </info>
+      </step>
+      <step>
+        <cmd>Open <filepath>index.html</filepath> to check it.</cmd>
+      </step>
+    </steps>
+    <postreq>
+      <p><option>--all</option> packages the staff view: everything, with conditions marked. Use it only for
+        your own team. See <xref href="cli-reference.dita#cli-reference/package"/> for every option.</p>
+    </postreq>
+  </taskbody>
+</task>
