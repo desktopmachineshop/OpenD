@@ -86,6 +86,15 @@
         <li>The version menu's label keeps full contrast in every theme.</li>
       </ul>
     </section>
+    <section id="patch-0.3.1">
+      <title>In 0.3.1</title>
+      <ul>
+        <li audience="developer" product="embed">The help widget works in host apps whose Content Security
+          Policy allows no inline styles (<codeph>style-src 'self'</codeph>): it styles its button and panel
+          with constructable stylesheets. Before, the panel was blocked from being styled there. See
+          <xref href="../help/security.dita#security/host-csp"/>.</li>
+      </ul>
+    </section>
     <section id="upgrade" product="core">
       <title>Upgrading from 0.2</title>
       <p>Deploy the new image. Migrations <codeph>012_release_lines</codeph> and

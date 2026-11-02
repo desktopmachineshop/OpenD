@@ -1,6 +1,6 @@
 {
   "name": "@opend/validate",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Validation checks shared by CI, the previewer and the hosted build",
   "license": "MIT",
   "type": "module",

@@ -69,6 +69,28 @@ export function installWidget(win: Window & { OpenDHelp?: OpenDHelpApi }): void 
   let expectReady = false;
   let followTimer: ReturnType<typeof setTimeout> | undefined;
 
+  /**
+   * Styles a shadow root with a constructable stylesheet, which a host page's
+   * Content-Security-Policy does not restrict, so the widget works under
+   * `style-src 'self'`. Browsers without them get a <style> element.
+   */
+  const styleRoot = (root: ShadowRoot, css: string) => {
+    const Sheet = (win as unknown as { CSSStyleSheet?: typeof CSSStyleSheet }).CSSStyleSheet;
+    try {
+      if (Sheet && 'adoptedStyleSheets' in root) {
+        const sheet = new Sheet();
+        sheet.replaceSync(css);
+        root.adoptedStyleSheets = [sheet];
+        return;
+      }
+    } catch {
+      // Fall back to a <style> element below.
+    }
+    const style = doc.createElement('style');
+    style.textContent = css;
+    root.append(style);
+  };
+
   const clean = (value: unknown): string | null =>
     typeof value === 'string' && value.trim() && value.length <= MAX ? value.trim() : null;
 
@@ -126,8 +148,9 @@ export function installWidget(win: Window & { OpenDHelp?: OpenDHelpApi }): void 
     const root = host.attachShadow({ mode: 'open' });
     const width = options!.width ?? 380;
     const side = options!.side ?? 'right';
-    const style = doc.createElement('style');
-    style.textContent = `
+    styleRoot(
+      root,
+      `
       :host { all: initial; }
       .panel { position: fixed; top: 0; ${side}: 0; height: 100vh; height: 100dvh; width: ${width}px; max-width: 100vw;
         z-index: ${options!.zIndex ?? 2147483000}; background: Canvas; color: CanvasText;
@@ -136,7 +159,8 @@ export function installWidget(win: Window & { OpenDHelp?: OpenDHelpApi }): void 
       .panel.open { transform: none; visibility: visible; }
       iframe { border: 0; width: 100%; height: 100%; display: block; }
       @media (max-width: 600px) { .panel { width: 100vw; } }
-      @media (prefers-reduced-motion: reduce) { .panel { transition: none; } }`;
+      @media (prefers-reduced-motion: reduce) { .panel { transition: none; } }`,
+    );
     panel = doc.createElement('aside');
     panel.className = 'panel';
     panel.setAttribute('role', 'complementary');
@@ -145,7 +169,7 @@ export function installWidget(win: Window & { OpenDHelp?: OpenDHelpApi }): void 
     frame.title = 'Help';
     frame.setAttribute('referrerpolicy', 'strict-origin');
     panel.append(frame);
-    root.append(style, panel);
+    root.append(panel);
     doc.body.append(host);
   };
 
@@ -310,15 +334,17 @@ export function installWidget(win: Window & { OpenDHelp?: OpenDHelpApi }): void 
           button.setAttribute('part', 'button');
           button.setAttribute('aria-label', this.getAttribute('label') ?? 'Help for this page');
           button.textContent = '?';
-          const style = doc.createElement('style');
-          style.textContent = `button { font: 600 14px/1 system-ui, sans-serif; width: 28px; height: 28px;
-            border-radius: 50%; border: 1px solid currentColor; background: transparent; color: inherit; cursor: pointer; }`;
+          styleRoot(
+            root,
+            `button { font: 600 14px/1 system-ui, sans-serif; width: 28px; height: 28px;
+            border-radius: 50%; border: 1px solid currentColor; background: transparent; color: inherit; cursor: pointer; }`,
+          );
           button.addEventListener('click', () => {
             const key = this.getAttribute('key');
             const path = this.getAttribute('path');
             api.toggle(key ? { key } : path ? { path } : undefined);
           });
-          root.append(style, button);
+          root.append(button);
         }
       },
     );

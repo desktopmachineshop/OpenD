@@ -90,6 +90,33 @@ describe.skipIf(!url || !hasBrowser)('embedded help widget in a browser', () => 
           .then((t) => res.end(t));
         return;
       }
+      if (u.pathname === '/strict-init.js') {
+        res.setHeader('content-type', 'text/javascript');
+        res.end(`OpenDHelp.init({
+  docsUrl: ${JSON.stringify(docsUrl)},
+  app: 'console',
+  getToken: () => fetch('/token?user=gus').then((r) => r.text()),
+});
+OpenDHelp.setContext({ key: 'settings.sso' });
+document.getElementById('open').addEventListener('click', () => OpenDHelp.open());`);
+        return;
+      }
+      if (u.pathname === '/strict') {
+        // A host app with a strict policy: no inline script or style anywhere.
+        res.setHeader(
+          'content-security-policy',
+          `default-src 'none'; script-src 'self' ${docsUrl}; style-src 'self'; frame-src ${docsUrl}; connect-src 'self'`,
+        );
+        res.setHeader('content-type', 'text/html');
+        res.end(`<!doctype html><html><body>
+<h1>Strict host</h1>
+<button id="open" type="button">Help</button>
+<opend-help-button></opend-help-button>
+<script src="${docsUrl}/embed/opend-help.js"></script>
+<script src="/strict-init.js"></script>
+</body></html>`);
+        return;
+      }
       res.setHeader('content-type', 'text/html');
       if (u.pathname === '/settings') {
         // A host view whose fields, buttons and tabs say which help they need.
@@ -273,6 +300,34 @@ describe.skipIf(!url || !hasBrowser)('embedded help widget in a browser', () => 
       .toContain('Widget Platform overview');
     await page.evaluate(() => (window as unknown as Help).OpenDHelp.setContext({ path: '/x' }));
     expect(await activity()).toEqual({ focus: 'settings.sso.idp', path: '/x' });
+    await page.close();
+  });
+
+  it('works on a host page whose CSP allows no inline styles or scripts', async () => {
+    const page = await browser.newPage();
+    const violations: string[] = [];
+    page.on('console', (m) => {
+      if (/Content Security Policy|Refused to/i.test(m.text())) violations.push(m.text());
+    });
+    await page.goto(`${hostUrl}/strict`);
+    // The help button is styled: round, as its stylesheet says.
+    const radius = await page
+      .locator('opend-help-button')
+      .locator('button')
+      .evaluate((b) => getComputedStyle(b).borderTopLeftRadius);
+    expect(radius).toBe('50%');
+    await page.click('#open');
+    await expect
+      .poll(() => frameText(page), { timeout: 10_000 })
+      .toContain('Configure single sign-on');
+    // The panel is laid out as a fixed drawer, not dropped unstyled into the page.
+    const position = await page.evaluate(() => {
+      const host = document.querySelector('[data-opend-help]')!;
+      const panel = host.shadowRoot!.querySelector('.panel')!;
+      return getComputedStyle(panel).position;
+    });
+    expect(position).toBe('fixed');
+    expect(violations).toEqual([]);
     await page.close();
   });
 
