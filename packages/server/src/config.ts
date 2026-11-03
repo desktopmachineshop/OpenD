@@ -99,6 +99,8 @@ const envSchema = z
     // Where AI assistants connect (the managed service's MCP server for this site),
     // shown on the admin console's API page.
     OPEND_MCP_URL: z.url().optional(),
+    // The managed host's account panel, linked from the admin console's header.
+    OPEND_ACCOUNT_URL: z.url().optional(),
     // On unless set to 0/false/off; nothing about a reader is recorded either way.
     OPEND_ANALYTICS: z
       .string()
@@ -246,6 +248,8 @@ export interface ServerConfig {
   embed?: { secret: string; origins: string[] };
   /** The MCP server address for this site (managed hosting), shown on the API page. */
   mcpUrl?: string;
+  /** The managed host's account panel (`OPEND_ACCOUNT_URL`), linked from the admin console. */
+  accountUrl?: string;
   /**
    * Docs analytics and reader feedback. Absent means on, with the default
    * retention; `enabled: false` records nothing and hides the feedback form.
@@ -344,5 +348,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
   if (e.OPEND_EMBED_SECRET)
     config.embed = { secret: e.OPEND_EMBED_SECRET, origins: e.OPEND_EMBED_ORIGINS };
   if (e.OPEND_MCP_URL) config.mcpUrl = e.OPEND_MCP_URL;
+  if (e.OPEND_ACCOUNT_URL) config.accountUrl = e.OPEND_ACCOUNT_URL;
   return config;
 }

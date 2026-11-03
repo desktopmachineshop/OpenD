@@ -14,8 +14,9 @@ export const ADMIN_CSS = `
 .admin-page { max-width: 60rem; margin: 0 auto; }
 .admin-mark { display: inline-grid; place-items: center; flex: none; width: 30px; height: 30px; border-radius: var(--opend-radius-sm); background: var(--opend-accent); color: var(--opend-on-accent); }
 .admin-mark svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.admin-view-site { margin-left: auto; font-size: 14px; font-weight: 600; text-decoration: none; }
-.admin-view-site:hover { text-decoration: underline; }
+.admin-header-links { display: flex; align-items: center; gap: 20px; margin-left: auto; }
+.admin-header-link { font-size: 14px; font-weight: 600; text-decoration: none; }
+.admin-header-link:hover { text-decoration: underline; }
 .opend-admin .site-header > .site-account { margin-left: 0; }
 .admin-nav-label { margin: 18px 0 4px; padding: 0 10px; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--opend-muted); }
 .admin-nav-label:first-child { margin-top: 0; }
@@ -169,7 +170,7 @@ ${Object.entries(THEME_PRESETS)
 
 @media (max-width: 60rem) {
   .opend-admin main { padding: 20px 16px 56px; }
-  .admin-view-site { display: none; }
+  .admin-header-links { display: none; }
   .admin-card { padding: 18px 16px; border-radius: var(--opend-radius); }
   .admin-facts { grid-template-columns: 1fr; gap: 2px; }
   .admin-facts dd { margin-bottom: 8px; }

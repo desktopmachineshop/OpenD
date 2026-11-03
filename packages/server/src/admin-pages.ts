@@ -150,6 +150,8 @@ export interface ShellOptions {
   flash?: Flash | null;
   /** Warnings shown on every page, such as unreadable stored secrets. */
   warnings?: string[];
+  /** The managed host's account panel (`OPEND_ACCOUNT_URL`): a link back to it. */
+  accountUrl?: string | null;
 }
 
 function navList(current: AdminSection): Html {
@@ -217,13 +219,27 @@ ${html`<a class="opend-skip" href="#opend-main">Skip to content</a>
         <div class="site-menu-account">
           <p class="site-menu-who">Signed in as <strong>${display}</strong> (staff)</p>
           <p class="site-menu-who"><a href="/">View the documentation</a></p>
+          ${
+            o.accountUrl
+              ? html`<p class="site-menu-who">
+                  <a href="${o.accountUrl}">Back to your account</a>
+                </p>`
+              : ''
+          }
           ${signOut}
         </div>
       </div>
     </details>
     <a class="site-title" href="/admin"
       ><span class="admin-mark">${ICONS.shield}</span><span>${o.siteTitle}</span></a
-    ><span class="site-release">Admin</span><a class="admin-view-site" href="/">View site</a>
+    ><span class="site-release">Admin</span
+    ><span class="admin-header-links"
+      >${
+        o.accountUrl
+          ? html`<a class="admin-header-link" href="${o.accountUrl}">Your account</a>`
+          : ''
+      }<a class="admin-header-link" href="/">View site</a></span
+    >
     <div class="site-account">
       <span class="site-account-who" title="${o.reader.email}"
         ><span class="site-avatar" aria-hidden="true">${Array.from(display)[0] ?? '?'}</span

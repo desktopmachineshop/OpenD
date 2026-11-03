@@ -1106,6 +1106,24 @@ describe.skipIf(!url)('the admin console', () => {
       expect(again.body).toContain('already used');
     });
 
+    it('links back to the account panel the admin was opened from', async () => {
+      const res = await open(handoff('owner@docs.example', false));
+      const before = (await get('/admin', cookiesFrom(res))).body;
+      expect(before).not.toContain('Your account');
+      h.ctx.env.accountUrl = 'https://hosting.example/account';
+      try {
+        const page = (await get('/admin', cookiesFrom(res))).body;
+        expect(page).toContain(
+          '<a class="admin-header-link" href="https://hosting.example/account">Your account</a>',
+        );
+        expect(page).toContain(
+          '<a href="https://hosting.example/account">Back to your account</a>',
+        );
+      } finally {
+        delete h.ctx.env.accountUrl;
+      }
+    });
+
     it('refuses people who are not staff, unless they own the site', async () => {
       const reader = await open(handoff('stranger@docs.example', false));
       expect(reader.statusCode).toBe(403);
