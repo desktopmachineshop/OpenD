@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE topic PUBLIC "-//OASIS//DTD DITA Topic//EN" "topic.dtd">
+<!-- release="0.4..": every reader on 0.4 or later sees these notes. -->
+<topic id="release-0.4" release="0.4.." audience="author admin developer">
+  <title>Release notes for 0.4</title>
+  <shortdesc>Offline packages of one reader's docs, a way back to the managed account from the admin console,
+    and a help widget that works under a strict Content Security Policy.</shortdesc>
+  <prolog>
+    <resourceid appname="opend-console" appid="whats-new-0.4"/>
+  </prolog>
+  <body>
+    <section id="features">
+      <title>New</title>
+      <ul>
+        <li audience="author">New command <cmdname>opend package</cmdname> writes one reader's docs as a
+          static site that opens offline, as a zip file or a folder, optionally with their PDFs. Only what
+          that reader may see goes in. See <xref href="../start/package-offline.dita"/>.</li>
+        <li audience="admin" product="hosted">The admin console links back to the managed service's account
+          panel: <uicontrol>Your account</uicontrol> in its header, and <uicontrol>Back to your
+          account</uicontrol> in its menu on phones.<ph product="core"> See
+          <xref href="../hosting/env-vars.dita"/>.</ph></li>
+      </ul>
+    </section>
+    <section id="fixes">
+      <title>Fixes</title>
+      <ul>
+        <li audience="developer" product="embed">The help widget works in host apps whose Content Security
+          Policy allows no inline styles (<codeph>style-src 'self'</codeph>): it styles its button and panel
+          with constructable stylesheets. Before, the panel was blocked from being styled there. See
+          <xref href="../help/security.dita#security/host-csp"/>.</li>
+      </ul>
+    </section>
+    <section id="upgrade" product="core">
+      <title>Upgrading from 0.3</title>
+      <p>Deploy the new image. There are no new migrations. The new environment variable
+        <codeph>OPEND_ACCOUNT_URL</codeph> is optional and set by a hosting provider; see
+        <xref href="../hosting/env-vars.dita"/>.</p>
+    </section>
+  </body>
+</topic>

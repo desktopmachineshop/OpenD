@@ -69,7 +69,8 @@
         <li>Site settings declared in the docs repository's <filepath>opend.config.yaml</filepath>.</li>
       </ul>
       <p>Multi-tenancy and an operator console come later and reuse the same packages. See
-        <xref href="notes/release-0.3.dita"/>, <xref href="notes/release-0.2.dita"/> and
+        <xref href="notes/release-0.4.dita"/>, <xref href="notes/release-0.3.dita"/>,
+        <xref href="notes/release-0.2.dita"/> and
         <xref href="notes/release-0.1.dita"/>.</p>
     </section>
     <section id="where-next">
